@@ -1,0 +1,403 @@
+/* ==========================================================================
+   Tela de Instruções — réplica dos frames do Figma (desktop 1440 + mobile 412).
+   Aberta pelo "Saiba Mais" da seção Projeto.
+
+   Duas seções:
+   1) Instruções  → título + card de vídeo (player + faixa navy "Veja a Cogni
+      em ação.") com um selo de lâmpada saindo do canto.
+   2) Descrição   → título + grade de 6 cards numerados (passo a passo).
+
+   Ao contrário do article.css (que usa "palco" de posição absoluta), aqui o
+   layout é FLUIDO de verdade (grid + flexbox): os 6 cards reflowam 3→2→1
+   colunas conforme a tela, como nas demais seções do site. As cores, raios e
+   proporções saem do Figma; o comportamento responsivo é robusto.
+   ========================================================================== */
+
+/* --- Variáveis locais da página (derivadas dos tokens + valores do Figma) - */
+.instructions {
+  /* Navy do card de vídeo e dos círculos numerados */
+  --instr-navy: #080c38;
+  /* Dourado das bordas/realces (já existe como --brand-gold) */
+  --instr-gold: var(--brand-gold);
+  /* Texto dos cards numerados (navy no claro, claro no escuro) */
+  --instr-card-text: #080c38;
+  /* Fundo translúcido dos cards numerados (Figma: rgba(241,241,241,0.2)) */
+  --instr-card-bg: rgba(241, 241, 241, 0.2);
+  --instr-card-border-top: 19px;
+  --instr-card-radius: 15px;
+}
+
+/* No escuro, os cards numerados precisam de mais contraste: texto claro e um
+   fundo um pouco mais visível (o rgba claro some sobre o fundo escuro). */
+[data-theme="dark"] .instructions {
+  --instr-card-text: #f1f1f1;
+  --instr-card-bg: rgba(255, 255, 255, 0.04);
+}
+
+/* O <main> ocupa a tela toda abaixo do header fixo. Damos respiro no topo
+   (header) e embaixo (antes do footer). */
+.instructions {
+  position: relative;
+  padding-top: clamp(7rem, 14vh, 9.5rem);
+  padding-bottom: clamp(3rem, 8vh, 6rem);
+  overflow: hidden;
+}
+
+/* Nota: o componente "Voltar" (.back-link) é compartilhado e mora em
+   sections.css (design system), pois também é usado no login/cadastro.
+   Aqui só ajustamos o espaçamento dele neste contexto (acima do título). */
+.instructions .back-link {
+  margin-bottom: clamp(1rem, 2.5vh, 1.75rem);
+}
+
+/* ==========================================================================
+   Cabeçalho de bloco (título display + linha decorativa + subtítulo).
+   Reproduz o conjunto "Instruções / Descrição" do Figma: título grande
+   (Zilla Slab Regular ~96px no desktop), uma linha curta dourada logo abaixo
+   alinhada à esquerda do título, e um subtítulo discreto.
+   ========================================================================== */
+.instr-heading {
+  position: relative;
+  text-align: center;
+  margin-bottom: clamp(2rem, 5vh, 3.5rem);
+}
+.instr-heading__title {
+  font-family: var(--font-body);
+  font-weight: var(--fw-regular);
+  /* Figma: 96px @1440 — fluido pra telas menores (28px no mobile do Figma) */
+  font-size: clamp(1.75rem, 6.6vw, 6rem);
+  line-height: 1;
+  color: var(--text-primary);
+  transition: color 0.45s ease;
+}
+/* Linha dourada curta sob o título. No Figma ela é ~485px e nasce alinhada à
+   borda esquerda da palavra; aqui a centralizamos junto do título e limitamos
+   a largura, mantendo o mesmo "peso" visual. */
+.instr-heading__line {
+  display: block;
+  width: clamp(120px, 33%, 485px);
+  height: 4px;
+  border-radius: 4px;
+  background-color: var(--section-line);
+  margin: clamp(0.4rem, 1vh, 0.75rem) auto clamp(0.6rem, 1.4vh, 1rem);
+  transition: background-color 0.45s ease;
+}
+.instr-heading__subtitle {
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: clamp(0.85rem, 1.05vw, 1.1rem);
+  color: var(--text-primary);
+  opacity: 0.85;
+  max-width: 60ch;
+  margin-inline: auto;
+  transition: color 0.45s ease;
+}
+
+/* ==========================================================================
+   SEÇÃO 1 — Card de vídeo "Veja a Cogni em ação."
+   Estrutura: um cartão com a parte de cima = vídeo (thumbnail + play) e a
+   parte de baixo = faixa navy com título + texto. Borda inferior dourada.
+   Um selo de lâmpada (círculo dourado) "sai" do canto superior direito.
+   ========================================================================== */
+.instr-video {
+  position: relative;
+  max-width: 1158px;            /* largura do card no Figma (@1440) */
+  margin-inline: auto;
+  margin-bottom: clamp(3.5rem, 9vh, 7rem);
+}
+
+/* O cartão em si (vídeo + faixa). overflow:hidden recorta o vídeo nos cantos
+   arredondados do topo; a borda inferior dourada vem do .instr-video__caption. */
+.instr-video__card {
+  position: relative;
+  border-radius: 30px;
+  background-color: var(--instr-navy);
+  box-shadow: 0 18px 40px -18px rgba(8, 12, 56, 0.55);
+  transition: background-color 0.45s ease;
+}
+
+/* --- Player (thumbnail + botão play) --- */
+.instr-video__player {
+  position: relative;
+  display: block;
+  width: 100%;
+  /* moldura navy ao redor do vídeo, como no Figma (border 12px) */
+  padding: 12px 12px 0;
+  border-radius: 30px 30px 0 0;
+  cursor: pointer;
+}
+.instr-video__thumb {
+  width: 100%;
+  height: auto;
+  /* proporção do vídeo no Figma (~1134×326 → recorte largo) */
+  aspect-ratio: 1134 / 326;
+  object-fit: cover;
+  border-radius: 20px 20px 0 0;
+  display: block;
+}
+/* leve escurecida pra dar contraste ao play e indicar "clicável" */
+.instr-video__player::after {
+  content: "";
+  position: absolute;
+  inset: 12px 12px 0;
+  border-radius: 20px 20px 0 0;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 12, 56, 0.05) 0%,
+    rgba(8, 12, 56, 0.22) 100%
+  );
+  pointer-events: none;
+  transition: background 0.3s ease;
+}
+.instr-video__player:hover::after {
+  background: linear-gradient(
+    180deg,
+    rgba(8, 12, 56, 0.02) 0%,
+    rgba(8, 12, 56, 0.12) 100%
+  );
+}
+
+/* Botão play circular dourado, centralizado sobre o vídeo */
+.instr-video__play {
+  position: absolute;
+  top: calc(50% + 6px); /* +6px compensa a moldura superior de 12px */
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: clamp(64px, 9vw, 100px);
+  height: clamp(64px, 9vw, 100px);
+  border-radius: 50%;
+  background-color: var(--instr-gold);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 22px -6px rgba(240, 163, 21, 0.7);
+  transition: transform 0.25s ease, filter 0.2s ease, background-color 0.45s ease;
+}
+.instr-video__player:hover .instr-video__play {
+  transform: translate(-50%, -50%) scale(1.07);
+  filter: brightness(1.05);
+}
+.instr-video__play svg {
+  width: 42%;
+  height: 42%;
+}
+
+/* --- Faixa navy com o texto (parte de baixo do card) --- */
+.instr-video__caption {
+  position: relative;
+  padding: clamp(1rem, 2.2vw, 1.75rem) clamp(1.25rem, 3vw, 2.5rem)
+    clamp(1.25rem, 2.6vw, 2rem);
+  border-radius: 0 0 30px 30px;
+  /* a borda inferior dourada espessa do Figma (18px) */
+  border-bottom: clamp(8px, 1.2vw, 18px) solid var(--instr-gold);
+  color: #fff;
+}
+.instr-video__title {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: clamp(1.15rem, 2.2vw, 2rem); /* 32px @1440 */
+  line-height: 1.15;
+  margin-bottom: 0.4rem;
+}
+.instr-video__text {
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: clamp(0.85rem, 1.7vw, 1.5625rem); /* 25px @1440 */
+  line-height: 1.35;
+  opacity: 0.95;
+  max-width: 70ch;
+}
+
+/* --- Selo de lâmpada (círculo dourado saindo do canto sup. direito) --- */
+.instr-video__bulb {
+  position: absolute;
+  top: clamp(-22px, -2.4vw, -10px);
+  right: clamp(-14px, -1.4vw, -6px);
+  z-index: 3;
+  width: clamp(64px, 9.5vw, 137px);
+  height: clamp(64px, 9.5vw, 137px);
+  border-radius: 50%;
+  background-color: var(--instr-gold);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 26px -8px rgba(240, 163, 21, 0.7);
+}
+.instr-video__bulb svg {
+  width: 56%;
+  height: 56%;
+}
+
+/* ==========================================================================
+   SEÇÃO 2 — Grade de cards numerados (passo a passo).
+   Grid fluido: 3 colunas no desktop, 2 no tablet, 1 no celular.
+   ========================================================================== */
+.instr-steps {
+  /* É um <ol> (passos ordenados, bom p/ acessibilidade); list-style:none remove
+     os marcadores "1. 2. 3." nativos do navegador, já que o número fica dentro
+     da bolinha. (O base.css zera só <ul>, não <ol>.) */
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(2.5rem, 4vw, 3.75rem) clamp(1.5rem, 3vw, 3.75rem);
+  /* respiro no topo pra acomodar os círculos numerados que "sobem" pra fora */
+  padding-top: clamp(2.5rem, 5vw, 3.5rem);
+  max-width: 1280px;
+  margin-inline: auto;
+}
+
+/* Cada passo: cartão com borda superior dourada, número em círculo no topo,
+   ícone, título e texto centralizados. */
+.instr-step {
+  position: relative;
+  background-color: var(--instr-card-bg);
+  border-top: var(--instr-card-border-top) solid var(--instr-gold);
+  border-radius: var(--instr-card-radius);
+  padding: clamp(2.75rem, 4vw, 3.5rem) clamp(1.25rem, 2vw, 2rem)
+    clamp(1.5rem, 2.5vw, 2.25rem);
+  text-align: center;
+  box-shadow: var(--card-shadow);
+  transition: background-color 0.45s ease, transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+.instr-step:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px -12px rgba(8, 12, 56, 0.35);
+}
+
+/* Círculo do número — navy, centralizado e subindo metade pra fora do card
+   (sobre a borda dourada), exatamente como no Figma. */
+.instr-step__num {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -55%);
+  width: clamp(64px, 7vw, 113px);
+  height: clamp(64px, 7vw, 113px);
+  border-radius: 50%;
+  background-color: var(--instr-navy);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: clamp(1.9rem, 4vw, 3.625rem); /* 58px @1440 */
+  line-height: 1;
+  /* Compensa o baseline do número no Zilla Slab (sobra mais espaço acima do
+     glifo que abaixo): um respiro mínimo no topo centra o número opticamente
+     dentro do círculo. box-sizing:border-box mantém o círculo do mesmo tamanho. */
+  padding-top: 0.08em;
+  box-shadow: 0 8px 18px -6px rgba(8, 12, 56, 0.5);
+  transition: background-color 0.45s ease;
+}
+/* No escuro o círculo navy fica escuro demais contra o fundo; clareia um toque
+   e ganha um anel dourado pra destacar. */
+[data-theme="dark"] .instr-step__num {
+  background-color: #10142e;
+  box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.6),
+    0 0 0 2px rgba(240, 163, 21, 0.35);
+}
+
+/* Ícone do passo (SVG inline) — dourado, herdando a cor via currentColor.
+   display:block é essencial: como é um <span> (inline por padrão), sem isto o
+   width/height seriam ignorados e o SVG estouraria pro tamanho do viewBox. */
+.instr-step__icon {
+  display: block;
+  width: clamp(48px, 6vw, 90px);
+  height: clamp(48px, 6vw, 90px);
+  margin-inline: auto;
+  margin-bottom: clamp(0.85rem, 1.6vw, 1.4rem);
+  color: var(--instr-gold);
+}
+.instr-step__icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.instr-step__title {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: clamp(1.25rem, 3.3vw, 3rem); /* 48px @1440 */
+  line-height: 1.05;
+  color: var(--instr-card-text);
+  margin-bottom: clamp(0.6rem, 1.4vw, 1.1rem);
+  transition: color 0.45s ease;
+}
+.instr-step__text {
+  font-family: var(--font-body);
+  font-weight: var(--fw-regular);
+  font-size: clamp(0.9rem, 2.2vw, 2rem); /* 32px @1440 */
+  line-height: 1.3;
+  color: var(--instr-card-text);
+  max-width: 22ch;
+  margin-inline: auto;
+  transition: color 0.45s ease;
+}
+
+/* ==========================================================================
+   RESPONSIVO
+   ========================================================================== */
+
+/* Tablet: 2 colunas (o 3º card "sobra" e centraliza na linha de baixo). */
+@media (max-width: 960px) {
+  .instr-steps {
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(2.5rem, 6vw, 3.25rem) clamp(1.25rem, 4vw, 2.5rem);
+  }
+  /* No desktop os textos eram enormes (32px @1440); a partir daqui já estão
+     fluidos pelos clamp, então só garantimos largura confortável. */
+  .instr-step__text {
+    max-width: 26ch;
+  }
+}
+
+/* Mobile: o Figma mantém 3 colunas BEM compactas (cards de 120px). Em telas
+   pequenas isso vira ilegível, então caímos pra 1 coluna — leitura confortável,
+   mesma hierarquia (número, ícone, título, texto). */
+@media (max-width: 600px) {
+  .instr-steps {
+    grid-template-columns: 1fr;
+    gap: clamp(2.75rem, 12vw, 3.5rem);
+    max-width: 420px;
+    padding-top: clamp(2.25rem, 9vw, 3rem);
+  }
+  .instr-step {
+    padding: clamp(2.5rem, 9vw, 3rem) clamp(1.25rem, 6vw, 2rem)
+      clamp(1.5rem, 6vw, 2rem);
+  }
+  /* tamanhos legíveis no celular (acima dos 10px minúsculos do Figma mobile) */
+  .instr-step__title {
+    font-size: clamp(1.35rem, 6.5vw, 1.75rem);
+  }
+  .instr-step__text {
+    font-size: clamp(0.95rem, 4vw, 1.125rem);
+    max-width: 32ch;
+  }
+
+  /* Card de vídeo: no mobile a faixa navy fica logo abaixo do vídeo (já é o
+     comportamento natural do nosso empilhamento). Reduzimos a moldura. */
+  .instr-video__player {
+    padding: 8px 8px 0;
+  }
+  .instr-video__thumb {
+    aspect-ratio: 355 / 164; /* proporção do vídeo no mobile do Figma */
+    border-radius: 16px 16px 0 0;
+  }
+  .instr-video__player::after {
+    inset: 8px 8px 0;
+    border-radius: 16px 16px 0 0;
+  }
+}
+
+/* Telas bem estreitas: encolhe um pouco mais o selo da lâmpada pra não cobrir
+   o título do vídeo. */
+@media (max-width: 400px) {
+  .instr-video__bulb {
+    width: 56px;
+    height: 56px;
+    top: -16px;
+    right: -8px;
+  }
+}

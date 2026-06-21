@@ -1,0 +1,99 @@
+/* ==========================================================================
+   Footer — faixa escura com borda dourada no topo, cabecinha do Cogni
+   centralizada, e colunas de navegação/informações.
+   ========================================================================== */
+
+.footer {
+  position: relative;
+  margin-top: clamp(3rem, 8vh, 6rem);
+  background-color: var(--footer-bg);
+  border-top: 8px solid var(--footer-border);
+  color: var(--footer-text);
+  transition: background-color 0.45s ease, border-color 0.45s ease;
+}
+
+/* Cabecinha do Cogni "saindo" do topo da faixa */
+.footer__mascot {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -58%);
+  width: clamp(110px, 14vw, 170px);
+  height: auto;
+  pointer-events: none;
+  z-index: 2;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.3));
+}
+
+/* Troca a cabecinha conforme o tema, igual ao Hero (mesma posição/tamanho) */
+.footer__mascot--dark {
+  display: none;
+}
+[data-theme="dark"] .footer__mascot--light {
+  display: none;
+}
+[data-theme="dark"] .footer__mascot--dark {
+  display: block;
+}
+
+.footer__inner {
+  display: flex;
+  justify-content: center;
+  gap: clamp(3rem, 12vw, 9rem);
+  padding: clamp(3.5rem, 7vh, 5rem) 1.5rem clamp(2.5rem, 5vh, 3.5rem);
+  flex-wrap: wrap;
+}
+
+.footer__col {
+  min-width: 140px;
+}
+.footer__title {
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: clamp(1.25rem, 1.6vw, 1.5625rem);
+  margin-bottom: 1rem;
+}
+.footer__links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.footer__links a {
+  font-family: var(--font-body);
+  font-weight: var(--fw-regular);
+  font-size: clamp(1rem, 1.1vw, 1.25rem);
+  color: var(--footer-text);
+  opacity: 0.85;
+  width: fit-content;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.footer__links a:hover {
+  opacity: 1;
+  transform: translateX(4px);
+}
+/* Link da seção que está visível na tela (scrollspy) */
+.footer__links a.is-active {
+  opacity: 1;
+  font-weight: var(--fw-semibold);
+  color: var(--footer-border); /* dourado da marca */
+}
+
+/* Linha de copyright */
+.footer__bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+  padding: 1.25rem 1.5rem;
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+
+/* ==========================================================================
+   Responsivo
+   ========================================================================== */
+@media (max-width: 560px) {
+  .footer__inner {
+    justify-content: space-around;
+    gap: 2rem;
+    text-align: left;
+  }
+}

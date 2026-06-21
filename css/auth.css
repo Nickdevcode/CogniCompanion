@@ -1,0 +1,385 @@
+/* ==========================================================================
+   Telas de autenticação — Login e Cadastro (réplica do Figma).
+   Desktop: robô de um lado, formulário do outro (login = robô à esquerda,
+   cadastro = robô à direita). Mobile: empilhado (robô em cima, form embaixo).
+   Reaproveita header e footer do site; segue os dois temas (claro/escuro).
+   ========================================================================== */
+
+.auth-page {
+  position: relative;
+  /* ocupa a tela cheia abaixo do header fixo */
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  /* topo generoso: além de afastar do header, garante que o conteúdo nunca
+     encoste no botão "Voltar" (canto sup. esq.) em telas de altura média. */
+  padding-block: clamp(8.5rem, 16vh, 10.5rem) clamp(2rem, 5vh, 4rem);
+}
+
+/* Botão "Voltar": fica no canto superior esquerdo, logo abaixo do header,
+   sem interferir no grid centralizado do formulário. Alinhado à mesma margem
+   lateral do palco (.auth__stage). z-index acima do dot-pattern. */
+.auth__back {
+  position: absolute;
+  top: clamp(5.5rem, 11vh, 7rem);
+  left: clamp(1.25rem, 4vw, 3rem);
+  z-index: 3;
+}
+
+/* Palco com as duas colunas (imagem + formulário) */
+.auth__stage {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 3rem);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: clamp(1rem, 4vw, 3rem);
+}
+/* No cadastro o formulário fica à ESQUERDA e o robô à direita. */
+.auth__stage--reverse .auth__media {
+  order: 2;
+}
+.auth__stage--reverse .auth__form {
+  order: 1;
+}
+
+/* --- Coluna da imagem (robô) --- */
+.auth__media {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+/* Wrapper: carrega a sombra (estática), pra ela NÃO ser recalculada a cada
+   quadro da animação — esse recálculo do drop-shadow é o que travava o float.
+   Mesma técnica usada na cabeça do robô do hero. */
+.auth__robot {
+  width: 100%;
+  max-width: 620px;
+  filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.3));
+}
+/* Camada interna: faz só o movimento de float, isolada na GPU. */
+.auth__robot-inner {
+  width: 100%;
+  animation: auth-robot-float 6s ease-in-out infinite;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+.auth__robot-inner img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+/* translate3d (e não translateY) garante aceleração por GPU */
+@keyframes auth-robot-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -12px, 0);
+  }
+}
+
+/* --- Coluna do formulário --- */
+.auth__form {
+  width: 100%;
+  max-width: 460px;
+  justify-self: center;
+}
+
+/* Título "Seja Bem Vindo !" / "Crie sua Conta" */
+.auth__title {
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: clamp(2rem, 3.3vw, 3rem); /* 48px @1440 */
+  line-height: 1.1;
+  color: var(--auth-title, #20273d);
+  margin-bottom: 0.4rem;
+  transition: color 0.45s ease;
+}
+/* No desktop o título é todo escuro (Figma); no mobile a palavra final fica
+   dourada (Figma mobile). Por isso o accent só vira dourado no media query. */
+.auth__title .accent {
+  color: inherit;
+}
+/* linha decorativa sob o título (como no Figma) */
+.auth__title-line {
+  display: block;
+  width: clamp(180px, 20vw, 287px);
+  height: 3px;
+  border-radius: 3px;
+  background-color: var(--auth-title-line, rgba(32, 39, 61, 0.65));
+  margin-bottom: clamp(1.5rem, 3.5vh, 2.5rem);
+  transition: background-color 0.45s ease;
+}
+
+/* --- Campos --- */
+.auth__field {
+  position: relative;
+  margin-bottom: clamp(1rem, 2vh, 1.5rem);
+}
+.auth__input {
+  width: 100%;
+  height: clamp(58px, 7vh, 75px);
+  padding: 0 3.5rem 0 1.5rem; /* espaço à direita pro ícone */
+  font-family: var(--font-body);
+  font-weight: var(--fw-regular);
+  font-size: clamp(0.95rem, 1.1vw, 1rem);
+  color: var(--auth-input-text, #20273d);
+  background-color: var(--auth-input-bg, #d9d9d9);
+  border: 1px solid transparent;
+  border-radius: 19px;
+  box-shadow: 0 4px 4px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.45s ease, border-color 0.2s ease,
+    box-shadow 0.2s ease, color 0.45s ease;
+}
+.auth__input::placeholder {
+  color: var(--auth-placeholder, #949393);
+  text-align: center; /* placeholder centralizado, como no Figma */
+}
+.auth__input:focus {
+  outline: none;
+  border-color: var(--brand-gold);
+  box-shadow: 0 4px 12px rgba(240, 163, 21, 0.25);
+}
+/* ícone à direita do campo */
+.auth__field-icon {
+  position: absolute;
+  right: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  color: var(--auth-icon, #20273d);
+  pointer-events: none;
+  transition: color 0.45s ease;
+}
+.auth__field-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* o olho da senha é clicável (mostrar/ocultar) */
+.auth__toggle-pass {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  color: var(--auth-icon, #20273d);
+  border-radius: 50%;
+  transition: color 0.45s ease, background-color 0.2s ease;
+}
+.auth__toggle-pass:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+.auth__toggle-pass svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+}
+.auth__toggle-pass .icon-eye-off {
+  display: none;
+}
+.auth__toggle-pass.is-revealed .icon-eye {
+  display: none;
+}
+.auth__toggle-pass.is-revealed .icon-eye-off {
+  display: block;
+}
+
+/* --- Botão "Próximo" --- */
+.auth__submit {
+  width: 100%;
+  height: clamp(58px, 7vh, 75px);
+  margin-top: 0.5rem;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: clamp(1.25rem, 1.8vw, 2rem); /* 32px @1440 */
+  color: #fff;
+  background-color: var(--auth-submit-bg, #062541);
+  border-radius: 14px;
+  box-shadow: 0 4px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.2s ease, filter 0.2s ease,
+    background-color 0.45s ease, box-shadow 0.2s ease;
+}
+.auth__submit:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 10px 22px -8px rgba(6, 37, 65, 0.6);
+}
+.auth__submit:active {
+  transform: translateY(0);
+}
+
+/* --- Divisor "OUTRAS FORMAS" --- */
+.auth__divider {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin: clamp(1.25rem, 3vh, 2rem) 0 clamp(1rem, 2.5vh, 1.5rem);
+  color: var(--auth-divider, #080808);
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: 0.9375rem; /* 15px */
+  text-align: center;
+}
+.auth__divider::before,
+.auth__divider::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  border-radius: 2px;
+  background-color: var(--auth-divider-line, rgba(8, 8, 8, 0.4));
+}
+
+/* --- Botão Google --- */
+.auth__google {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  min-height: 64px;
+  padding: 0.75rem 1.25rem;
+  background-color: var(--auth-google-bg, rgba(217, 217, 217, 0.2));
+  border: 1px solid var(--auth-google-border, #f0f0f0);
+  border-radius: 19px;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.9375rem; /* 15px */
+  color: var(--auth-google-text, #20273d);
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.45s ease,
+    border-color 0.45s ease, color 0.45s ease, box-shadow 0.2s ease;
+}
+.auth__google:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.25);
+}
+.auth__google img {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2));
+}
+
+/* --- Troca login/cadastro --- */
+.auth__switch {
+  margin-top: clamp(1.25rem, 3vh, 2rem);
+  text-align: center;
+  font-family: var(--font-body);
+  font-weight: var(--fw-regular);
+  font-size: 0.9375rem; /* 15px */
+  color: var(--auth-switch, var(--text-primary));
+  transition: color 0.45s ease;
+}
+.auth__switch a {
+  display: block;
+  margin-top: 0.15rem;
+  font-weight: var(--fw-bold, 700);
+  color: var(--brand-gold);
+  transition: opacity 0.2s ease;
+}
+.auth__switch a:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ==========================================================================
+   Tema CLARO — variáveis específicas das telas de auth (valores do Figma)
+   ========================================================================== */
+:root,
+[data-theme="light"] {
+  --auth-title: #20273d;
+  --auth-title-line: rgba(32, 39, 61, 0.65);
+  --auth-input-bg: #d9d9d9;
+  --auth-input-text: #20273d;
+  --auth-placeholder: #949393;
+  --auth-icon: #20273d;
+  --auth-submit-bg: #062541;
+  --auth-divider: #080808;
+  --auth-divider-line: rgba(8, 8, 8, 0.35);
+  --auth-google-bg: rgba(217, 217, 217, 0.4);
+  --auth-google-border: #e2e2e2;
+  --auth-google-text: #20273d;
+}
+
+/* ==========================================================================
+   Tema ESCURO — adapta as cores mantendo o mesmo desenho
+   ========================================================================== */
+[data-theme="dark"] {
+  --auth-title: #f1f1f1;
+  --auth-title-line: rgba(241, 241, 241, 0.5);
+  --auth-input-bg: #2c2c30;
+  --auth-input-text: #f1f1f1;
+  --auth-placeholder: #8d8d92;
+  --auth-icon: #cfcfd4;
+  --auth-submit-bg: #216083; /* azul-petróleo do dark (igual a outros CTAs) */
+  --auth-divider: #f1f1f1;
+  --auth-divider-line: rgba(241, 241, 241, 0.3);
+  --auth-google-bg: rgba(255, 255, 255, 0.06);
+  --auth-google-border: rgba(255, 255, 255, 0.12);
+  --auth-google-text: #f1f1f1;
+}
+
+/* ==========================================================================
+   Responsivo — MOBILE: empilha (robô em cima, formulário embaixo).
+   ========================================================================== */
+@media (max-width: 820px) {
+  .auth-page {
+    padding-top: clamp(6.5rem, 16vh, 8.5rem);
+    align-items: flex-start;
+  }
+  .auth__stage,
+  .auth__stage--reverse {
+    grid-template-columns: 1fr;
+    gap: clamp(0.5rem, 3vw, 1.5rem);
+    text-align: center;
+  }
+  /* robô sempre em cima no mobile (independente de login/cadastro) */
+  .auth__media,
+  .auth__stage--reverse .auth__media {
+    order: 1;
+  }
+  .auth__form,
+  .auth__stage--reverse .auth__form {
+    order: 2;
+    max-width: 460px;
+    justify-self: center;
+  }
+  .auth__robot {
+    max-width: clamp(220px, 60vw, 320px);
+  }
+  /* título grande e centralizado no topo, como no Figma mobile */
+  .auth__title {
+    font-size: clamp(1.9rem, 8vw, 2.6rem);
+    text-align: center;
+  }
+  /* no mobile a palavra final do título fica dourada (Figma mobile) */
+  .auth__title .accent {
+    color: var(--brand-gold);
+  }
+  .auth__title-line {
+    margin-inline: auto;
+  }
+}
+
+/* Telas bem estreitas */
+@media (max-width: 380px) {
+  .auth__input,
+  .auth__submit {
+    height: 56px;
+  }
+}

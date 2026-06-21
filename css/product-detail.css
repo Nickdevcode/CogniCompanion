@@ -1,0 +1,371 @@
+/* ==========================================================================
+   Página de detalhe de produto (produto.html) — réplica dos frames do Figma
+   (desktop 1440 + mobile 412). Aberta pelos cards de "Materiais" da home.
+
+   Layout em duas colunas no desktop (card de texto à esquerda, palco da imagem
+   à direita) e empilhado no mobile (palco em cima, card embaixo). O conteúdo é
+   montado por JS a partir de products-data.js e troca via setas, mas o ESQUELETO
+   visual é todo CSS — fluido (clamp + grid), nos dois temas.
+
+   Peças do "palco" da imagem: um blob dourado de cantos arredondados, um brilho
+   radial atrás, a foto do produto levemente inclinada com sombra, um selo de
+   seta diagonal (↗) no canto e setas ‹ › grandes nas laterais (trocam produto).
+   ========================================================================== */
+
+.product {
+  --pd-navy: #080c38;
+  --pd-gold: var(--brand-gold);
+  --pd-teal: #216083;          /* azul-petróleo dos dots */
+  --pd-blob: #f0a315;          /* fundo dourado da imagem */
+  /* card de texto */
+  --pd-card-bg: rgba(241, 241, 241, 0.2);
+  --pd-name: #080c38;
+  --pd-text: var(--text-primary);
+}
+[data-theme="dark"] .product {
+  --pd-card-bg: rgba(255, 255, 255, 0.04);
+  --pd-name: #f1f1f1;
+}
+
+.product {
+  position: relative;
+  padding-top: clamp(7rem, 14vh, 9.5rem);
+  padding-bottom: clamp(3rem, 8vh, 6rem);
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+/* Voltar (canto superior esquerdo, abaixo do header) — reaproveita .back-link */
+.product__back {
+  margin-bottom: clamp(1rem, 2.5vh, 1.75rem);
+}
+
+/* --- Palco: grid de 2 colunas (texto | imagem) ------------------------- */
+.product__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  max-width: var(--container-max);
+  margin-inline: auto;
+}
+
+/* ==========================================================================
+   COLUNA 1 — Card de texto (nome, descrição, preço, dots)
+   ========================================================================== */
+.product__card {
+  position: relative;
+  z-index: 2;
+  background-color: var(--pd-card-bg);
+  border-radius: 30px;
+  padding: clamp(1.75rem, 3vw, 3rem) clamp(1.5rem, 3vw, 3rem)
+    clamp(1.5rem, 2.5vw, 2.5rem);
+  box-shadow: 12px 18px 30px -12px rgba(0, 0, 0, 0.3),
+    0 4px 4px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.45s ease;
+}
+
+.product__name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  /* Teto em 5rem (80px) — abaixo dos 96px do Figma — pra nomes longos
+     ("Módulo ESP32-CAM", "ESP32 DevKit V1") respirarem em 1–2 linhas em vez
+     de estourar em 3. Nomes curtos ("Microfone") seguem grandes e imponentes. */
+  font-size: clamp(2.25rem, 5.2vw, 5rem);
+  line-height: 1.02;
+  color: var(--pd-name);
+  transition: color 0.45s ease;
+  /* quebra por palavra; o nbsp em códigos como "ESP32-CAM" (no JS) evita que
+     o hífen vire ponto de quebra e parta o nome no meio do modelo. */
+  overflow-wrap: break-word;
+  hyphens: none;
+}
+
+/* Linha dourada sob o nome */
+.product__line {
+  display: block;
+  width: clamp(180px, 90%, 535px);
+  height: 4px;
+  border-radius: 4px;
+  background-color: var(--pd-gold);
+  margin: clamp(0.6rem, 1.4vw, 1rem) 0 clamp(1rem, 2vw, 1.5rem);
+  transition: background-color 0.45s ease;
+}
+
+.product__desc {
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: clamp(0.95rem, 1.39vw, 1.25rem); /* 20px @1440 */
+  line-height: 1.45;
+  color: var(--pd-text);
+  max-width: 30ch;
+  transition: color 0.45s ease;
+}
+
+/* Badge de preço (pílula dourada) */
+.product__price {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: clamp(1.25rem, 2.5vw, 2rem);
+  min-width: clamp(180px, 18vw, 270px);
+  padding: 0.5rem 1.75rem;
+  border-radius: 38px;
+  background-color: var(--pd-gold);
+  color: #fff;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-style: italic;
+  font-size: clamp(1.5rem, 2.8vw, 2.5rem); /* 40px @1440 */
+  line-height: 1;
+  box-shadow: -1px 10px 18px -6px rgba(240, 163, 21, 0.5);
+}
+
+/* --- Carrossel de "dots" (posição entre os produtos) ------------------- */
+.product__nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(0.6rem, 1.2vw, 1rem);
+  margin-top: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+/* Pílula navy que abriga os dots */
+.product__dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.4rem, 0.9vw, 0.7rem);
+  height: clamp(32px, 3vw, 40px);
+  padding-inline: clamp(0.9rem, 1.8vw, 1.5rem);
+  border-radius: 38px;
+  background-color: var(--pd-navy);
+  box-shadow: -1px 10px 8.8px rgba(0, 0, 0, 0.16);
+  transition: background-color 0.45s ease;
+}
+[data-theme="dark"] .product__dots {
+  background-color: #10142e;
+}
+
+/* Cada dot: petróleo por padrão; o atual fica dourado e maior. Tamanho varia
+   um pouco (efeito do Figma) conforme a distância do atual. */
+.product__dot {
+  width: clamp(8px, 0.9vw, 12px);
+  height: clamp(8px, 0.9vw, 12px);
+  border-radius: 50%;
+  background-color: var(--pd-teal);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color 0.25s ease, transform 0.25s ease;
+}
+.product__dot:hover {
+  transform: scale(1.2);
+}
+.product__dot.is-active {
+  background-color: var(--pd-gold);
+  width: clamp(11px, 1.2vw, 16px);
+  height: clamp(11px, 1.2vw, 16px);
+}
+
+/* Botões circulares ‹ › ao lado da pílula */
+.product__navbtn {
+  flex: 0 0 auto;
+  width: clamp(38px, 3.4vw, 46px);
+  height: clamp(38px, 3.4vw, 46px);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background-color: var(--pd-navy);
+  color: #fff;
+  box-shadow: -1px 10px 8.8px rgba(0, 0, 0, 0.16);
+  transition: transform 0.2s ease, filter 0.2s ease, background-color 0.45s ease;
+}
+.product__navbtn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+}
+.product__navbtn:active {
+  transform: translateY(0);
+}
+[data-theme="dark"] .product__navbtn {
+  background-color: #10142e;
+}
+.product__navbtn svg {
+  width: 45%;
+  height: 45%;
+}
+
+/* ==========================================================================
+   COLUNA 2 — Palco da imagem (blob dourado + brilho + foto + setas + selo)
+   ========================================================================== */
+.product__media {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* mantém proporção parecida com o frame do Figma (≈660×680) */
+  min-height: clamp(320px, 42vw, 600px);
+}
+
+/* Brilho radial atrás da imagem (blur-cerebro do Figma) */
+.product__glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side at 60% 60%,
+    rgba(240, 163, 21, 0.35) 0%,
+    rgba(240, 163, 21, 0) 70%
+  );
+  filter: blur(20px);
+}
+
+/* Blob dourado (o "Rectangle111/119" do Figma): um quadrilátero largo de
+   cantos MUITO arredondados — entre o quadrado e o orgânico ("squircle"). Os
+   raios levemente diferentes em cada canto dão o ar feito à mão do design. */
+.product__blob {
+  position: relative;
+  z-index: 1;
+  width: clamp(260px, 40vw, 532px);
+  aspect-ratio: 532 / 560;
+  background-color: var(--pd-blob);
+  border-radius: clamp(48px, 7vw, 110px) clamp(60px, 9vw, 130px)
+    clamp(48px, 7vw, 110px) clamp(60px, 9vw, 130px);
+  box-shadow: 0 24px 48px -20px rgba(240, 163, 21, 0.6);
+  display: grid;
+  place-items: center;
+  transition: background-color 0.45s ease;
+}
+
+/* Foto do produto: grande (chega a "vazar" um pouco o blob, como no Figma),
+   levemente inclinada e com sombra forte pra dar profundidade. */
+.product__photo {
+  width: 104%;             /* maior que o blob → efeito de "saltar" pra frente */
+  max-height: 104%;
+  object-fit: contain;
+  transform: rotate(-6deg);
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.4));
+  transition: transform 0.4s ease;
+}
+.product__media:hover .product__photo {
+  transform: rotate(-3deg) scale(1.04);
+}
+
+/* Selo de seta diagonal (↗) no canto superior esquerdo do blob */
+.product__badge {
+  position: absolute;
+  top: clamp(-8px, 1vw, 6px);
+  left: clamp(-10px, -0.5vw, 4px);
+  z-index: 3;
+  width: clamp(54px, 7vw, 96px);
+  height: clamp(54px, 7vw, 96px);
+  border-radius: 50%;
+  background-color: #fff;
+  color: var(--pd-navy);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.3);
+  border: 3px solid var(--pd-navy);
+}
+[data-theme="dark"] .product__badge {
+  background-color: #1c1c1e;
+  color: var(--pd-gold);
+  border-color: var(--pd-gold);
+}
+.product__badge svg {
+  width: 52%;
+  height: 52%;
+}
+
+/* Setas grandes ‹ › nas laterais do palco (trocam de produto) */
+.product__arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  width: clamp(40px, 4vw, 60px);
+  height: clamp(40px, 4vw, 60px);
+  display: grid;
+  place-items: center;
+  color: var(--pd-navy);
+  transition: transform 0.2s ease, color 0.45s ease, opacity 0.2s ease;
+}
+[data-theme="dark"] .product__arrow {
+  color: #f1f1f1;
+}
+.product__arrow svg {
+  width: 100%;
+  height: 100%;
+}
+.product__arrow--prev {
+  left: clamp(-18px, -1vw, 0px);
+}
+.product__arrow--next {
+  right: clamp(-18px, -1vw, 0px);
+}
+.product__arrow--prev:hover {
+  transform: translateY(-50%) translateX(-4px);
+}
+.product__arrow--next:hover {
+  transform: translateY(-50%) translateX(4px);
+}
+
+/* Animação sutil ao trocar de produto (aplicada por JS na coluna que muda) */
+@keyframes product-swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.product__card.is-swapping,
+.product__media.is-swapping {
+  animation: product-swap-in 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ==========================================================================
+   RESPONSIVO — MOBILE: empilha (imagem em cima, card embaixo).
+   ========================================================================== */
+@media (max-width: 860px) {
+  .product__stage {
+    grid-template-columns: 1fr;
+    gap: clamp(1.5rem, 5vw, 2.5rem);
+    max-width: 560px;
+  }
+  /* imagem sempre em cima no mobile (Figma) */
+  .product__media {
+    order: 1;
+    min-height: clamp(280px, 70vw, 360px);
+  }
+  .product__card {
+    order: 2;
+  }
+  .product__blob {
+    width: clamp(240px, 80vw, 380px);
+    aspect-ratio: 355 / 300;
+    border-radius: 30px; /* no mobile o Figma usa cantos arredondados normais */
+  }
+  /* no mobile os dots ficam à direita na base do card (Figma) */
+  .product__nav {
+    justify-content: flex-end;
+  }
+}
+
+/* Telas bem estreitas: nome um pouco menor e setas mais discretas. */
+@media (max-width: 420px) {
+  .product__name {
+    font-size: clamp(2rem, 11vw, 2.75rem);
+  }
+  .product__arrow--prev {
+    left: -6px;
+  }
+  .product__arrow--next {
+    right: -6px;
+  }
+}

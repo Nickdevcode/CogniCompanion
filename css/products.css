@@ -1,0 +1,205 @@
+/* ==========================================================================
+   Seção Produtos — texto à esquerda + carrossel de cards à direita.
+   Cards: fundo navy, foto do produto em quadro claro, nome, preço e botão ↗.
+   ========================================================================== */
+
+.products__inner {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.4fr);
+  align-items: center;
+  gap: clamp(2rem, 4vw, 3.5rem);
+}
+
+.products__content {
+  max-width: 480px;
+}
+.products__title {
+  margin-bottom: 1.5rem;
+}
+.products__text {
+  margin-bottom: 2rem;
+}
+/* texto tem duas versões (desktop/mobile, como no Figma) */
+.products__text--mobile {
+  display: none;
+}
+
+/* --- Carrossel --- */
+.carousel {
+  position: relative;
+  min-width: 0; /* permite o track encolher dentro do grid */
+}
+
+.carousel__track {
+  display: flex;
+  gap: clamp(1.25rem, 2vw, 2rem);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  padding: 1rem 0.5rem 1.5rem;
+  /* esconde a scrollbar mantendo o scroll funcional */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.carousel__track::-webkit-scrollbar {
+  display: none;
+}
+
+.carousel__controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  padding-right: 0.5rem;
+}
+.carousel__btn {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--brand-gold);
+  border: 2px solid transparent;
+  transition: transform 0.2s ease, background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+.carousel__btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--brand-gold);
+}
+.carousel__btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* --- Card de produto --- */
+.product-card {
+  flex: 0 0 auto;
+  width: clamp(260px, 24vw, 340px);
+  scroll-snap-align: start;
+  background-color: var(--card-product-bg);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 12px 14px 20px -10px rgba(0, 0, 0, 0.35);
+  transition: transform 0.3s ease, box-shadow 0.3s ease,
+    background-color 0.45s ease;
+}
+.product-card:hover {
+  transform: translateY(-6px);
+}
+
+.product-card__photo {
+  background-color: var(--card-product-photo);
+  border-radius: 13px;
+  aspect-ratio: 6 / 5;       /* proporção do quadro no Figma (≈453×380) */
+  display: grid;
+  place-items: center;
+  padding: 0.5rem;
+  overflow: hidden;
+  transition: background-color 0.45s ease;
+}
+.product-card__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  mix-blend-mode: multiply; /* funde o fundo branco da foto com o quadro claro */
+}
+/* A imagem da fonte tem bastante margem branca embutida; um leve zoom faz a
+   peça preencher o quadro como no Figma (o branco some pelo blend multiply). */
+.product-card__photo img.fill-cover {
+  transform: scale(1.35);
+}
+
+.product-card__footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 0.5rem 0.5rem;
+}
+.product-card__info {
+  min-width: 0;
+}
+.product-card__name {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: clamp(1.25rem, 1.6vw, 2rem);
+  color: var(--card-product-text);
+  line-height: 1.1;
+}
+.product-card__price {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 1.25rem;
+  color: var(--card-product-text);
+  opacity: 0.92;
+  margin-top: 0.35rem;
+}
+.product-card__cta {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background-color: var(--brand-gold);
+  color: #fff;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+.product-card__cta:hover {
+  transform: scale(1.08) rotate(8deg);
+  filter: brightness(1.05);
+}
+.product-card__cta svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ==========================================================================
+   Responsivo
+   ========================================================================== */
+@media (max-width: 880px) {
+  .products__inner {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  .products__content {
+    max-width: 600px;
+    margin-inline: auto;
+  }
+  .products__title .section-line {
+    margin-inline: auto;
+  }
+  .carousel__track {
+    padding-inline: clamp(1rem, 5vw, 2rem);
+  }
+  .carousel__controls {
+    justify-content: center;
+    padding-right: 0;
+  }
+}
+
+/* Mobile: o Figma alinha título e texto à ESQUERDA e usa o texto curto. */
+@media (max-width: 600px) {
+  .products__inner {
+    text-align: left;
+  }
+  .products__content {
+    margin-inline: 0;
+  }
+  .products__title .section-line {
+    margin-inline: 0;
+  }
+  .products__text--desktop {
+    display: none;
+  }
+  .products__text--mobile {
+    display: block;
+  }
+  /* controles do carrossel à esquerda também, acompanhando o conteúdo */
+  .carousel__controls {
+    justify-content: flex-start;
+  }
+}

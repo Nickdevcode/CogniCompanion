@@ -1,0 +1,162 @@
+/* ==========================================================================
+   Padrões compartilhados entre seções (design system)
+   Título de seção, linha decorativa, botões e cabeçalho de bloco.
+   Cada seção específica só ajusta o que for único dela.
+   ========================================================================== */
+
+.section {
+  position: relative;
+  width: 100%;
+  padding-block: clamp(4rem, 9vh, 7rem);
+  overflow: hidden;
+}
+
+/* --- Título de seção (ex.: "Projeto", "Produtos") --- */
+.section-title {
+  font-family: var(--font-body);
+  font-weight: var(--fw-regular);
+  font-size: clamp(2.75rem, 6vw, 6rem);
+  line-height: 1;
+  color: var(--section-title);
+  transition: color 0.45s ease;
+}
+
+/* Linha dourada curta sob o título (como no Figma) */
+.section-line {
+  display: block;
+  width: clamp(220px, 26vw, 397px);
+  height: 4px;
+  border-radius: 4px;
+  background-color: var(--section-line);
+  margin-top: 0.5rem;
+  transition: background-color 0.45s ease;
+}
+
+/* --- Botões reutilizáveis --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-btn);
+  border-radius: var(--radius-pill);
+  padding: 0.85rem 2rem;
+  min-width: 263px;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease,
+    background-color 0.45s ease, color 0.45s ease, filter 0.2s ease;
+  text-align: center;
+}
+.btn:hover {
+  transform: translateY(-3px);
+  filter: brightness(1.05);
+}
+.btn:active {
+  transform: translateY(-1px);
+}
+
+.btn--primary {
+  background-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  box-shadow: 0 8px 20px -8px rgba(8, 12, 56, 0.5);
+}
+
+.btn--gold {
+  background-color: var(--btn-gold-bg);
+  color: var(--btn-gold-text);
+  box-shadow: 0 8px 20px -8px rgba(240, 163, 21, 0.5);
+}
+
+/* --- Link "Voltar" (seta + label) ---
+   Componente discreto de navegação usado no topo de telas internas
+   (Instruções, Login, Cadastro) para retornar à página anterior/home. */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: clamp(1rem, 1.2vw, 1.125rem);
+  color: var(--text-primary);
+  opacity: 0.85;
+  transition: opacity 0.2s ease, transform 0.2s ease, color 0.45s ease;
+}
+.back-link:hover {
+  opacity: 1;
+  transform: translateX(-3px); /* a seta "puxa" levemente pra esquerda */
+}
+.back-link__icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.back-link__icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Variação "pílula": fundo de vidro (glass) em volta, pra dar destaque quando
+   o Voltar fica SOBRE uma imagem (ex.: hero do jogo). */
+.back-link--pill {
+  padding: 0.5rem 1.1rem 0.5rem 0.85rem;
+  border-radius: var(--radius-pill);
+  background-color: rgba(20, 20, 22, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  opacity: 1;
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.4);
+}
+.back-link--pill:hover {
+  background-color: rgba(20, 20, 22, 0.68);
+  transform: translateX(-2px);
+}
+
+/* Texto corrido de seção */
+.section-text {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: clamp(0.95rem, 1.1vw, 1.25rem);
+  line-height: 1.55;
+  color: var(--text-primary);
+  transition: color 0.45s ease;
+}
+.section-text--regular {
+  font-weight: var(--fw-regular);
+}
+
+/* Fundo de pontos (dot pattern), reaproveitável, gerado em CSS.
+   Usado nas seções que no Figma têm a textura de bolinhas. */
+.dot-pattern {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(
+    var(--dot-color, rgba(8, 12, 56, 0.12)) 1.4px,
+    transparent 1.5px
+  );
+  background-size: 22px 22px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 18%,
+    #000 82%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 18%,
+    #000 82%,
+    transparent
+  );
+  opacity: 0.7;
+}
+[data-theme="dark"] .dot-pattern {
+  --dot-color: rgba(240, 163, 21, 0.14);
+}

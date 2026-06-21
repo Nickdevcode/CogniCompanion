@@ -1,0 +1,498 @@
+/* ==========================================================================
+   Tela do Jogo "Psybot" (jogo.html) — réplica dos frames do Figma
+   (desktop 1440 + mobile 412). Aberta pelo "Saber mais" da seção Jogo da home.
+
+   Página longa, dividida em seções: Hero (capa pixel art + menu lateral âncora
+   + badge + "Baixar agora") · Vídeos · Sobre · História · Fases · (extra) botão
+   de download Windows ao final.
+
+   Identidade "game": títulos de seção em Pixelify Sans (fonte pixel) sobre
+   faixas largas (laranja ou navy), com sombra dura estilo pixel. Corpo em
+   Zilla Slab, como o resto do site. Suporta os dois temas.
+   ========================================================================== */
+
+.game-page {
+  --gp-navy: #080c38;
+  --gp-gold: var(--brand-gold);
+  --gp-blue: #216083;          /* azul dos rótulos das fases */
+  --gp-text: #080c38;          /* texto dos parágrafos (Figma) */
+  --gp-band-radius: 8px;
+  position: relative;
+  overflow: hidden;
+}
+[data-theme="dark"] .game-page {
+  --gp-text: #e7e7ea;
+}
+
+/* Título de seção em "pixel" sobre faixa larga.
+   Reutilizável: .game-band--gold (Vídeos/Fases) e .game-band--navy (Sobre/História). */
+.game-band {
+  position: relative;
+  width: 100%;
+  text-align: center;
+  padding: clamp(0.6rem, 1.4vw, 1.1rem) 1rem;
+  margin-bottom: clamp(1.5rem, 4vh, 3rem);
+  font-family: "Pixelify Sans", var(--font-body);
+  font-weight: 600;
+  font-size: clamp(2rem, 4.4vw, 4rem); /* 64px @1440 */
+  line-height: 1;
+  color: #fff;
+  /* sombra dura (offset sem blur) reforça o ar retrô/pixel */
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.25);
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.3);
+  transition: background-color 0.45s ease;
+}
+.game-band--gold {
+  background-color: var(--gp-gold);
+}
+.game-band--navy {
+  background-color: var(--gp-navy);
+}
+[data-theme="dark"] .game-band--navy {
+  background-color: #10142e;
+}
+
+/* Largura do conteúdo textual das seções (parágrafos centrais) */
+.game-section {
+  position: relative;
+  padding-block: clamp(2.5rem, 6vh, 5rem);
+}
+.game-section__text {
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: clamp(1rem, 1.4vw, 1.5625rem); /* 25px @1440 */
+  line-height: 1.5;
+  color: var(--gp-text);
+  max-width: 70ch;
+  margin-inline: auto;
+  text-align: center;
+  transition: color 0.45s ease;
+}
+.game-section__tagline {
+  font-family: var(--font-body);
+  font-weight: var(--fw-regular);
+  font-size: clamp(0.95rem, 1.2vw, 1.25rem);
+  color: var(--gp-text);
+  text-align: center;
+  margin-bottom: clamp(1rem, 2vh, 1.5rem);
+  opacity: 0.9;
+  transition: color 0.45s ease;
+}
+
+/* ==========================================================================
+   HERO — capa pixel art da cabana (faixa full-bleed no topo, ocupa a tela
+   inteira de ponta a ponta) com o título "Psybot", o menu de âncoras e o badge
+   sobrepostos. A capa é SÓ o topo da página: as seções (Vídeos, Sobre, …)
+   começam ABAIXO dela, em fundo normal — nunca dentro da foto.
+   ========================================================================== */
+.game-hero {
+  position: relative;
+  /* A capa aparece INTEIRA (proporção natural 1440×1064 ≈ 1.353), full-bleed,
+     então o hero fica alto (~74vw). MAS o conteúdo (Psybot + menu + botão) é
+     ancorado dentro da PRIMEIRA DOBRA (≈ altura da viewport), pra estar visível
+     já com o scroll no topo — não lá embaixo na base da imagem alta. */
+  aspect-ratio: 1440 / 1064;
+  min-height: 420px;
+}
+
+/* A capa ocupa a LARGURA TOTAL da viewport (full-bleed), ignorando o container,
+   e aparece COMPLETA (height:auto = proporção natural, sem object-fit:cover que
+   cortaria as bordas). Termina com um fade suave que funde no fundo da página
+   antes da próxima seção. */
+.game-hero__cover {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;          /* tela inteira, de ponta a ponta */
+  height: auto;          /* proporção natural: mostra a imagem inteira */
+  z-index: 0;
+  /* pixel art: mantém os pixels nítidos em vez de borrar ao escalar */
+  image-rendering: pixelated;
+  /* fade só na base, pra emendar com o fundo da página sem corte seco */
+  -webkit-mask-image: linear-gradient(to bottom, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 86%, transparent 100%);
+}
+
+/* O conteúdo do hero (Voltar, Baixar agora, Psybot, menu) fica ancorado na base
+   de uma faixa de altura = viewport, no TOPO do hero. Assim aparece já na
+   primeira tela (scroll no topo), sobre a parte de baixo da arte que está
+   visível, em vez de seguir a base da imagem alta (que ficaria fora da tela). */
+.game-hero__inner {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  width: 100%;
+  /* nunca passa de uma tela cheia: garante o conteúdo dentro da 1ª dobra */
+  height: min(100vh, 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* barra no topo, bloco principal na base */
+  padding-top: clamp(6rem, 12vh, 8.5rem);
+  padding-bottom: clamp(1.5rem, 4vw, 3.5rem);
+}
+
+/* Barra superior: Voltar à esquerda, Baixar agora à direita */
+.game-hero__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* Bloco principal (Psybot + menu) ancorado na base da primeira dobra */
+.game-hero__main {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Título "Psybot" em pixel, com brilho dourado suave (como no Figma) */
+.game-hero__title {
+  font-family: "Pixelify Sans", var(--font-body);
+  font-weight: 700;
+  font-size: clamp(3.5rem, 11vw, 9rem);
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 0 18px rgba(240, 163, 21, 0.7),
+    4px 4px 0 rgba(218, 108, 10, 0.35);
+  margin-bottom: clamp(1.25rem, 3vh, 2rem);
+}
+
+/* Menu de âncoras (Início/Vídeos/Sobre/História/Fases) — o "header secundário"
+   do jogo. Maior e bem espaçado, ancorado na base da arte. */
+.game-hero__menu {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.65rem, 1.4vh, 1.15rem);
+}
+.game-hero__menu a {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(0.7rem, 1vw, 1rem);
+  width: fit-content;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: clamp(1.25rem, 1.9vw, 2.25rem); /* maior que antes (até 36px) */
+  line-height: 1.1;
+  color: #fff;
+  /* o menu fica sobre a capa pixel art (clara/escura conforme a região); o
+     contorno escuro garante leitura em qualquer parte da imagem. */
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.7);
+  transition: color 0.25s ease, transform 0.2s ease;
+}
+/* marcador quadrado: vazado por padrão, preenchido no item ativo */
+.game-hero__menu a::before {
+  content: "";
+  width: clamp(16px, 1.3vw, 22px);
+  height: clamp(16px, 1.3vw, 22px);
+  flex-shrink: 0;
+  border: 3px solid var(--gp-gold);
+  background-color: transparent;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+.game-hero__menu a:hover {
+  transform: translateX(4px);
+  color: var(--gp-gold);
+}
+.game-hero__menu a:hover::before,
+.game-hero__menu a.is-active::before {
+  background-color: var(--gp-gold);
+}
+.game-hero__menu a.is-active {
+  color: var(--gp-gold);
+}
+
+/* Botão "Baixar agora" (na barra superior do hero, à direita) */
+.game-hero__cta {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: clamp(1rem, 1.4vw, 1.5rem);
+  color: #fff;
+  background-color: var(--gp-gold);
+  padding: clamp(0.6rem, 1.2vw, 0.9rem) clamp(1.5rem, 3vw, 3rem);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 10px 24px -8px rgba(240, 163, 21, 0.6);
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+.game-hero__cta:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+}
+
+
+/* ==========================================================================
+   VÍDEOS — card de vídeo (thumbnail + play + data/nome)
+   ========================================================================== */
+.game-video {
+  max-width: 880px;
+  margin-inline: auto;
+}
+.game-video__card {
+  position: relative;
+  display: block;
+  border-radius: 18px;
+  overflow: hidden;
+  /* moldura dourada com um leve detalhe (como no Figma) */
+  border: 4px solid var(--gp-gold);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+.game-video__thumb {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 735 / 388;
+  object-fit: cover;
+  display: block;
+}
+.game-video__play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: clamp(60px, 8vw, 92px);
+  height: clamp(60px, 8vw, 92px);
+  border-radius: 50%;
+  background-color: rgba(20, 20, 22, 0.6);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(4px);
+  transition: transform 0.25s ease, background-color 0.25s ease;
+}
+.game-video__card:hover .game-video__play {
+  transform: translate(-50%, -50%) scale(1.08);
+  background-color: rgba(240, 163, 21, 0.85);
+}
+.game-video__play svg {
+  width: 40%;
+  height: 40%;
+}
+/* faixa inferior com data + nome do vídeo */
+.game-video__meta {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  padding: clamp(0.85rem, 1.6vw, 1.4rem) clamp(1rem, 2vw, 1.6rem) 0.6rem;
+  background: linear-gradient(to top, rgba(8, 12, 56, 0.85), transparent);
+  color: #fff;
+  font-family: var(--font-body);
+}
+.game-video__date {
+  font-weight: var(--fw-regular);
+  font-size: clamp(0.8rem, 1vw, 1rem);
+  opacity: 0.9;
+}
+.game-video__name {
+  font-weight: var(--fw-semibold);
+  font-size: clamp(0.95rem, 1.2vw, 1.25rem);
+}
+
+/* ==========================================================================
+   HISTÓRIA — 2 parágrafos + 3 cards de imagem com legendas
+   ========================================================================== */
+.game-story__media {
+  display: grid;
+  grid-template-columns: 0.8fr 1.4fr 0.8fr; /* central maior (Figma) */
+  align-items: stretch;
+  gap: clamp(0.75rem, 1.6vw, 1.5rem);
+  margin-top: clamp(2rem, 4vh, 3rem);
+}
+.game-story__card {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 12px 28px -14px rgba(0, 0, 0, 0.5);
+  min-height: 0;
+}
+.game-story__card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  image-rendering: pixelated;
+  aspect-ratio: 281 / 507; /* cards laterais (retrato) */
+}
+.game-story__card--wide img {
+  aspect-ratio: 834 / 588; /* card central (panorâmico) */
+}
+/* legenda em pixel sobre a base da imagem */
+.game-story__caption {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  padding: clamp(0.6rem, 1.2vw, 1rem) clamp(0.6rem, 1.2vw, 1rem)
+    clamp(0.5rem, 1vw, 0.85rem);
+  background: linear-gradient(to top, rgba(8, 12, 56, 0.9), transparent);
+  font-family: "Pixelify Sans", var(--font-body);
+  font-weight: 500;
+  font-size: clamp(0.85rem, 1.5vw, 2rem); /* 32px @1440 */
+  line-height: 1.05;
+  color: #fff;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+}
+/* ícones de play/volume no card central */
+.game-story__icons {
+  position: absolute;
+  top: clamp(0.5rem, 1vw, 0.85rem);
+  right: clamp(0.5rem, 1vw, 0.85rem);
+  display: flex;
+  gap: 0.5rem;
+  color: #fff;
+}
+.game-story__icons span {
+  width: clamp(28px, 3vw, 40px);
+  height: clamp(28px, 3vw, 40px);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background-color: rgba(8, 12, 56, 0.55);
+  backdrop-filter: blur(3px);
+}
+.game-story__icons svg {
+  width: 55%;
+  height: 55%;
+}
+
+/* ==========================================================================
+   FASES — parágrafo intro + mapa vertical com rótulos Fase 1–4
+   ========================================================================== */
+.game-stages__map {
+  position: relative;
+  max-width: 680px;
+  margin: clamp(2rem, 5vh, 3.5rem) auto 0;
+}
+.game-stages__img {
+  width: 100%;
+  height: auto;
+  display: block;
+  image-rendering: pixelated;
+  border-radius: 18px;
+}
+/* Rótulo "Fase X" (azul, pixel) posicionado LOGO ABAIXO do medalhão que já
+   vem desenhado na própria imagem do mapa. Não desenhamos medalhão por CSS —
+   a arte já o traz. As posições derivam do zigue-zague das ilhas no Figma:
+   Fase 1 e 3 à esquerda, Fase 2 e 4 à direita. */
+.game-stages__label {
+  position: absolute;
+  font-family: "Pixelify Sans", var(--font-body);
+  font-weight: 600;
+  font-size: clamp(1rem, 2.4vw, 3rem); /* ~64px no mapa @1113 */
+  color: var(--gp-blue);
+  text-shadow: 2px 2px 0 rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+[data-theme="dark"] .game-stages__label {
+  color: #5aa9d4; /* clareia o azul pra contrastar no escuro */
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+/* Posições calibradas pelos medalhões da arte (imagem 1113×1670). */
+.game-stages__label--1 { top: 19%; left: 1%; }
+.game-stages__label--2 { top: 47%; right: 1%; }
+.game-stages__label--3 { top: 67%; left: 1%; }
+.game-stages__label--4 { top: 90%; right: 1%; }
+
+/* ==========================================================================
+   Botão "Download disponível para Windows" (EXTRA, ao final das fases).
+   Reaproveita o visual do .game__download da home, centralizado e maior.
+   ========================================================================== */
+.game-download-final {
+  display: flex;
+  justify-content: center;
+  padding-block: clamp(2.5rem, 6vh, 4.5rem);
+}
+.game-download-final .game__download {
+  align-self: center;
+  font-size: clamp(1rem, 1.3vw, 1.375rem);
+  padding: 0.85rem 2.25rem;
+  margin-bottom: 0;
+}
+
+/* ==========================================================================
+   RESPONSIVO — MOBILE
+   ========================================================================== */
+@media (max-width: 860px) {
+  /* Hero no mobile: MESMA lógica do desktop (igual ao Figma mobile) — a capa
+     full-bleed aparece inteira no topo e o conteúdo (Psybot + menu) fica
+     SOBRE ela, ancorado na base da primeira dobra e alinhado À ESQUERDA.
+     A barra (Voltar + Baixar agora) fica no topo, sobre a arte. */
+  .game-hero {
+    /* NÃO usar aspect-ratio aqui: combinado com min-height ele calcularia a
+       LARGURA a partir da altura e estouraria a viewport. Usamos altura fixa
+       em vw, e a imagem (cover) preenche essa caixa. */
+    aspect-ratio: auto;
+    height: clamp(440px, 125vw, 620px);
+    min-height: 0;
+  }
+  .game-hero__cover {
+    /* volta a ser absoluta e full-bleed, cobrindo todo o hero */
+    position: absolute;
+    top: 0;
+    height: 100%;
+    object-fit: cover;        /* preenche o hero mantendo o foco na cabana */
+    object-position: center 30%;
+  }
+  /* conteúdo sobre a imagem, ancorado na base da 1ª dobra (como no desktop).
+     padding-top generoso pra a barra (Voltar/Baixar agora) descer e não colar
+     no header fixo. */
+  .game-hero__inner {
+    position: absolute;
+    top: 0;
+    height: min(100svh, 100%);
+    justify-content: space-between;
+    padding-top: clamp(7.5rem, 19vh, 10rem);
+    padding-bottom: clamp(1.25rem, 5vw, 2rem);
+  }
+  /* barra superior: Voltar à esquerda, Baixar agora à direita (sobre a arte) */
+  .game-hero__top {
+    gap: 0.6rem;
+  }
+  /* Psybot + menu alinhados à ESQUERDA, sobre a base da arte */
+  .game-hero__main {
+    align-items: flex-start;
+  }
+  .game-hero__title {
+    font-size: clamp(3rem, 17vw, 5.5rem);
+    margin-bottom: clamp(0.75rem, 3vw, 1.25rem);
+  }
+  .game-hero__menu {
+    align-items: flex-start;
+    gap: clamp(0.5rem, 2.2vw, 0.9rem);
+  }
+  .game-hero__menu a {
+    font-size: clamp(1.1rem, 5vw, 1.6rem);
+  }
+
+  /* História: cards empilham (1 coluna), todos panorâmicos pra ficar legível */
+  .game-story__media {
+    grid-template-columns: 1fr;
+    max-width: 480px;
+    margin-inline: auto;
+    gap: 1rem;
+  }
+  .game-story__card img,
+  .game-story__card--wide img {
+    aspect-ratio: 16 / 10;
+  }
+
+  /* Fases: rótulos um pouco menores pra não cobrir as ilhas */
+  .game-stages__label {
+    font-size: clamp(0.95rem, 4.5vw, 1.6rem);
+  }
+}
+
+/* Telas bem estreitas */
+@media (max-width: 420px) {
+  .game-stages__label--1,
+  .game-stages__label--3 { left: 0; }
+  .game-stages__label--2,
+  .game-stages__label--4 { right: 0; }
+}

@@ -1,0 +1,50 @@
+# ───────────────────────────────────────────────────────────────
+# Cogni — .gitignore
+# Projeto web estático (HTML/CSS/JS). Aqui ficam apenas os arquivos
+# que NÃO devem ir pro GitHub: lixo de sistema, configs de editor e
+# pastas geradas pela Vercel/ferramentas.
+# ───────────────────────────────────────────────────────────────
+
+# --- Sistema operacional ---
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+# macOS (caso alguém da equipe use Mac)
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# --- Editores / IDEs ---
+.vscode/
+.idea/
+.claude/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*~
+
+# --- Vercel (gerado no deploy/CLI, não versionar) ---
+.vercel/
+
+# --- Logs e temporários ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.cache/
+tmp/
+temp/
+
+# --- Dependências (caso um dia o projeto ganhe build/ferramentas) ---
+node_modules/
+
+# --- Segredos (nunca subir credenciais) ---
+.env
+.env.*
+!.env.example

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Aprenda a usar a Cogni passo a passo: ligar, criar um perfil, conversar e tirar o melhor proveito da sua tutora com IA."
+    />
+    <meta name="theme-color" content="#f0f0f0" />
+    <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg" />
+    <title>Instruções — Como usar a Cogni</title>
+
+    <!-- Roda antes de pintar a tela: aplica o tema salvo (anti-flash) e
+         marca .js no <html> para ativar os estados de animação de scroll. -->
+    <script>
+      (function () {
+        var root = document.documentElement;
+        root.classList.add("js");
+        try {
+          var saved = localStorage.getItem("cognify-theme");
+          var theme =
+            saved === "light" || saved === "dark"
+              ? saved
+              : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+          root.setAttribute("data-theme", theme);
+        } catch (e) {}
+      })();
+    </script>
+
+    <!-- Fontes do Figma: Wittgenstein (título) + Zilla Slab (corpo) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Gugi&family=Wittgenstein:ital,wght@0,900;1,900&family=Zilla+Slab:ital,wght@0,400;0,500;0,600;0,700;1,600;1,700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Estilos (ordem importa: tokens → base → componentes) -->
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/animations.css" />
+    <link rel="stylesheet" href="css/sections.css" />
+    <link rel="stylesheet" href="css/header.css" />
+    <link rel="stylesheet" href="css/footer.css" />
+    <link rel="stylesheet" href="css/instructions.css" />
+  </head>
+  <body>
+    <!-- ===================== HEADER (mesmo do site) ===================== -->
+    <header class="site-header">
+      <div class="site-header__inner" data-header-inner>
+        <a href="index.html" class="sr-only">Cognify — página inicial</a>
+
+        <nav class="nav" aria-label="Navegação principal">
+          <a href="index.html#inicio" class="nav__link">Home</a>
+          <a href="index.html#projeto" class="nav__link">Projeto</a>
+          <a href="index.html#produtos" class="nav__link">Materiais</a>
+          <a href="index.html#jogo" class="nav__link">Jogo</a>
+          <a href="index.html#artigo" class="nav__link">Artigo Científico</a>
+          <a href="index.html#sobre" class="nav__link">Sobre Nós</a>
+          <!-- Login/Cadastro entram no menu só no mobile -->
+          <a href="login.html" class="nav__link nav__link--auth nav__link--auth-first">Login</a>
+          <a href="cadastro.html" class="nav__link nav__link--auth">Cadastro</a>
+        </nav>
+
+        <div class="header__right">
+          <!-- Toggle de tema claro/escuro -->
+          <button
+            type="button"
+            class="theme-toggle"
+            data-theme-toggle
+            aria-pressed="false"
+            aria-label="Ativar modo escuro"
+          >
+            <span class="theme-toggle__label" aria-hidden="true"
+              ><span class="label-on">On</span
+              ><span class="label-off">Off</span></span
+            >
+            <span class="theme-toggle__knob" aria-hidden="true">
+              <!-- Sol (modo claro) -->
+              <svg
+                class="theme-toggle__icon theme-toggle__icon--sun"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />
+                <path
+                  d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+                />
+              </svg>
+              <!-- Lua (modo escuro) -->
+              <svg
+                class="theme-toggle__icon theme-toggle__icon--moon"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+              </svg>
+            </span>
+          </button>
+
+          <!-- Autenticação -->
+          <div class="auth">
+            <a href="login.html" class="auth__login">Login</a>
+            <a href="cadastro.html" class="auth__signup">Cadastro</a>
+          </div>
+        </div>
+
+        <!-- Botão hambúrguer (mobile) -->
+        <button
+          type="button"
+          class="nav-toggle"
+          data-nav-toggle
+          aria-label="Abrir menu"
+          aria-expanded="false"
+        >
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ===================== INSTRUÇÕES ===================== -->
+    <main class="instructions">
+      <div class="container">
+        <!-- Voltar para a Home (pedido extra; acima do título) -->
+        <a href="index.html" class="back-link" aria-label="Voltar para a página inicial">
+          <span class="back-link__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M15 18l-6-6 6-6"
+                stroke="currentColor"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+          <span>Voltar</span>
+        </a>
+
+        <!-- ---------- Seção: cabeçalho "Instruções" ---------- -->
+        <header class="instr-heading">
+          <h1 class="instr-heading__title" data-reveal>Instruções</h1>
+          <span class="instr-heading__line" aria-hidden="true"></span>
+          <p class="instr-heading__subtitle" data-reveal data-reveal-delay="120">
+            Tudo que você precisa saber pra começar a usar a Cogni.
+          </p>
+        </header>
+
+        <!-- ---------- Card de vídeo "Veja a Cogni em ação." ---------- -->
+        <section
+          class="instr-video"
+          aria-label="Vídeo: veja a Cogni em ação"
+          data-reveal="scale"
+          data-reveal-delay="160"
+        >
+          <div class="instr-video__card">
+            <!-- Player (no futuro pode abrir o vídeo real; por ora é o pôster) -->
+            <a
+              href="#"
+              class="instr-video__player"
+              aria-label="Assistir ao vídeo da Cogni em ação"
+            >
+              <img
+                class="instr-video__thumb"
+                src="assets/images/instrucoes-video.png"
+                alt="Uma criança interagindo com a Cogni, o robô tutor da Cognify"
+                loading="lazy"
+              />
+              <span class="instr-video__play" aria-hidden="true">
+                <!-- Triângulo de play -->
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14z" />
+                </svg>
+              </span>
+            </a>
+
+            <!-- Faixa navy com o texto -->
+            <div class="instr-video__caption">
+              <h2 class="instr-video__title">Veja a Cogni em ação.</h2>
+              <p class="instr-video__text">
+                Em poucos minutos, mostramos como ligar, conversar e tirar o
+                melhor proveito da sua tutora.
+              </p>
+            </div>
+          </div>
+
+          <!-- Selo de lâmpada saindo do canto -->
+          <span class="instr-video__bulb" aria-hidden="true">
+            <!-- Lâmpada acesa (filled) -->
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9v1zM12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z" />
+            </svg>
+          </span>
+        </section>
+
+        <!-- ===================== DESCRIÇÃO ===================== -->
+        <header class="instr-heading">
+          <h2 class="instr-heading__title" data-reveal>Descrição</h2>
+          <span class="instr-heading__line" aria-hidden="true"></span>
+          <p class="instr-heading__subtitle" data-reveal data-reveal-delay="120">
+            Como usar, passo a passo.
+          </p>
+        </header>
+
+        <!-- Grade dos 6 passos -->
+        <ol class="instr-steps">
+          <!-- Passo 1 — Ligue a Cogni -->
+          <li class="instr-step" data-reveal data-reveal-delay="0">
+            <span class="instr-step__num" aria-hidden="true">1</span>
+            <span class="instr-step__icon" aria-hidden="true">
+              <!-- Power / liga-desliga (outline, como no Figma) -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v9" />
+                <path d="M7.5 6.6a8 8 0 1 0 9 0" />
+              </svg>
+            </span>
+            <h3 class="instr-step__title">Ligue a Cogni</h3>
+            <p class="instr-step__text">
+              Coloque o robô ligado à energia e espere a tela acender. Em
+              segundos, ela está pronta pra conversar.
+            </p>
+          </li>
+
+          <!-- Passo 2 — Crie um perfil -->
+          <li class="instr-step" data-reveal data-reveal-delay="80">
+            <span class="instr-step__num" aria-hidden="true">2</span>
+            <span class="instr-step__icon" aria-hidden="true">
+              <!-- Usuário (filled) -->
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20a8 8 0 0 1 16 0 1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" />
+              </svg>
+            </span>
+            <h3 class="instr-step__title">Crie um perfil</h3>
+            <p class="instr-step__text">
+              Cadastre o nome de quem vai estudar. A Cogni guarda o histórico de
+              cada criança separadinho, com carinho.
+            </p>
+          </li>
+
+          <!-- Passo 3 — Microfone -->
+          <li class="instr-step" data-reveal data-reveal-delay="160">
+            <span class="instr-step__num" aria-hidden="true">3</span>
+            <span class="instr-step__icon" aria-hidden="true">
+              <!-- Microfone (filled) -->
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <rect x="9" y="2" width="6" height="12" rx="3" />
+                <path d="M5 11a7 7 0 0 0 14 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+                <path d="M12 18v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+                <path d="M8 21h8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+              </svg>
+            </span>
+            <h3 class="instr-step__title">Microfone</h3>
+            <p class="instr-step__text">
+              Toque no botão de microfone e pode falar normal. A Cogni escuta,
+              entende e responde no mesmo instante.
+            </p>
+          </li>
+
+          <!-- Passo 4 — Mostre algo -->
+          <li class="instr-step" data-reveal data-reveal-delay="0">
+            <span class="instr-step__num" aria-hidden="true">4</span>
+            <span class="instr-step__icon" aria-hidden="true">
+              <!-- Imagem / foto (filled, quadro com montanha + sol) -->
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm0 13.5L9 12l3 3.5L15.5 11l4.5 6.5V6H4v11.5z" />
+                <circle cx="16" cy="8.5" r="1.6" />
+              </svg>
+            </span>
+            <h3 class="instr-step__title">Mostre algo</h3>
+            <p class="instr-step__text">
+              Ligue a câmera pra mostrar o caderno, um desenho ou um exercício.
+              Ela enxerga e ajuda a resolver junto.
+            </p>
+          </li>
+
+          <!-- Passo 5 — Converse -->
+          <li class="instr-step" data-reveal data-reveal-delay="80">
+            <span class="instr-step__num" aria-hidden="true">5</span>
+            <span class="instr-step__icon" aria-hidden="true">
+              <!-- Balão de fala (filled) -->
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-4.6 3.45A1 1 0 0 1 3 19.65V6a2 2 0 0 1 1-2z" />
+              </svg>
+            </span>
+            <h3 class="instr-step__title">Converse</h3>
+            <p class="instr-step__text">
+              Pergunte, conte uma dúvida ou peça uma curiosidade. A Cogni
+              responde como uma amiga e puxa o papo de volta.
+            </p>
+          </li>
+
+          <!-- Passo 6 — Aprenda -->
+          <li class="instr-step" data-reveal data-reveal-delay="160">
+            <span class="instr-step__num" aria-hidden="true">6</span>
+            <span class="instr-step__icon" aria-hidden="true">
+              <!-- Chapéu de formatura (filled) -->
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 3 1 8l11 5 9-4.09V15h2V8L12 3z" />
+                <path d="M5 11.18V15c0 1.66 3.13 3 7 3s7-1.34 7-3v-3.82l-7 3.18-7-3.18z" />
+              </svg>
+            </span>
+            <h3 class="instr-step__title">Aprenda</h3>
+            <p class="instr-step__text">
+              Quanto mais vocês conversam, mais a Cogni conhece o jeito de
+              aprender de cada um e adapta as explicações.
+            </p>
+          </li>
+        </ol>
+      </div>
+    </main>
+
+    <!-- ===================== FOOTER (mesmo do site) ===================== -->
+    <footer class="footer">
+      <img
+        class="footer__mascot footer__mascot--light"
+        src="assets/images/cogni-head-light.png"
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+      />
+      <img
+        class="footer__mascot footer__mascot--dark"
+        src="assets/images/cogni-head-dark.png"
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+      />
+      <div class="footer__inner">
+        <nav class="footer__col" aria-label="Navegação do rodapé">
+          <h2 class="footer__title">Navegação</h2>
+          <div class="footer__links">
+            <a href="index.html#projeto">Projeto</a>
+            <a href="index.html#produtos">Materiais</a>
+            <a href="index.html#jogo">Jogo</a>
+            <a href="index.html#artigo">Artigo Científico</a>
+          </div>
+        </nav>
+        <nav class="footer__col" aria-label="Informações do rodapé">
+          <h2 class="footer__title">Informações</h2>
+          <div class="footer__links">
+            <a href="login.html">Login</a>
+            <a href="cadastro.html">Cadastro</a>
+            <a href="index.html#sobre">Sobre Nós</a>
+          </div>
+        </nav>
+      </div>
+      <p class="footer__bottom">
+        © 2026 Cognify · Projeto de TCC · Todos os direitos reservados.
+      </p>
+    </footer>
+
+    <!-- Scripts (defer: não bloqueiam o parsing).
+         theme = tema claro/escuro · scroll = animações [data-reveal] ·
+         ui = menu hambúrguer mobile. (nav.js/particles.js são exclusivos da
+         home — scrollspy, to-top e partículas — e não entram aqui.) -->
+    <script src="js/theme.js" defer></script>
+    <script src="js/scroll.js" defer></script>
+    <script src="js/ui.js" defer></script>
+  </body>
+</html>

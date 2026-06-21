@@ -1,0 +1,230 @@
+/* ==========================================================================
+   Seção Jogo — título "JoGo" (dois blocos, monitor cobre o meio),
+   monitor CRT na frente, badge de download (Windows) e link "Saber mais".
+   ========================================================================== */
+
+.game {
+  padding-block: clamp(3rem, 7vh, 6rem);
+}
+
+.game__inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* --- Badge "Download disponível para [Windows]" --- */
+.game__download {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
+  background-color: var(--game-download-bg, #080c38);
+  color: #fff;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: clamp(0.9rem, 1vw, 1.25rem);
+  padding: 0.65rem 1.6rem;
+  border-radius: var(--radius-pill);
+  margin-bottom: clamp(1rem, 3vh, 2.5rem);
+  transition: background-color 0.45s ease, transform 0.2s ease;
+}
+.game__download:hover {
+  transform: translateY(-2px);
+}
+.icon-windows {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+/* --- Palco: título atrás + imagem na frente --- */
+.game__stage {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  isolation: isolate;
+}
+
+/* Título: duas palavras "Jogo" completas, ambas CENTRADAS no palco e
+   sobrepostas ao monitor. A da esquerda é deslocada um pouco à esquerda
+   (seu "go" final entra atrás do monitor) e a da direita um pouco à direita
+   (seu "Jo" inicial entra atrás do monitor). Resultado: "Jo" e "go"
+   coladinhos no monitor, exatamente como no Figma. */
+.game__title {
+  position: absolute;
+  inset: 0;
+  z-index: 0;            /* fica ATRÁS do monitor (que tem z-index 1) */
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-style: italic;
+  font-size: clamp(4.5rem, 14vw, 10rem);
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+.game__title-word {
+  position: absolute;
+  top: 25%;
+  left: 50%;
+  white-space: nowrap;
+  padding-bottom: 0.12em;
+}
+/* desloca cada palavra a partir do centro; o valor controla quanto fica
+   visível pra fora do monitor (≈ meia palavra de cada lado) */
+.game__title-left {
+  transform: translate(-84%, -50%);
+}
+.game__title-right {
+  transform: translate(-16%, -50%);
+}
+/* linha dourada sublinhando (acompanha cada palavra) */
+.game__title-word::after {
+  content: "";
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 0.18em;
+  height: 5px;
+  border-radius: 4px;
+  background-color: var(--brand-gold);
+}
+
+.t-d1 { color: var(--display-1); }
+.t-d2 { color: var(--display-2); }
+.t-gold { color: var(--display-gold); }
+
+/* No dark, as pontas visíveis ("Jo" e "go") ficam douradas, como no Figma. */
+[data-theme="dark"] .game__title .t-d1,
+[data-theme="dark"] .game__title .t-d2 {
+  color: var(--display-gold);
+}
+
+.game__image {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 40px 50px rgba(0, 0, 0, 0.25));
+}
+/* As duas imagens têm proporções diferentes no Figma (claro 1.63, dark 1.5),
+   e a dark é ~85% da largura da clara — calibramos cada uma. */
+.game__image--light {
+  max-width: 740px;
+  aspect-ratio: 1475 / 903;
+}
+.game__image--dark {
+  max-width: 630px; /* ~85% da clara */
+  aspect-ratio: 3 / 2;
+}
+/* troca a imagem do monitor conforme o tema */
+.game__image--dark {
+  display: none;
+}
+[data-theme="dark"] .game__image--light {
+  display: none;
+}
+[data-theme="dark"] .game__image--dark {
+  display: block;
+}
+
+/* --- Link "Saber mais" — posicionado SOBRE a mesa, à direita do monitor.
+   A diagonal sai da base (perto do mouse) e sobe até o tracejado + label. --- */
+.game__more {
+  position: absolute;
+  bottom: 18%;            /* na altura da mesa/pódio */
+  right: 2%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;     /* alinha a label verticalmente com o tracejado */
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: clamp(1rem, 1.3vw, 1.5625rem);
+  color: var(--heading-navy);
+  transition: color 0.45s ease;
+}
+.game__more-line {
+  width: clamp(110px, 13vw, 180px);
+  height: clamp(40px, 4.5vw, 60px);
+  margin-right: 0.5rem;
+  flex-shrink: 0;
+}
+.game__more-diag,
+.game__more-dash {
+  stroke: var(--brand-gold);
+}
+.game__more-node {
+  fill: var(--brand-gold);
+}
+.game__more-label {
+  white-space: nowrap;
+  /* alinha com a altura do tracejado (que fica no topo do svg, y=17/60) */
+  align-self: center;
+  margin-top: -1.4em;
+}
+.game__more:hover .game__more-label {
+  text-decoration: underline;
+  text-decoration-color: var(--brand-gold);
+  text-underline-offset: 4px;
+}
+
+/* ==========================================================================
+   Responsivo — MOBILE
+   Espelha o Figma mobile: badge "Download" no canto esquerdo, título "Jogo"
+   com o monitor no meio ocupando a largura, e "Saber mais" à direita do
+   monitor (não solto embaixo).
+   ========================================================================== */
+@media (max-width: 760px) {
+  /* badge fica no canto esquerdo, discreto (como no Figma mobile) */
+  .game__download {
+    align-self: flex-start;
+    font-size: 0.78rem;
+    padding: 0.5rem 1.1rem;
+    gap: 0.6rem;
+    margin-bottom: clamp(0.5rem, 2vh, 1.25rem);
+  }
+  .icon-windows {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* o título escala junto com a largura; ~16vw mantém o "Jo"/"go" visível
+     dos dois lados do monitor sem estourar */
+  .game__title {
+    font-size: clamp(3rem, 16vw, 5.5rem);
+  }
+  /* aproxima as duas metades do centro (monitor é menor no mobile) */
+  .game__title-left {
+    transform: translate(-82%, -50%);
+  }
+  .game__title-right {
+    transform: translate(-18%, -50%);
+  }
+
+  /* "Saber mais" continua à direita do monitor, só menor e com o tracejado
+     mais curto pra caber na largura do celular */
+  .game__more {
+    bottom: 24%;
+    right: 1%;
+    font-size: 0.9rem;
+  }
+  .game__more-line {
+    width: clamp(64px, 22vw, 110px);
+    height: clamp(30px, 9vw, 44px);
+  }
+}
+
+/* Telas bem estreitas: encolhe mais o "Saber mais" pra não sobrepor o monitor. */
+@media (max-width: 420px) {
+  .game__more {
+    font-size: 0.8rem;
+  }
+  .game__more-line {
+    width: 54px;
+  }
+}

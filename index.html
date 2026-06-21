@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Cognify — o robô com IA que pensa, aprende e evolui junto com você, transformando cada conversa em uma nova descoberta."
+    />
+    <meta name="theme-color" content="#f0f0f0" />
+    <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg" />
+    <title>Cognify — O futuro da inteligência artificial</title>
+
+    <!-- Roda antes de pintar a tela: aplica o tema salvo (anti-flash) e
+         marca .js no <html> para ativar os estados de animação de scroll. -->
+    <script>
+      (function () {
+        var root = document.documentElement;
+        root.classList.add("js");
+        try {
+          var saved = localStorage.getItem("cognify-theme");
+          var theme =
+            saved === "light" || saved === "dark"
+              ? saved
+              : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+          root.setAttribute("data-theme", theme);
+        } catch (e) {}
+      })();
+    </script>
+
+    <!-- Fontes do Figma: Wittgenstein (título) + Zilla Slab (corpo) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Gugi&family=Wittgenstein:ital,wght@0,900;1,900&family=Zilla+Slab:ital,wght@0,400;0,500;0,600;0,700;1,600;1,700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Estilos (ordem importa: tokens → base → componentes) -->
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/animations.css" />
+    <link rel="stylesheet" href="css/sections.css" />
+    <link rel="stylesheet" href="css/header.css" />
+    <link rel="stylesheet" href="css/hero.css" />
+    <link rel="stylesheet" href="css/project.css" />
+    <link rel="stylesheet" href="css/products.css" />
+    <link rel="stylesheet" href="css/game.css" />
+    <link rel="stylesheet" href="css/article.css" />
+    <link rel="stylesheet" href="css/team.css" />
+    <link rel="stylesheet" href="css/footer.css" />
+    <link rel="stylesheet" href="css/to-top.css" />
+  </head>
+  <body>
+    <!-- ===================== HEADER ===================== -->
+    <header class="site-header">
+      <div class="site-header__inner" data-header-inner>
+        <!-- Logo textual / link Home -->
+        <a href="#" class="sr-only">Cognify — página inicial</a>
+
+        <!-- Navegação -->
+        <nav class="nav" aria-label="Navegação principal">
+          <a href="#inicio" class="nav__link nav__link--active">Home</a>
+          <a href="#projeto" class="nav__link">Projeto</a>
+          <a href="#produtos" class="nav__link">Materiais</a>
+          <a href="#jogo" class="nav__link">Jogo</a>
+          <a href="#artigo" class="nav__link">Artigo Científico</a>
+          <a href="#sobre" class="nav__link">Sobre Nós</a>
+          <!-- Login/Cadastro entram no menu só no mobile -->
+          <a href="login.html" class="nav__link nav__link--auth nav__link--auth-first">Login</a>
+          <a href="cadastro.html" class="nav__link nav__link--auth">Cadastro</a>
+        </nav>
+
+        <div class="header__right">
+          <!-- Toggle de tema claro/escuro -->
+          <button
+            type="button"
+            class="theme-toggle"
+            data-theme-toggle
+            aria-pressed="false"
+            aria-label="Ativar modo escuro"
+          >
+            <span class="theme-toggle__label" aria-hidden="true"
+              ><span class="label-on">On</span
+              ><span class="label-off">Off</span></span
+            >
+            <span class="theme-toggle__knob" aria-hidden="true">
+              <!-- Sol (modo claro) -->
+              <svg
+                class="theme-toggle__icon theme-toggle__icon--sun"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />
+                <path
+                  d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+                />
+              </svg>
+              <!-- Lua (modo escuro) -->
+              <svg
+                class="theme-toggle__icon theme-toggle__icon--moon"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path
+                  d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"
+                />
+              </svg>
+            </span>
+          </button>
+
+          <!-- Autenticação -->
+          <div class="auth">
+            <a href="login.html" class="auth__login">Login</a>
+            <a href="cadastro.html" class="auth__signup">Cadastro</a>
+          </div>
+        </div>
+
+        <!-- Botão hambúrguer (mobile) -->
+        <button
+          type="button"
+          class="nav-toggle"
+          data-nav-toggle
+          aria-label="Abrir menu"
+          aria-expanded="false"
+        >
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ===================== HERO ===================== -->
+    <main>
+      <section class="hero" id="inicio" aria-labelledby="hero-title">
+        <!-- Campo de partículas interativo -->
+        <canvas
+          id="hero-particles"
+          class="hero__particles"
+          aria-hidden="true"
+        ></canvas>
+
+        <div class="hero__content">
+          <h1 class="hero__title" id="hero-title" data-reveal data-reveal-delay="0">
+            <span class="word-cogni">COGNI</span><span class="word-fy">FY</span>
+          </h1>
+          <span
+            class="hero__title-line"
+            aria-hidden="true"
+            data-reveal="fade"
+            data-reveal-delay="120"
+          ></span>
+
+          <p class="hero__lead hero__lead--desktop" data-reveal data-reveal-delay="200">
+            A robô que pensa, aprende e evolui junto com você, transformando cada
+            conversa em uma nova descoberta.<br />
+            Mais do que uma inteligência artificial, a Cogni é a sua parceira
+            digital pra criar, explorar e ir além.<br />
+            Bem-vindo ao futuro da inteligência artificial.
+          </p>
+          <p class="hero__lead hero__lead--mobile" data-reveal data-reveal-delay="200">
+            A Cogni é uma parceira digital que pensa, aprende e evolui com você,
+            transformando cada conversa em uma nova descoberta e tornando a
+            inteligência artificial mais próxima, criativa e interativa.
+          </p>
+
+          <a
+            href="#projeto"
+            class="hero__cta"
+            data-reveal
+            data-reveal-delay="320"
+            >Saiba Mais</a
+          >
+
+          <!-- Cabeça do Cogni (troca conforme o tema).
+               Wrapper externo = reveal + sombra estática;
+               .hero__robot-inner = só o movimento de float (sem filtro,
+               pra a sombra não ser recalculada a cada frame). -->
+          <div class="hero__robot" data-reveal="scale" data-reveal-delay="420">
+            <div class="hero__robot-inner">
+              <img
+                class="robot--light"
+                src="assets/images/cogni-head-light.png"
+                alt="Cogni, o robô da Cognify, com olhos azuis brilhantes"
+                width="430"
+                height="287"
+                fetchpriority="high"
+              />
+              <img
+                class="robot--dark"
+                src="assets/images/cogni-head-dark.png"
+                alt=""
+                width="430"
+                height="287"
+                aria-hidden="true"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Indicador de scroll (mouse) -->
+        <button
+          type="button"
+          class="hero__scroll"
+          aria-label="Rolar para baixo"
+          data-scroll-down
+          data-reveal="fade"
+          data-reveal-delay="600"
+        >
+          <svg viewBox="0 0 104 86" fill="none" aria-hidden="true">
+            <path
+              fill-rule="evenodd"
+              clip-rule="evenodd"
+              d="M51.9984 86.1875C39.8719 86.1875 30 77.8562 30 67.6102V37.5773C30 27.3313 39.8719 19 51.9984 19C64.125 19 73.9969 27.3313 73.9969 37.5773V67.627C73.9969 77.8563 64.125 86.1875 51.9984 86.1875ZM70.625 37.5773C70.625 28.8766 62.2766 21.8051 51.9984 21.8051C41.7203 21.8051 33.3719 28.8766 33.3719 37.5773V67.627C33.3719 76.3277 41.7203 83.3992 51.9984 83.3992C62.2766 83.3992 70.625 76.3277 70.625 67.627V37.5773ZM51.9984 45.5895C50.1297 45.5895 48.6063 44.3297 48.6063 42.7844V34.3859C48.6063 32.8406 50.1297 31.5809 51.9984 31.5809C53.8672 31.5809 55.3906 32.8406 55.3906 34.3859V42.7844C55.3906 44.3465 53.8672 45.5895 51.9984 45.5895Z"
+              fill="currentColor"
+            />
+          </svg>
+        </button>
+      </section>
+
+      <!-- ===================== PROJETO ===================== -->
+      <section class="section project" id="projeto" aria-labelledby="projeto-title">
+        <div class="container project__inner">
+          <div class="project__content">
+            <h2
+              class="section-title project__title"
+              id="projeto-title"
+              data-reveal
+            >
+              Projeto
+              <span class="section-line" aria-hidden="true"></span>
+            </h2>
+            <p class="section-text project__text project__text--desktop" data-reveal data-reveal-delay="120">
+              A Cogni é uma tutora de IA com corpo, voz e olhar próprio. Ela
+              escuta o que você diz, enxerga o que aparece na câmera e responde
+              na hora, num papo natural que parece conversa com uma amiga que
+              entende de tudo um pouco. Por trás do sorriso, tem um cérebro que
+              combina reconhecimento de fala, visão computacional e modelos de
+              linguagem de última geração, tudo orquestrado para transformar
+              dúvida em descoberta. Cada usuário tem sua própria memória dentro
+              dela, então quanto mais vocês conversam, mais a Cogni te conhece,
+              lembra do que você gosta e adapta o jeito de explicar ao seu ritmo.
+            </p>
+            <p class="section-text project__text project__text--mobile" data-reveal data-reveal-delay="120">
+              A Cogni é uma tutora de IA que ouve, vê e responde em tempo real,
+              transformando dúvidas em aprendizado e adaptando o ensino ao ritmo
+              de cada usuário.
+            </p>
+            <a href="instrucoes.html" class="btn btn--primary" data-reveal data-reveal-delay="240"
+              >Saiba Mais</a
+            >
+          </div>
+
+          <div class="project__media" data-reveal="scale" data-reveal-delay="160">
+            <span class="project__bignum" aria-hidden="true">1,700</span>
+            <span class="project__shape project__shape--square" aria-hidden="true"></span>
+            <span class="project__shape project__shape--circle" aria-hidden="true"></span>
+            <img
+              class="project__robot"
+              src="assets/images/cogni-fullbody.png"
+              alt="Cogni, a tutora robótica, de corpo inteiro apontando para o lado"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== PRODUTOS ===================== -->
+      <section class="section products" id="produtos" aria-labelledby="produtos-title">
+        <div class="container products__inner">
+          <div class="products__content">
+            <h2 class="section-title products__title" id="produtos-title" data-reveal>
+              Materiais
+              <span class="section-line" aria-hidden="true"></span>
+            </h2>
+            <p class="section-text products__text products__text--desktop" data-reveal data-reveal-delay="120">
+              A Cogni não é só um robô, é um conjunto de partes que conversam
+              entre si para criar uma experiência completa de aprendizado. Do
+              hardware que dá corpo à tutora, ao cérebro que abre a porta pra
+              conversa, passando pelas ferramentas que tornam cada estudo único,
+              cada peça foi pensada para funcionar sozinha e brilhar ainda mais
+              quando usada em conjunto. Dá uma olhada no que está sendo usado
+              para o funcionamento do Cogni.
+            </p>
+            <p class="section-text products__text products__text--mobile" data-reveal data-reveal-delay="120">
+              A Cogni une hardware e IA para criar uma experiência de aprendizado
+              integrada, eficiente e personalizada.
+            </p>
+            <a href="produto.html?id=fonte" class="btn btn--primary" data-reveal data-reveal-delay="240"
+              >Saiba Mais</a
+            >
+          </div>
+
+          <div class="carousel" data-reveal="scale" data-reveal-delay="160">
+            <div class="carousel__track" data-carousel-track tabindex="0" aria-label="Lista de materiais">
+              <!-- Card -->
+              <article class="product-card">
+                <div class="product-card__photo">
+                  <img
+                    class="fill-cover"
+                    src="assets/images/produto-fonte.png"
+                    alt="Fonte de alimentação 5V 5A"
+                    loading="lazy"
+                  />
+                </div>
+                <div class="product-card__footer">
+                  <div class="product-card__info">
+                    <h3 class="product-card__name">Fonte 5V 5A</h3>
+                    <p class="product-card__price">R$ 30,00</p>
+                  </div>
+                  <a href="produto.html?id=fonte" class="product-card__cta" aria-label="Ver Fonte 5V 5A">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </a>
+                </div>
+              </article>
+
+              <!-- Card -->
+              <article class="product-card">
+                <div class="product-card__photo">
+                  <img
+                    src="assets/images/produto-esp32.png"
+                    alt="Placa microcontroladora ESP32"
+                    loading="lazy"
+                  />
+                </div>
+                <div class="product-card__footer">
+                  <div class="product-card__info">
+                    <h3 class="product-card__name">ESP 32</h3>
+                    <p class="product-card__price">R$ 35,00</p>
+                  </div>
+                  <a href="produto.html?id=esp32" class="product-card__cta" aria-label="Ver ESP 32">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </a>
+                </div>
+              </article>
+
+              <!-- Card -->
+              <article class="product-card">
+                <div class="product-card__photo">
+                  <img
+                    src="assets/images/produto-camera.png"
+                    alt="Módulo de câmera ESP32-CAM"
+                    loading="lazy"
+                  />
+                </div>
+                <div class="product-card__footer">
+                  <div class="product-card__info">
+                    <h3 class="product-card__name">Câmera</h3>
+                    <p class="product-card__price">R$ 40,00</p>
+                  </div>
+                  <a href="produto.html?id=camera" class="product-card__cta" aria-label="Ver Câmera">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </a>
+                </div>
+              </article>
+            </div>
+
+            <div class="carousel__controls">
+              <button type="button" class="carousel__btn" data-carousel-prev aria-label="Materiais anteriores">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <button type="button" class="carousel__btn" data-carousel-next aria-label="Próximos materiais">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m9 18 6-6-6-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== JOGO ===================== -->
+      <section class="section game" id="jogo" aria-labelledby="jogo-title">
+        <div class="container game__inner">
+          <a href="#" class="game__download" data-reveal>
+            <span>Download disponível para</span>
+            <svg class="icon-windows" viewBox="0 0 88 88" fill="currentColor" aria-hidden="true">
+              <path d="M0 12.4 35.7 7.5v34.5H0zM40.1 6.9 88 0v42h-47.9zM0 46h35.7v34.5L0 75.6zM40.1 46H88v42l-47.9-6.9z"/>
+            </svg>
+            <span class="sr-only">Windows</span>
+          </a>
+
+          <div class="game__stage" data-reveal="scale" data-reveal-delay="120">
+            <!-- Título "JoGo": dois blocos sobrepostos; o monitor cobre o meio,
+                 deixando "Jo" à esquerda e "go" à direita (igual ao Figma). -->
+            <h2 class="game__title" id="jogo-title" aria-label="Jogo">
+              <span class="game__title-word game__title-left" aria-hidden="true"
+                ><span class="t-d1">J</span><span class="t-gold">o</span><span class="t-d2">go</span></span
+              >
+              <span class="game__title-word game__title-right" aria-hidden="true"
+                ><span class="t-d2">Jo</span><span class="t-gold">g</span><span class="t-d1">o</span></span
+              >
+            </h2>
+            <img
+              class="game__image game__image--light"
+              src="assets/images/jogo-monitor.png"
+              alt="Monitor retrô exibindo o jogo Psybot da Cognify"
+              loading="lazy"
+            />
+            <img
+              class="game__image game__image--dark"
+              src="assets/images/jogo-monitor-dark.png"
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+            />
+
+            <!-- "Saber mais": posicionado sobre a mesa, à direita do monitor -->
+            <a href="jogo.html" class="game__more">
+              <svg class="game__more-line" viewBox="0 0 180 60" fill="none" aria-hidden="true" preserveAspectRatio="none">
+                <path class="game__more-diag" d="M3 57 L72 17" stroke-width="2.5" stroke-linecap="round"/>
+                <circle class="game__more-node" cx="72" cy="17" r="5"/>
+                <path class="game__more-dash" d="M80 17 H178" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="9 7"/>
+              </svg>
+              <span class="game__more-label">Saber mais</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== ARTIGO CIENTÍFICO ===================== -->
+      <section class="section article" id="artigo" aria-labelledby="artigo-title">
+        <span class="dot-pattern" aria-hidden="true"></span>
+        <div class="container article__inner">
+          <!-- Palco sobreposto (espelha o frame do Figma): título full-width,
+               imagem da mão grande recortada embaixo, texto à esquerda e o
+               card "Descrição" ancorado na base. -->
+          <div class="article__stage">
+            <!-- Faixa cinza atrás do título (efeito-h1 no Figma) -->
+            <span class="article__title-band" aria-hidden="true"></span>
+
+            <h2 class="article__title" id="artigo-title">
+              <span class="a1">ARTIGO</span> <span class="a2">CIENTÍFICO</span>
+            </h2>
+
+            <!-- Texto à esquerda — versões desktop e mobile (Figma usa textos
+                 diferentes em cada layout). Alternadas via CSS. -->
+            <p class="article__lead article__lead--desktop" data-reveal data-reveal-delay="120">
+              A Cogni é uma robô educacional inovador com IA avançada que
+              transforma a educação infantil atuando como companheira carinhosa
+              e interativa capaz de enxergar o ambiente para personalizar o
+              aprendizado de cada criança.
+            </p>
+            <p class="article__lead article__lead--mobile" data-reveal data-reveal-delay="120">
+              A Cogni é um robô educacional com IA que personaliza o aprendizado
+              infantil de forma interativa e carinhosa.
+            </p>
+
+            <!-- Mídia: brilho do cérebro + imagem da mão. O recorte do braço
+                 é feito pelo container (.article__media tem overflow:hidden). -->
+            <div class="article__media">
+              <span class="article__glow" aria-hidden="true"></span>
+              <img
+                class="article__brain"
+                src="assets/images/artigo-cerebro.png"
+                alt="Mão robótica segurando um cérebro com conexões neurais luminosas"
+                loading="lazy"
+              />
+            </div>
+
+            <div class="article__desc" data-reveal data-reveal-delay="120">
+              <span class="article__desc-badge">Descrição</span>
+              <div class="article__desc-grid">
+                <!-- Texto do card — versões desktop e mobile (Figma). -->
+                <p class="article__desc-text article__desc-text--desktop">
+                  Todo o desenvolvimento da Cogni está documentado em um artigo
+                  científico que investiga como a inteligência artificial e a
+                  robótica educacional podem se unir para apoiar a aprendizagem
+                  personalizada de crianças e adolescentes. O estudo percorre
+                  desde os fundamentos teóricos e as decisões de arquitetura até
+                  a construção do protótipo físico, passando pelos desafios de
+                  integrar voz, visão e memória em uma única tutora interativa.
+                  Mais do que um relato técnico, é uma reflexão sobre o papel da
+                  tecnologia no aprendizado humano.
+                </p>
+                <p class="article__desc-text article__desc-text--mobile">
+                  O artigo científico da Cogni apresenta seu desenvolvimento,
+                  mostrando como IA e robótica podem apoiar a aprendizagem
+                  personalizada de forma interativa e inovadora.
+                </p>
+                <a href="assets/pdfs/Cogni_Artigo_Cientifico.pdf" download class="btn btn--gold">BAIXAR ARTIGO</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== SOBRE NÓS ===================== -->
+      <section class="section team" id="sobre" aria-labelledby="sobre-title">
+        <span class="dot-pattern" aria-hidden="true"></span>
+        <div class="container team__inner">
+          <div class="team__header">
+            <h2 class="team__title" id="sobre-title" data-reveal>
+              SOBRE NÓS
+              <span class="section-line" aria-hidden="true"></span>
+            </h2>
+            <p class="team__intro" data-reveal data-reveal-delay="120">
+              Esta é a nossa equipe. Caso deseje conhecer com mais profundidade
+              as responsabilidades de cada integrante, convidamos você a entrar
+              em contato conosco por meio de nossas redes sociais, cujos links
+              encontram-se abaixo.
+            </p>
+          </div>
+
+          <div class="carousel" data-reveal="scale" data-reveal-delay="160">
+            <div class="carousel__track" data-carousel-track tabindex="0" aria-label="Membros da equipe">
+              <!-- Membro -->
+              <article class="team-card">
+                <img class="team-card__photo" src="assets/images/team-beatriz.png" alt="Beatriz" loading="lazy" />
+                <div class="team-card__footer">
+                  <div>
+                    <h3 class="team-card__name">Beatriz</h3>
+                    <p class="team-card__role">Design</p>
+                  </div>
+                  <div class="team-card__socials" data-socials></div>
+                </div>
+              </article>
+
+              <!-- Membro -->
+              <article class="team-card">
+                <img class="team-card__photo" src="assets/images/team-gabrielly.jpg" alt="Gabrielly" loading="lazy" />
+                <div class="team-card__footer">
+                  <div>
+                    <h3 class="team-card__name">Gabrielly</h3>
+                    <p class="team-card__role">Design</p>
+                  </div>
+                  <div class="team-card__socials" data-socials></div>
+                </div>
+              </article>
+
+              <!-- Membro -->
+              <article class="team-card">
+                <img class="team-card__photo" src="assets/images/team-marcos.png" alt="Marcos" loading="lazy" />
+                <div class="team-card__footer">
+                  <div>
+                    <h3 class="team-card__name">Marcos</h3>
+                    <p class="team-card__role">Programador</p>
+                  </div>
+                  <div class="team-card__socials" data-socials></div>
+                </div>
+              </article>
+
+              <!-- Membro -->
+              <article class="team-card">
+                <img class="team-card__photo" src="assets/images/team-nicolas.png" alt="Nicolas" loading="lazy" />
+                <div class="team-card__footer">
+                  <div>
+                    <h3 class="team-card__name">Nicolas</h3>
+                    <p class="team-card__role">Programador</p>
+                  </div>
+                  <div class="team-card__socials" data-socials></div>
+                </div>
+              </article>
+
+              <!-- Membro -->
+              <article class="team-card">
+                <img class="team-card__photo" src="assets/images/team-ronny.png" alt="Ronny" loading="lazy" />
+                <div class="team-card__footer">
+                  <div>
+                    <h3 class="team-card__name">Ronny</h3>
+                    <p class="team-card__role">Design</p>
+                  </div>
+                  <div class="team-card__socials" data-socials></div>
+                </div>
+              </article>
+            </div>
+
+            <div class="carousel__controls">
+              <button type="button" class="carousel__btn" data-carousel-prev aria-label="Membros anteriores">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <button type="button" class="carousel__btn" data-carousel-next aria-label="Próximos membros">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m9 18 6-6-6-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ===================== FOOTER ===================== -->
+    <footer class="footer">
+      <img
+        class="footer__mascot footer__mascot--light"
+        src="assets/images/cogni-head-light.png"
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+      />
+      <img
+        class="footer__mascot footer__mascot--dark"
+        src="assets/images/cogni-head-dark.png"
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+      />
+      <div class="footer__inner">
+        <nav class="footer__col" aria-label="Navegação do rodapé">
+          <h2 class="footer__title">Navegação</h2>
+          <div class="footer__links">
+            <a href="#projeto">Projeto</a>
+            <a href="#produtos">Materiais</a>
+            <a href="#jogo">Jogo</a>
+            <a href="#artigo">Artigo Científico</a>
+          </div>
+        </nav>
+        <nav class="footer__col" aria-label="Informações do rodapé">
+          <h2 class="footer__title">Informações</h2>
+          <div class="footer__links">
+            <a href="login.html">Login</a>
+            <a href="cadastro.html">Cadastro</a>
+            <a href="#sobre">Sobre Nós</a>
+          </div>
+        </nav>
+      </div>
+      <p class="footer__bottom">
+        © 2026 Cognify · Projeto de TCC · Todos os direitos reservados.
+      </p>
+    </footer>
+
+    <!-- Botão "voltar ao topo": aparece ao rolar a página pra baixo -->
+    <button
+      type="button"
+      class="to-top"
+      data-to-top
+      aria-label="Voltar ao topo"
+      hidden
+    >
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M12 19V5M6 11l6-6 6 6"
+          stroke="currentColor"
+          stroke-width="2.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </button>
+
+    <!-- Scripts (defer: não bloqueiam o parsing) -->
+    <script src="js/theme.js" defer></script>
+    <script src="js/particles.js" defer></script>
+    <script src="js/scroll.js" defer></script>
+    <script src="js/ui.js" defer></script>
+    <script src="js/nav.js" defer></script>
+  </body>
+</html>

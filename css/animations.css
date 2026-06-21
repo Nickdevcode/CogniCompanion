@@ -1,0 +1,33 @@
+/* ==========================================================================
+   Animações de scroll (reveal)
+   Estado inicial dos elementos [data-reveal] e a transição para visível.
+   O JS (scroll.js) adiciona .is-visible quando o elemento entra na tela.
+   ========================================================================== */
+
+/* O estado oculto inicial só vale quando o JS está ativo (classe .js no <html>).
+   Sem JS, o conteúdo aparece normalmente — nunca fica preso invisível. */
+.js [data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+.js [data-reveal].is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Variação: entrada com leve escala (usada no robô) */
+.js [data-reveal="scale"] {
+  transform: translateY(28px) scale(0.96);
+}
+.js [data-reveal="scale"].is-visible {
+  transform: translateY(0) scale(1);
+}
+
+/* Variação: entrada vinda de baixo mais sutil (usada no indicador de scroll) */
+.js [data-reveal="fade"] {
+  transform: none;
+}

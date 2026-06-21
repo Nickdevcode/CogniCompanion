@@ -1,0 +1,183 @@
+/* ==========================================================================
+   Design Tokens — Cognify
+   Valores extraídos diretamente do Figma (modos claro e escuro).
+   O tema é controlado pelo atributo [data-theme] no <html>, alternado via JS.
+   ========================================================================== */
+
+:root {
+  /* --- Cores de marca (constantes nos dois temas) --- */
+  --brand-navy: #080c38;       /* azul-marinho da marca */
+  --brand-gold: #f0a315;       /* dourado principal */
+  --brand-gold-deep: #da6c0a;  /* dourado/laranja escuro (acento) */
+
+  /* --- Tipografia --- */
+  --font-display: "Wittgenstein", Georgia, "Times New Roman", serif; /* título COGNIFY */
+  --font-body: "Zilla Slab", Georgia, serif;                          /* textos e nav */
+
+  --fs-display: clamp(5rem, 12vw, 11.25rem); /* 180px no desktop, fluido p/ telas menores */
+  --fs-lead: 1.0625rem;  /* 17px — subtítulo do hero */
+  --fs-nav: 1.25rem;     /* 20px — itens do menu */
+  --fs-btn: 1.25rem;     /* 20px — botões */
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-black: 900;
+
+  /* --- Espaçamento / raio / sombra --- */
+  --radius-pill: 81px;
+  --radius-header: 43px;
+  --shadow-header: 0 4px 5px 0 rgba(0, 0, 0, 0.25);
+
+  --container-max: 1440px;
+  --header-max: 1316px;
+
+  /* --- Transição padrão de troca de tema --- */
+  --theme-transition: background-color 0.45s ease, color 0.45s ease,
+    border-color 0.45s ease, box-shadow 0.45s ease, fill 0.45s ease;
+}
+
+/* ==========================================================================
+   TEMA CLARO (padrão)
+   ========================================================================== */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-page: #f0f0f0;
+  --bg-page-2: #ffffff;        /* gradiente sutil do fundo */
+  --surface-header: rgba(217, 217, 217, 0.2);
+
+  --text-primary: #080808;
+  --text-strong: #080c38;
+  --text-on-brand: #ffffff;
+  --text-nav: #000000;
+
+  /* Hero */
+  --hero-title-1: #080c38;     /* "COGNI" */
+  --hero-title-2: #f0a315;     /* "FY" */
+  --hero-btn-bg: #080c38;
+  --hero-btn-text: #ffffff;
+  --hero-line: rgba(8, 12, 56, 0.55); /* linha decorativa sob o título */
+
+  /* Seções gerais */
+  --section-title: #080808;          /* títulos "Projeto", "Produtos" */
+  --section-line: #f0a315;           /* linha dourada sob títulos de seção */
+  --section-line-navy: rgba(8, 12, 56, 0.5);
+  --heading-navy: #062541;           /* azul-petróleo de títulos (Sobre Nós) */
+  --btn-primary-bg: #080c38;
+  --btn-primary-text: #ffffff;
+  --btn-gold-bg: #f0a315;
+  --btn-gold-text: #ffffff;
+  --display-1: #171c2b;              /* títulos display grandes (Jogo, Artigo) */
+  --display-2: #080c38;
+  --display-gold: #f0a315;
+  --game-download-bg: #080c38;       /* badge de download (Jogo) */
+
+  /* Cards de produto */
+  --card-product-bg: #080c38;
+  --card-product-text: #ffffff;
+  --card-product-photo: #f4efef;
+
+  /* Cards da equipe */
+  --card-team-bg: #ffffff;
+  --card-team-name: #062541;
+  --card-team-role: #062541;
+  --card-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.28);
+
+  /* Footer */
+  --footer-bg: #131313;
+  --footer-text: #ffffff;
+  --footer-border: #f0a315;
+
+  /* Partículas (dot field) */
+  --particle-color: 8, 12, 56;        /* RGB do navy, usado com alpha no canvas */
+  --particle-base-alpha: 0.16;
+  --particle-hover-alpha: 0.65;
+
+  /* Toggle */
+  --toggle-track: #d9d9d9;
+  --toggle-knob: #f0a315;
+  --toggle-knob-ring: #da6c0a;
+  --toggle-label: #080c38;
+
+  /* Header */
+  --header-border: rgba(255, 255, 255, 0.5);
+
+  /* Botões do header (Cadastro) */
+  --cta-bg: #080c38;
+  --cta-text: #ffffff;
+  --nav-underline: #080c38;
+}
+
+/* ==========================================================================
+   TEMA ESCURO
+   ========================================================================== */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-page: #1c1c1e;
+  --bg-page-2: #242426;
+  --surface-header: rgba(20, 20, 22, 0.55);
+
+  --text-primary: #f1f1f1;
+  --text-strong: #f1f1f1;
+  --text-on-brand: #ffffff;
+  --text-nav: #ffffff;
+
+  /* Hero — cores invertem conforme o Figma do modo escuro */
+  --hero-title-1: #f0a315;     /* "COGNI" fica dourado */
+  --hero-title-2: #da6c0a;     /* "FY" fica laranja escuro */
+  --hero-btn-bg: #f0a315;      /* botão fica dourado */
+  --hero-btn-text: #ffffff;
+  --hero-line: rgba(241, 241, 241, 0.55);
+
+  /* Seções gerais (dark) */
+  --section-title: #f1f1f1;
+  --section-line: #f0a315;
+  --section-line-navy: rgba(241, 241, 241, 0.4);
+  --heading-navy: #f1f1f1;
+  --btn-primary-bg: #f0a315;         /* botões primários ficam dourados */
+  --btn-primary-text: #080c38;
+  --btn-gold-bg: #f0a315;
+  --btn-gold-text: #080c38;
+  --display-1: #f1f1f1;
+  --display-2: #f1f1f1;              /* claro no dark, p/ contrastar com o dourado */
+  --display-gold: #f0a315;
+  --game-download-bg: #216083;       /* badge fica azul-petróleo no dark */
+
+  /* Cards de produto (dark) */
+  --card-product-bg: #10142e;
+  --card-product-text: #ffffff;
+  --card-product-photo: #e9e6e6;
+
+  /* Cards da equipe (dark) */
+  --card-team-bg: #242426;
+  --card-team-name: #f1f1f1;
+  --card-team-role: #c8c8c8;
+  --card-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.6);
+
+  /* Footer (dark) */
+  --footer-bg: #0c0c0c;
+  --footer-text: #ffffff;
+  --footer-border: #f0a315;
+
+  /* Partículas — claras sobre fundo escuro */
+  --particle-color: 240, 163, 21;     /* dourado */
+  --particle-base-alpha: 0.12;
+  --particle-hover-alpha: 0.70;
+
+  /* Toggle (estado "Off"/escuro do Figma: trilho navy, knob azul-petróleo) */
+  --toggle-track: #080c38;
+  --toggle-knob: #216083;
+  --toggle-knob-ring: #063c59;
+  --toggle-label: #f1f1f1;
+
+  /* Header */
+  --header-border: rgba(255, 255, 255, 0.08);
+
+  /* Botões do header (Cadastro fica dourado no dark) */
+  --cta-bg: #f0a315;
+  --cta-text: #080c38;
+  --nav-underline: #f0a315;
+}

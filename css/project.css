@@ -1,0 +1,140 @@
+/* ==========================================================================
+   Seção Projeto — texto à esquerda, Cogni (corpo inteiro) à direita.
+   Fundo: número "1700" gigante girado + formas douradas decorativas.
+   ========================================================================== */
+
+.project {
+  --gold-shape: #f0a315;
+}
+
+.project__inner {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  align-items: center;
+  gap: clamp(2rem, 5vw, 4rem);
+}
+
+/* Coluna de texto */
+.project__content {
+  max-width: 520px;
+}
+.project__title {
+  margin-bottom: 1.5rem;
+}
+.project__text {
+  margin-bottom: 2rem;
+}
+/* texto tem duas versões (desktop/mobile, como no Figma) */
+.project__text--mobile {
+  display: none;
+}
+
+/* Coluna da imagem */
+.project__media {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+/* Número "1700" decorativo, girado, atrás do robô */
+.project__bignum {
+  position: absolute;
+  right: -2%;
+  top: 50%;
+  transform: translateY(-50%) rotate(90deg);
+  font-family: var(--font-body);
+  font-weight: var(--fw-regular);
+  font-size: clamp(12rem, 26vw, 22rem);
+  line-height: 1;
+  color: var(--display-gold);
+  opacity: 0.85;
+  text-shadow: 0 12px 20px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 0;
+}
+
+/* Formas decorativas douradas (quadrado vazado + círculo) atrás do robô */
+.project__shape {
+  position: absolute;
+  border: 14px solid var(--gold-shape);
+  z-index: 0;
+  pointer-events: none;
+}
+.project__shape--square {
+  width: clamp(90px, 11vw, 150px);
+  height: clamp(90px, 11vw, 150px);
+  top: 8%;
+  right: 4%;
+  border-bottom: none;
+  border-left: none;
+}
+.project__shape--circle {
+  width: clamp(120px, 14vw, 190px);
+  height: clamp(120px, 14vw, 190px);
+  border-radius: 50%;
+  bottom: 4%;
+  right: 8%;
+}
+
+.project__robot {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 620px;
+  height: auto;
+  filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.3));
+}
+
+/* ==========================================================================
+   Responsivo
+   ========================================================================== */
+@media (max-width: 880px) {
+  .project__inner {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  .project__content {
+    max-width: 600px;
+    margin-inline: auto;
+    order: 2;
+  }
+  .project__media {
+    order: 1;
+  }
+  .project__title .section-line {
+    margin-inline: auto;
+  }
+  .project__bignum {
+    font-size: clamp(10rem, 40vw, 16rem);
+  }
+}
+
+/* Mobile: o Figma alinha título e texto à ESQUERDA e usa o texto curto. */
+@media (max-width: 600px) {
+  .project__inner {
+    text-align: left;
+  }
+  .project__content {
+    margin-inline: 0;
+  }
+  .project__title .section-line {
+    margin-inline: 0;
+  }
+  .project__text--desktop {
+    display: none;
+  }
+  .project__text--mobile {
+    display: block;
+  }
+}
+
+@media (max-width: 480px) {
+  .project__robot {
+    max-width: 420px;
+  }
+}

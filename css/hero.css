@@ -1,0 +1,279 @@
+/* ==========================================================================
+   Hero — primeira dobra "COGNIFY"
+   Regra-chave: TUDO cabe em 100vh, sem rolagem. Por isso as medidas usam
+   majoritariamente vh/clamp, para escalar com a altura da janela.
+   ========================================================================== */
+
+.hero {
+  position: relative;
+  height: 100vh;
+  height: 100dvh; /* respeita a barra de endereços em mobile */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: clamp(5.5rem, 11vh, 8rem) clamp(1.25rem, 4vw, 3rem)
+    clamp(1.25rem, 3vh, 2.5rem);
+  overflow: hidden;
+}
+
+/* Canvas das partículas interativas — cobre o hero inteiro, atrás do conteúdo */
+.hero__particles {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none; /* o JS escuta o mouse no document, não bloqueia cliques */
+}
+
+.hero__content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 1100px;
+}
+
+/* --- Título COGNIFY --- */
+.hero__title {
+  position: relative;
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-style: italic;
+  /* Escala pela altura também, pra não empurrar o resto pra fora em telas baixas */
+  font-size: clamp(3.5rem, 11.5vh, 8.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.35rem;
+}
+
+.hero__title .word-cogni {
+  color: var(--hero-title-1);
+  transition: color 0.45s ease;
+}
+.hero__title .word-fy {
+  color: var(--hero-title-2);
+  transition: color 0.45s ease;
+}
+
+/* Linha decorativa que cruza por trás do título (igual ao Figma) */
+.hero__title-line {
+  display: block;
+  width: min(671px, 60%);
+  height: 3px;
+  margin: 0.1rem auto clamp(0.75rem, 1.8vh, 1.5rem);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--hero-line) 12%,
+    var(--hero-line) 88%,
+    transparent
+  );
+  transform: rotate(-0.26deg);
+  transition: background 0.45s ease;
+}
+
+/* --- Subtítulo / lead ---
+   No Figma é largo (~808px) e quebra em 3 linhas. Forçamos a largura e
+   deixamos o texto quebrar naturalmente nessas ~3 linhas. */
+.hero__lead {
+  font-size: clamp(0.95rem, 1.7vh, 1.0625rem);
+  line-height: 1.5;
+  color: var(--text-primary);
+  max-width: 820px;
+  width: 100%;
+  margin-bottom: clamp(1rem, 2.4vh, 1.75rem);
+  transition: color 0.45s ease;
+}
+
+/* Lead tem duas versões (desktop/mobile, como no Figma). Mostra desktop por
+   padrão; o mobile aparece no media query. */
+.hero__lead--mobile {
+  display: none;
+}
+
+/* --- Botão "Saiba Mais" --- */
+.hero__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 263px;
+  padding: clamp(0.6rem, 1.4vh, 0.85rem) 2rem;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-btn);
+  color: var(--hero-btn-text);
+  background-color: var(--hero-btn-bg);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 20px -8px rgba(8, 12, 56, 0.5);
+  transition: transform 0.25s ease, box-shadow 0.25s ease,
+    background-color 0.45s ease, color 0.45s ease;
+}
+.hero__cta:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px -8px rgba(8, 12, 56, 0.55);
+}
+.hero__cta:active {
+  transform: translateY(-1px);
+}
+
+/* --- Cabeça do Cogni (elemento dominante, escalando pela altura) --- */
+.hero__robot {
+  position: relative;
+  z-index: 1;
+  height: clamp(170px, 40vh, 430px);
+  margin-top: clamp(0.5rem, 1.6vh, 1.5rem);
+  /* A sombra fica AQUI (no wrapper estático), então não é recalculada a
+     cada quadro da animação — esse recálculo era a principal fonte de travamento. */
+  filter: drop-shadow(0 30px 45px rgba(0, 0, 0, 0.35));
+}
+
+/* Camada interna: faz só o movimento de float, isolada na GPU. */
+.hero__robot-inner {
+  height: 100%;
+  animation: robot-float 6s ease-in-out infinite;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* As duas versões da cabeça trocam conforme o tema */
+.hero__robot img {
+  height: 100%;
+  width: auto;
+}
+.hero__robot .robot--dark {
+  display: none;
+}
+[data-theme="dark"] .hero__robot .robot--light {
+  display: none;
+}
+[data-theme="dark"] .hero__robot .robot--dark {
+  display: block;
+}
+
+/* translate3d (em vez de translateY) garante aceleração por GPU */
+@keyframes robot-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -12px, 0);
+  }
+}
+
+/* --- Indicador de mouse / scroll (maior, e sempre dentro da tela) --- */
+.hero__scroll {
+  position: relative;
+  z-index: 2;
+  margin-top: clamp(0.75rem, 2vh, 1.75rem);
+  color: var(--text-primary);
+  opacity: 0.75;
+  background: none;
+  animation: scroll-bob 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.hero__scroll svg {
+  width: clamp(34px, 4.5vh, 46px);
+  height: auto;
+}
+
+@keyframes scroll-bob {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate3d(0, 7px, 0);
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   Responsivo
+   ========================================================================== */
+
+/* Tablet / telas médias */
+@media (max-width: 820px) {
+  .hero__title {
+    /* a partir daqui o título passa a escalar pela LARGURA, não pela altura,
+       pra nunca estourar as laterais */
+    font-size: clamp(3rem, 13vw, 6rem);
+  }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .hero {
+    padding-top: clamp(6rem, 16vh, 8rem);
+    justify-content: flex-start;
+  }
+
+  /* troca para o texto curto do Figma mobile */
+  .hero__lead--desktop {
+    display: none;
+  }
+  .hero__lead--mobile {
+    display: block;
+  }
+
+  .hero__title {
+    font-size: clamp(2.75rem, 16vw, 4.5rem);
+    margin-bottom: 0.5rem;
+  }
+
+  .hero__title-line {
+    width: 70%;
+    margin-bottom: 1.25rem;
+  }
+
+  .hero__lead {
+    font-size: 0.95rem;
+    line-height: 1.55;
+    max-width: 340px;
+    margin-bottom: 1.5rem;
+  }
+
+  /* No Figma mobile o botão do hero é dourado (no desktop é navy). */
+  .hero__cta {
+    min-width: 220px;
+    background-color: var(--btn-gold-bg);
+    color: var(--btn-gold-text);
+    box-shadow: 0 8px 20px -8px rgba(240, 163, 21, 0.5);
+  }
+
+  .hero__robot {
+    height: clamp(180px, 30vh, 250px);
+    margin-top: clamp(1rem, 3vh, 2rem);
+  }
+
+  .hero__scroll {
+    margin-top: clamp(1rem, 3vh, 2rem);
+  }
+  .hero__scroll svg {
+    width: 32px;
+  }
+}
+
+/* Mobile bem estreito (ex.: 360px) */
+@media (max-width: 380px) {
+  .hero__title {
+    font-size: clamp(2.5rem, 15vw, 3.5rem);
+  }
+  .hero__lead {
+    max-width: 300px;
+  }
+}
+
+/* Telas muito baixas (ex.: paisagem no notebook): comprime margens extras */
+@media (max-height: 680px) and (min-width: 601px) {
+  .hero__robot {
+    height: clamp(140px, 32vh, 300px);
+  }
+}
