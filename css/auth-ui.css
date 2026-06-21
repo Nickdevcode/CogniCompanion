@@ -1,0 +1,492 @@
+/* ==========================================================================
+   auth-ui.css — UI de autenticação que vive FORA das telas de login/cadastro:
+   • Badge do usuário logado + dropdown (no header)
+   • Toasts (notificações)
+   • Estados de formulário (feedback, erro, loading) das telas de auth
+   Usa os design tokens de tokens.css e segue os dois temas (claro/escuro).
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Tokens específicos desta camada (derivados da identidade do projeto)
+   -------------------------------------------------------------------------- */
+:root,
+[data-theme="light"] {
+  --badge-bg: rgba(8, 12, 56, 0.06);
+  --badge-bg-hover: rgba(8, 12, 56, 0.1);
+  --badge-text: #20273d;
+  --badge-avatar-bg: #080c38; /* navy do print */
+  --badge-avatar-icon: #f0a315; /* ícone dourado */
+  --badge-ring: rgba(8, 12, 56, 0.12);
+
+  --menu-bg: #ffffff;
+  --menu-border: rgba(8, 12, 56, 0.1);
+  --menu-text: #20273d;
+  --menu-item-hover: rgba(8, 12, 56, 0.06);
+  --menu-danger: #c0392b;
+  --menu-danger-hover: rgba(192, 57, 43, 0.1);
+
+  --toast-bg: #ffffff;
+  --toast-text: #20273d;
+  --toast-border: rgba(8, 12, 56, 0.1);
+  --toast-success: #1f9d55;
+  --toast-error: #c0392b;
+  --toast-info: #2a6df0;
+}
+
+[data-theme="dark"] {
+  --badge-bg: rgba(255, 255, 255, 0.06);
+  --badge-bg-hover: rgba(255, 255, 255, 0.12);
+  --badge-text: #f1f1f1;
+  --badge-avatar-bg: #10142e;
+  --badge-avatar-icon: #f0a315;
+  --badge-ring: rgba(255, 255, 255, 0.14);
+
+  --menu-bg: #242426;
+  --menu-border: rgba(255, 255, 255, 0.1);
+  --menu-text: #f1f1f1;
+  --menu-item-hover: rgba(255, 255, 255, 0.08);
+  --menu-danger: #ff6b6b;
+  --menu-danger-hover: rgba(255, 107, 107, 0.14);
+
+  --toast-bg: #242426;
+  --toast-text: #f1f1f1;
+  --toast-border: rgba(255, 255, 255, 0.12);
+  --toast-success: #2ecc71;
+  --toast-error: #ff6b6b;
+  --toast-info: #5b9bff;
+}
+
+/* Esconde os controles de Login/Cadastro quando o usuário está logado.
+   Precisa de !important para vencer `.auth { display: flex }` (header.css) e a
+   regra mobile de `.nav__link--auth { display: block }` — o atributo `hidden`
+   sozinho não venceria essas declarações de display. */
+.auth.is-auth-hidden,
+.nav__link--auth.is-auth-hidden {
+  display: none !important;
+}
+
+/* Anti-flash dos controles de auth: enquanto o session.js ainda não resolveu o
+   estado de login (sem a classe `auth-resolved` no <html>), mantém Login/Cadastro
+   ocultos para NÃO piscarem antes de a badge do usuário logado aparecer.
+   Só vale quando há JS (classe `js`, adicionada no <head>); sem JS, os botões
+   aparecem normalmente (fallback acessível). */
+html.js:not(.auth-resolved) .auth,
+html.js:not(.auth-resolved) .nav__link--auth {
+  visibility: hidden !important;
+}
+
+/* ==========================================================================
+   1) BADGE DO USUÁRIO (desktop) — fica no .header__right no lugar do .auth
+   ========================================================================== */
+.user-badge {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.user-badge__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.85rem 0.35rem 0.4rem;
+  background-color: var(--badge-bg);
+  border: 1px solid var(--badge-ring);
+  border-radius: var(--radius-header);
+  color: var(--badge-text);
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.15s ease,
+    var(--theme-transition);
+}
+.user-badge__trigger:hover {
+  background-color: var(--badge-bg-hover);
+}
+.user-badge__trigger:active {
+  transform: scale(0.98);
+}
+.user-badge__trigger:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 2px;
+}
+
+.user-badge__avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: var(--badge-avatar-bg);
+  color: var(--badge-avatar-icon);
+  transition: var(--theme-transition);
+}
+.user-badge__avatar svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+.user-badge__name {
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: var(--fs-nav);
+  line-height: 1;
+  white-space: nowrap;
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-badge__chevron {
+  display: grid;
+  place-items: center;
+  color: currentColor;
+  opacity: 0.7;
+  transition: transform 0.25s ease;
+}
+.user-badge__chevron svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+.user-badge.is-open .user-badge__chevron {
+  transform: rotate(180deg);
+}
+
+/* ==========================================================================
+   2) DROPDOWN (menu da conta)
+   ========================================================================== */
+.user-menu {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  min-width: 210px;
+  padding: 0.4rem;
+  background-color: var(--menu-bg);
+  border: 1px solid var(--menu-border);
+  border-radius: 18px;
+  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.45);
+  z-index: 120;
+
+  /* animação de entrada */
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+  transform-origin: top right;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.user-badge.is-open .user-menu {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.user-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: 1rem;
+  color: var(--menu-text);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.user-menu__item:hover,
+.user-menu__item:focus-visible {
+  background-color: var(--menu-item-hover);
+  outline: none;
+}
+.user-menu__item:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.user-menu__item--danger {
+  color: var(--menu-danger);
+}
+.user-menu__item--danger:hover,
+.user-menu__item--danger:focus-visible {
+  background-color: var(--menu-danger-hover);
+}
+.user-menu__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.user-menu__icon svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+/* ==========================================================================
+   3) BADGE no MOBILE — entra dentro do menu hambúrguer (.nav), full width.
+   Aqui o menu não flutua: vira uma lista inline embaixo da badge.
+   ========================================================================== */
+.user-badge--mobile {
+  display: none; /* o media query do header ativa no mobile */
+  width: 100%;
+  margin-top: 0.5rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--header-border);
+}
+.user-badge--mobile .user-badge__trigger {
+  width: 100%;
+  justify-content: flex-start;
+}
+.user-badge--mobile .user-badge__chevron {
+  margin-left: auto;
+}
+.user-badge--mobile .user-menu {
+  position: static;
+  min-width: 0;
+  width: 100%;
+  margin-top: 0.4rem;
+  box-shadow: none;
+  border-color: transparent;
+  background-color: transparent;
+  padding: 0;
+  /* sempre visível quando o badge mobile está aberto (sem flutuar) */
+}
+
+/* No desktop, esconde a variante mobile; no mobile, esconde a desktop.
+   O breakpoint segue o mesmo do header.css (980px). */
+@media (max-width: 980px) {
+  .user-badge--desktop {
+    display: none;
+  }
+  .user-badge--mobile {
+    display: block;
+  }
+}
+
+/* ==========================================================================
+   4) TOASTS (notificações)
+   ========================================================================== */
+.toast-region {
+  position: fixed;
+  z-index: 1000;
+  top: auto;
+  bottom: clamp(1rem, 3vw, 2rem);
+  right: clamp(1rem, 3vw, 2rem);
+  left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: min(380px, calc(100vw - 2rem));
+  pointer-events: none; /* só os toasts recebem clique */
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  background-color: var(--toast-bg);
+  color: var(--toast-text);
+  border: 1px solid var(--toast-border);
+  border-radius: 14px;
+  box-shadow: 0 16px 38px -14px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.toast.is-leaving {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+/* O "tipo" do toast é comunicado pelo ícone colorido (abaixo) e por um halo
+   sutil ao redor do disco do ícone — sem a faixa lateral grossa, que tem cara
+   de template. */
+
+.toast__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background-color: var(--toast-icon-halo, transparent);
+}
+.toast--success {
+  --toast-icon-halo: rgba(31, 157, 85, 0.12);
+}
+.toast--error {
+  --toast-icon-halo: rgba(192, 57, 43, 0.12);
+}
+.toast--info {
+  --toast-icon-halo: rgba(42, 109, 240, 0.12);
+}
+[data-theme="dark"] .toast--success {
+  --toast-icon-halo: rgba(46, 204, 113, 0.16);
+}
+[data-theme="dark"] .toast--error {
+  --toast-icon-halo: rgba(255, 107, 107, 0.16);
+}
+[data-theme="dark"] .toast--info {
+  --toast-icon-halo: rgba(91, 155, 255, 0.16);
+}
+.toast__icon svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+.toast--success .toast__icon {
+  color: var(--toast-success);
+}
+.toast--error .toast__icon {
+  color: var(--toast-error);
+}
+.toast--info .toast__icon {
+  color: var(--toast-info);
+}
+
+.toast__body {
+  flex: 1;
+  min-width: 0;
+}
+.toast__msg {
+  font-family: var(--font-body);
+  font-weight: var(--fw-regular);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  margin: 0;
+}
+.toast__action {
+  margin-top: 0.5rem;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.9rem;
+  color: var(--brand-gold);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.toast__action:hover {
+  opacity: 0.8;
+}
+
+.toast__close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: -0.2rem -0.2rem 0 0;
+  border-radius: 8px;
+  color: currentColor;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.18s ease, background-color 0.18s ease;
+}
+.toast__close:hover {
+  opacity: 1;
+  background-color: var(--menu-item-hover);
+}
+.toast__close svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+/* ==========================================================================
+   5) ESTADOS DOS FORMULÁRIOS de auth (feedback, erro, loading)
+   Complementa css/auth.css (não duplica nada de lá).
+   ========================================================================== */
+
+/* Mensagem de status logo abaixo do título do formulário */
+.auth__feedback {
+  margin: 0 0 clamp(1rem, 2.5vh, 1.5rem);
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  border: 1px solid transparent;
+}
+.auth__feedback--error {
+  color: var(--toast-error);
+  background-color: rgba(192, 57, 43, 0.08);
+  border-color: rgba(192, 57, 43, 0.25);
+}
+[data-theme="dark"] .auth__feedback--error {
+  background-color: rgba(255, 107, 107, 0.1);
+  border-color: rgba(255, 107, 107, 0.3);
+}
+.auth__feedback--success {
+  color: var(--toast-success);
+  background-color: rgba(31, 157, 85, 0.08);
+  border-color: rgba(31, 157, 85, 0.25);
+}
+[data-theme="dark"] .auth__feedback--success {
+  background-color: rgba(46, 204, 113, 0.1);
+  border-color: rgba(46, 204, 113, 0.3);
+}
+
+/* Campo com erro de validação */
+.auth__input--error,
+.auth__input--error:focus {
+  border-color: var(--toast-error) !important;
+  box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.15) !important;
+}
+
+/* Botão em carregamento: esconde o texto e mostra um spinner centralizado */
+.auth__submit.is-loading,
+.auth__google.is-loading {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+.auth__submit.is-loading > *,
+.auth__google.is-loading > * {
+  visibility: hidden;
+}
+.auth__submit.is-loading::after,
+.auth__google.is-loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  border: 2.5px solid currentColor;
+  border-top-color: transparent;
+  /* o Google tem texto escuro; força o spinner visível nele */
+  color: #fff;
+  animation: auth-spin 0.7s linear infinite;
+  visibility: visible;
+}
+.auth__google.is-loading::after {
+  color: var(--auth-google-text, #20273d);
+}
+@keyframes auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   Acessibilidade: respeita quem prefere menos movimento
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .user-menu,
+  .toast,
+  .user-badge__chevron {
+    transition: none;
+  }
+  .auth__submit.is-loading::after,
+  .auth__google.is-loading::after {
+    animation-duration: 1.2s;
+  }
+}

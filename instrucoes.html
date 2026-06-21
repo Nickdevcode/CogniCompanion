@@ -46,6 +46,7 @@
     <link rel="stylesheet" href="css/header.css" />
     <link rel="stylesheet" href="css/footer.css" />
     <link rel="stylesheet" href="css/instructions.css" />
+    <link rel="stylesheet" href="css/auth-ui.css" />
   </head>
   <body>
     <!-- ===================== HEADER (mesmo do site) ===================== -->
@@ -360,6 +361,18 @@
          theme = tema claro/escuro · scroll = animações [data-reveal] ·
          ui = menu hambúrguer mobile. (nav.js/particles.js são exclusivos da
          home — scrollspy, to-top e partículas — e não entram aqui.) -->
+    <!-- Supabase (CDN com SRI) → config → toast → session: estado de login no
+         site inteiro (header dinâmico). -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2/dist/umd/supabase.min.js"
+      integrity="sha384-JWEyvHh+lRf0sN/WWY+QTQwX+CyWqmNg4tkc8GQzAMEtR2wGNrCJlvnu1lHD1kDm"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script src="js/supabase-config.js" defer></script>
+    <script src="js/toast.js" defer></script>
+    <script src="js/session.js" defer></script>
+
     <script src="js/theme.js" defer></script>
     <script src="js/scroll.js" defer></script>
     <script src="js/ui.js" defer></script>

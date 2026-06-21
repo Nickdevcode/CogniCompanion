@@ -38,6 +38,49 @@ O site foi construído **do zero em HTML, CSS e JavaScript puro** (sem framework
 
 ---
 
+## 🔐 Autenticação (Login, Cadastro e Sessão)
+
+O login e o cadastro são **reais e funcionais**, feitos com **[Supabase Auth](https://supabase.com/auth)**
+(e-mail/senha + login com Google). Como o site é estático, a autenticação roda direto no navegador via
+a CDN oficial do `@supabase/supabase-js` — sem back-end próprio e sem build.
+
+### ✨ O que está implementado
+
+| Recurso | Descrição |
+| --- | --- |
+| 📝 **Cadastro** | Cria a conta (e-mail/senha), guarda o nome e já entra (confirmação de e-mail desativada) |
+| 🔑 **Login** | Entra com e-mail/senha, com mensagens de erro claras em português |
+| 🟦 **Login com Google** | Autenticação social via OAuth (`signInWithOAuth`) |
+| 👤 **Sessão persistente** | Continua logado entre reloads e abas; badge do usuário no header com menu (Dashboard / Sair) |
+| 🎮 **Gate de download** | Os botões de baixar o **jogo** só funcionam logado; deslogado, mostram um aviso pedindo login |
+| 🔔 **Notificações (toasts)** | Sistema de avisos acessível e reutilizável para sucesso/erro/informação |
+
+> 📄 O download do **artigo científico (PDF)** continua **livre**, sem exigir login.
+
+### 🔑 Sobre a chave do Supabase (importante)
+
+Num site estático **não existe "esconder" credencial no front-end** — qualquer chave usada pelo JavaScript
+fica visível. Por isso usamos a **chave pública (`anon`/`public`) do Supabase**, que é **feita para ficar
+exposta** e **não é um segredo**. A segurança real vem do **RLS (Row Level Security)** no banco e do próprio
+Supabase Auth (hash de senha, sessão/JWT). A chave secreta (`service_role`) **nunca** aparece no front.
+👉 [Doc oficial sobre as chaves](https://supabase.com/docs/guides/api/api-keys)
+
+### 🗃️ Arquivos de autenticação
+
+| Arquivo | Função |
+| --- | --- |
+| `js/supabase-config.js` | Inicializa o cliente Supabase (URL + anon key) e expõe helpers em `window.cognifyAuth` |
+| `js/auth.js` | Lógica das telas de login e cadastro (validação, `signUp`, `signInWithPassword`, Google) |
+| `js/session.js` | Header dinâmico (badge + menu), `signOut`, sessão em tempo real e gate de download |
+| `js/toast.js` | Notificações (toasts) reutilizáveis e acessíveis |
+| `css/auth-ui.css` | Estilos da badge, menu, toasts e estados de formulário (erro/carregando) |
+
+> ⚙️ As credenciais ficam em `js/supabase-config.js` (`SUPABASE_URL` e `SUPABASE_ANON_KEY`).
+> A biblioteca do Supabase é carregada por CDN com **SRI** (`integrity` + `crossorigin`) e versão fixa,
+> para proteger contra um eventual comprometimento da CDN.
+
+---
+
 ## 🗂️ Estrutura de pastas
 
 ```
@@ -59,6 +102,10 @@ Cogni Software/
 │   ├── nav.js              # Navegação / menu
 │   ├── scroll.js           # Animações ao rolar
 │   ├── products-data.js    # Dados dos materiais/produtos
+│   ├── supabase-config.js  # Cliente Supabase + helpers de auth
+│   ├── auth.js             # Login e cadastro (telas)
+│   ├── session.js          # Sessão, badge do usuário e gate de download
+│   ├── toast.js            # Notificações (toasts)
 │   └── ...
 │
 └── assets/                 # Mídia

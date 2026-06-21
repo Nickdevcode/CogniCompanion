@@ -52,6 +52,7 @@
     <link rel="stylesheet" href="css/team.css" />
     <link rel="stylesheet" href="css/footer.css" />
     <link rel="stylesheet" href="css/to-top.css" />
+    <link rel="stylesheet" href="css/auth-ui.css" />
   </head>
   <body>
     <!-- ===================== HEADER ===================== -->
@@ -653,7 +654,19 @@
       </svg>
     </button>
 
-    <!-- Scripts (defer: não bloqueiam o parsing) -->
+    <!-- Scripts (defer: não bloqueiam o parsing).
+         Supabase (CDN com SRI) → config → toast → session: estado de login no
+         site inteiro (header dinâmico + gate de download). -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2/dist/umd/supabase.min.js"
+      integrity="sha384-JWEyvHh+lRf0sN/WWY+QTQwX+CyWqmNg4tkc8GQzAMEtR2wGNrCJlvnu1lHD1kDm"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script src="js/supabase-config.js" defer></script>
+    <script src="js/toast.js" defer></script>
+    <script src="js/session.js" defer></script>
+
     <script src="js/theme.js" defer></script>
     <script src="js/particles.js" defer></script>
     <script src="js/scroll.js" defer></script>
