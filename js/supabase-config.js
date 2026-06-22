@@ -77,7 +77,7 @@
   }
 
   // Nome a partir dos metadados da sessão (síncrono). Usado como fallback
-  // imediato enquanto o nome "oficial" da tabela profiles ainda não chegou.
+  // imediato enquanto o nome "oficial" da tabela responsaveis ainda não chegou.
   function getDisplayName(user) {
     if (!user) return "";
     const meta = user.user_metadata || {};
@@ -90,10 +90,12 @@
   }
 
   /**
-   * Nome "oficial" do usuário (assíncrono): lê o full_name da tabela `profiles`,
-   * que guarda o nome do PRIMEIRO cadastro e não é sobrescrito quando uma conta
-   * Google é linkada depois (o trigger usa `on conflict do nothing`). Se o
-   * profile não existir/responder, cai para o nome dos metadados da sessão.
+   * Nome "oficial" do usuário (assíncrono): lê o `nome` da tabela `responsaveis`
+   * (a fonte única do projeto — espelha `auth.users`, populada pelo trigger do
+   * banco a partir do `full_name` enviado no cadastro). Guarda o nome do PRIMEIRO
+   * cadastro e não é sobrescrito quando uma conta Google é linkada depois (o
+   * trigger usa `on conflict do nothing`). Se a linha não existir/responder, cai
+   * para o nome dos metadados da sessão.
    * @param {object|null} user
    * @returns {Promise<string>}
    */
@@ -102,12 +104,12 @@
     if (client) {
       try {
         const { data, error } = await client
-          .from("profiles")
-          .select("full_name")
+          .from("responsaveis")
+          .select("nome")
           .eq("id", user.id)
           .maybeSingle();
         if (!error && data) {
-          const fromProfile = firstName(data.full_name);
+          const fromProfile = firstName(data.nome);
           if (fromProfile) return fromProfile;
         }
       } catch (e) {
@@ -133,6 +135,76 @@
     }
   }
 
+  /**
+   * Decide se um erro do `getUser()` significa que a SESSÃO É INVÁLIDA de fato
+   * (token revogado, usuário deletado no servidor) e não apenas uma falha
+   * transitória de rede. Só o primeiro caso deve deslogar o usuário.
+   *
+   * A SDK do Supabase classifica:
+   *   - `AuthApiError`  → o servidor respondeu rejeitando o token (status 401/403,
+   *     códigos como `user_not_found`, `session_not_found`, `bad_jwt`). Sessão morta.
+   *   - `AuthRetryableFetchError` → falha de fetch/offline/503 (GoTrue indisponível).
+   *     Transitório: NÃO deslogar, ou o usuário cai fora a cada piscada de wi-fi.
+   * (Doc: https://supabase.com/docs/guides/auth/debugging/error-codes)
+   *
+   * Checamos por `name`/`status` em vez de `instanceof` porque a SDK chega via
+   * bundle UMD e as classes de erro não são expostas em `window` de forma estável.
+   * @param {any} error — o `error` retornado por `client.auth.getUser()`
+   * @returns {boolean} true se a sessão deve ser encerrada
+   */
+  function isSessionInvalid(error) {
+    if (!error) return false;
+    const name = error.name || "";
+    const status = Number(error.status) || 0;
+    // Erro de rede/serviço indisponível → transitório, mantém a sessão.
+    if (name === "AuthRetryableFetchError") return false;
+    // Rejeição explícita do servidor de auth → sessão inválida.
+    if (status === 401 || status === 403) return true;
+    if (name === "AuthApiError" || name === "AuthSessionMissingError") return true;
+    // Desconhecido (ex.: sem `status`): trata como transitório por segurança,
+    // pra nunca expulsar o usuário com base num erro que não soubemos ler.
+    return false;
+  }
+
+  /**
+   * Valida a sessão CONTRA O SERVIDOR. Diferente de `getUser()` acima (que lê só
+   * o cache local e por isso continua "logado" mesmo após a conta ser excluída no
+   * Supabase), este chama `client.auth.getUser()` da SDK, que faz uma requisição
+   * de rede e valida o JWT no servidor de auth.
+   *
+   * - Sucesso → devolve o usuário autêntico.
+   * - Sessão inválida (conta deletada/token revogado) → limpa o token morto do
+   *   cache com `signOut()` e devolve `null`. É o sinal para deslogar a UI.
+   * - Falha transitória de rede → devolve o usuário do cache (se houver), pra não
+   *   deslogar à toa quando a internet oscila; a próxima revalidação tenta de novo.
+   *
+   * @returns {Promise<object|null>} o usuário validado, ou null se a sessão morreu.
+   */
+  async function validateUser() {
+    if (!client) return null;
+    try {
+      const { data, error } = await client.auth.getUser();
+      if (error) {
+        if (isSessionInvalid(error)) {
+          // Token morto no cache: remove pra parar de "parecer logado".
+          try {
+            await client.auth.signOut();
+          } catch (e) {
+            /* mesmo se o signOut falhar, devolvemos null: a UI desloga */
+          }
+          return null;
+        }
+        // Erro transitório (offline/503): preserva o estado atual do cache.
+        return await getUser();
+      }
+      return (data && data.user) || null;
+    } catch (e) {
+      // Exceção inesperada: não desloga por isso; mantém o que o cache souber.
+      console.debug("[Cognify] validateUser: erro não-fatal, mantendo sessão.", e);
+      return await getUser();
+    }
+  }
+
   /** Encerra a sessão atual. @returns {Promise<{error: any}>} */
   async function signOut() {
     if (!client) return { error: new Error("Supabase não configurado") };
@@ -146,6 +218,7 @@
       return client;
     },
     getUser: getUser,
+    validateUser: validateUser,
     signOut: signOut,
     getDisplayName: getDisplayName,
     getProfileName: getProfileName,

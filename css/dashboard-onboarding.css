@@ -1,0 +1,448 @@
+/* ==========================================================================
+   dashboard-onboarding.css — Boas-vindas + pareamento (Companion).
+   Overlay full-screen que cobre o painel quando não há criança vinculada.
+   Usa os tokens do site (navy/dourado, fontes) e motion sutil e proposital.
+   ========================================================================== */
+
+.ob-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 4vw, 2.5rem);
+  overflow-y: auto;
+  background:
+    radial-gradient(
+      120% 120% at 50% 0%,
+      color-mix(in srgb, var(--brand-gold) 12%, var(--bg-page)) 0%,
+      var(--bg-page) 55%
+    );
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.ob-overlay.is-open {
+  opacity: 1;
+}
+
+.ob-inner {
+  position: relative;
+  width: min(100%, 720px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+/* Botão "pular apresentação" no canto superior. */
+.ob-skip {
+  align-self: flex-end;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--text-primary) 60%, transparent);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  border-radius: 10px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+.ob-skip:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Viewport + trilho de slides (navegação horizontal por translateX)
+   -------------------------------------------------------------------------- */
+.ob-viewport {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 28px;
+}
+.ob-track {
+  display: flex;
+  width: 100%;
+  transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.ob-screen {
+  flex: 0 0 100%;
+  min-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1.5rem;
+  padding: clamp(1.75rem, 4vw, 2.75rem);
+  background: var(--bg-page-2);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent);
+  box-shadow: 0 18px 50px -22px rgba(8, 12, 56, 0.45);
+  border-radius: 28px;
+}
+
+.ob-screen__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  max-width: 36rem;
+}
+
+/* Tipografia */
+.ob-eyebrow {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 1.05rem;
+  color: var(--brand-gold-deep);
+  letter-spacing: 0.01em;
+}
+.ob-title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-size: clamp(1.6rem, 4.5vw, 2.4rem);
+  line-height: 1.1;
+  color: var(--text-strong);
+  margin: 0;
+}
+.ob-title--sm {
+  font-size: clamp(1.4rem, 3.5vw, 1.95rem);
+}
+.ob-lead {
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--text-primary) 78%, transparent);
+  margin: 0;
+}
+
+/* CTA com chevron que desliza no hover */
+.ob-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+.ob-cta__ico {
+  display: inline-flex;
+  width: 1.1em;
+  height: 1.1em;
+  transition: transform 0.25s ease;
+}
+.ob-cta:hover .ob-cta__ico {
+  transform: translateX(3px);
+}
+.ob-cta.is-loading {
+  position: relative;
+  color: transparent !important;
+}
+.ob-cta.is-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  color: var(--text-on-brand);
+  animation: ob-spin 0.7s linear infinite;
+}
+
+/* --------------------------------------------------------------------------
+   Tela 1 — hero com robô flutuante
+   -------------------------------------------------------------------------- */
+.ob-screen--hero {
+  padding-top: clamp(2rem, 5vw, 3rem);
+}
+.ob-hero__art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+.ob-hero__robot {
+  width: clamp(150px, 32vw, 215px);
+  height: auto;
+  filter: drop-shadow(0 16px 26px rgba(8, 12, 56, 0.32));
+  animation: ob-enter-pop 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.ob-hero__glow {
+  position: absolute;
+  width: clamp(190px, 40vw, 280px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--brand-gold) 38%, transparent) 0%,
+    transparent 68%
+  );
+  filter: blur(6px);
+  z-index: 0;
+  animation: ob-pulse 4s ease-in-out infinite;
+}
+.ob-hero__robot {
+  position: relative;
+  z-index: 1;
+}
+
+/* Float contínuo e sutil (robô "respirando") */
+.ob-float {
+  animation: ob-float 5.5s ease-in-out infinite;
+}
+.ob-hero__robot.ob-float {
+  animation: ob-enter-pop 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both,
+    ob-float 5.5s ease-in-out 0.7s infinite;
+}
+
+/* --------------------------------------------------------------------------
+   Tela 2 — lista de recursos (entrada escalonada)
+   -------------------------------------------------------------------------- */
+.ob-features {
+  display: grid;
+  gap: 0.85rem;
+  width: 100%;
+  text-align: left;
+}
+.ob-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--brand-navy) 4%, var(--bg-page-2));
+  border: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+  /* entrada escalonada via --i */
+  opacity: 0;
+  animation: ob-rise 0.5s ease forwards;
+  animation-delay: calc(0.12s * var(--i, 0) + 0.1s);
+}
+.ob-feature__ico {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand-gold) 16%, transparent);
+  color: var(--brand-gold-deep);
+}
+.ob-feature__ico svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+.ob-feature__title {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 1.08rem;
+  color: var(--text-strong);
+  margin: 0 0 0.15rem;
+}
+.ob-feature__desc {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--text-primary) 70%, transparent);
+  margin: 0;
+}
+
+.ob-nav {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+/* --------------------------------------------------------------------------
+   Tela de pareamento
+   -------------------------------------------------------------------------- */
+.ob-screen--pair {
+  gap: 1.75rem;
+}
+.ob-pair__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  max-width: 34rem;
+}
+.ob-pair__robot {
+  width: clamp(72px, 16vw, 96px);
+  height: auto;
+  filter: drop-shadow(0 10px 18px rgba(8, 12, 56, 0.28));
+}
+.ob-pair__form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  width: 100%;
+}
+
+/* Caixas do código (estilo OTP) */
+.ob-code {
+  display: flex;
+  gap: clamp(0.4rem, 2vw, 0.7rem);
+  justify-content: center;
+}
+.ob-code__box {
+  width: clamp(2.6rem, 11vw, 3.3rem);
+  height: clamp(3.1rem, 13vw, 3.9rem);
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: clamp(1.4rem, 5vw, 1.8rem);
+  text-transform: uppercase;
+  color: var(--text-strong);
+  background: var(--bg-page);
+  border: 2px solid color-mix(in srgb, var(--text-primary) 16%, transparent);
+  border-radius: 14px;
+  caret-color: var(--brand-gold-deep);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+.ob-code__box:focus {
+  outline: none;
+  border-color: var(--brand-gold);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-gold) 28%, transparent);
+  transform: translateY(-2px);
+}
+.ob-code__box:not(:placeholder-shown),
+.ob-code__box:valid {
+  border-color: color-mix(in srgb, var(--brand-navy) 35%, transparent);
+}
+.ob-code.is-error .ob-code__box {
+  border-color: #d64545;
+  animation: ob-shake 0.4s ease;
+}
+
+/* Feedback (erro/sucesso) */
+.ob-feedback {
+  min-height: 1.3rem;
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  line-height: 1.4;
+  text-align: center;
+}
+.ob-feedback.is-error {
+  color: #d64545;
+}
+.ob-feedback.is-ok {
+  color: #1f9d57;
+}
+
+.ob-pair__submit {
+  min-width: 12rem;
+  justify-content: center;
+}
+
+/* --------------------------------------------------------------------------
+   Indicadores de slide (bolinhas)
+   -------------------------------------------------------------------------- */
+.ob-dots {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+.ob-dot {
+  width: 22px; /* largura fixa; o "encolher" inativo é via scaleX (GPU) */
+  height: 8px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--text-primary) 22%, transparent);
+  transform: scaleX(0.36); /* ~8px aparente quando inativo */
+  transform-origin: center;
+  transition: transform 0.3s ease, background-color 0.3s ease;
+}
+.ob-dot.is-active {
+  transform: scaleX(1);
+  background: var(--brand-gold);
+}
+
+/* --------------------------------------------------------------------------
+   Keyframes
+   -------------------------------------------------------------------------- */
+@keyframes ob-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+@keyframes ob-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+@keyframes ob-enter-pop {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes ob-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ob-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
+}
+@keyframes ob-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Acessibilidade: respeita quem pediu menos movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .ob-overlay,
+  .ob-track,
+  .ob-cta__ico,
+  .ob-code__box,
+  .ob-dot {
+    transition: none;
+  }
+  .ob-float,
+  .ob-hero__robot,
+  .ob-hero__robot.ob-float,
+  .ob-hero__glow,
+  .ob-feature,
+  .ob-cta.is-loading::after {
+    animation: none;
+  }
+  .ob-feature {
+    opacity: 1;
+  }
+}

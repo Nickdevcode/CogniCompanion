@@ -352,66 +352,131 @@
 }
 
 /* --------------------------------------------------------------------------
-   Curiosidades
+   Dicas da Cogni (dica atual em destaque + histórico rolável)
    -------------------------------------------------------------------------- */
-.ap-curios {
+.ap-dicas {
   display: flex;
   flex-direction: column;
+  min-height: 0; /* permite o histórico encolher e rolar dentro do card */
   padding: 1.25rem;
 }
-.ap-curios__head {
+.ap-dicas__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 1rem;
 }
-.ap-curios__title {
+.ap-dicas__title {
   font-family: var(--font-display);
   font-weight: var(--fw-semibold);
   font-size: 1.15rem;
   color: var(--dash-text);
 }
-.ap-curios__ico {
+.ap-dicas__ico {
   display: grid;
   place-items: center;
   color: var(--dash-accent);
 }
-.ap-curios__ico svg {
+.ap-dicas__ico svg {
   width: 20px;
   height: 20px;
 }
-.ap-curios__list {
+
+/* Dica atual: destaque dourado no topo do card */
+.ap-dica-now {
   display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-.ap-curio {
-  display: flex;
-  gap: 0.65rem;
-  padding: 0.8rem 0.9rem;
-  background-color: var(--dash-surface-2);
-  border: 1px solid var(--dash-border);
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+  background-color: var(--dash-accent-soft);
+  border: 1px solid rgba(240, 163, 21, 0.28);
   border-radius: 12px;
 }
-.ap-curio--accent {
-  background-color: var(--dash-accent-soft);
-  border-color: rgba(240, 163, 21, 0.25);
-}
-.ap-curio__ico {
+.ap-dica-now__ico {
   display: grid;
   place-items: start center;
   flex-shrink: 0;
   color: var(--dash-accent);
 }
-.ap-curio__ico svg {
-  width: 18px;
-  height: 18px;
+.ap-dica-now__ico svg {
+  width: 20px;
+  height: 20px;
 }
-.ap-curio__text {
+.ap-dica-now__body {
+  min-width: 0;
+}
+.ap-dica-now__label {
+  display: block;
+  margin-bottom: 0.2rem;
   font-family: var(--font-body);
-  font-size: 0.9rem;
+  font-weight: var(--fw-semibold);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dash-accent);
+}
+.ap-dica-now__text {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
   line-height: 1.45;
   color: var(--dash-text);
+}
+
+/* Histórico: lista rolável (cabe na coluna estreita ao lado do gráfico) */
+.ap-dicas__scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  /* scrollbar discreta sem reservar goteira larga */
+  scrollbar-width: thin;
+  scrollbar-color: var(--dash-border) transparent;
+}
+.ap-dicas__scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.ap-dicas__scroll::-webkit-scrollbar-thumb {
+  background-color: var(--dash-border);
+  border-radius: 999px;
+}
+.ap-dicas__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.ap-dica {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.75rem 0.85rem;
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+}
+.ap-dica__ico {
+  display: grid;
+  place-items: start center;
+  flex-shrink: 0;
+  color: var(--dash-text-muted);
+}
+.ap-dica__ico svg {
+  width: 16px;
+  height: 16px;
+}
+.ap-dica__body {
+  min-width: 0;
+}
+.ap-dica__text {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--dash-text);
+}
+.ap-dica__time {
+  display: block;
+  margin-top: 0.3rem;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--dash-text-faint);
 }
 
 /* --------------------------------------------------------------------------

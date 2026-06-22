@@ -15,6 +15,7 @@
 import { createRouter } from "./router.js";
 import * as mock from "./mock-data.js";
 import { idadeLabel, primeiroNome } from "./format.js";
+import { iniciarOnboarding } from "./onboarding.js";
 
 import { renderInicio } from "./sections/inicio.js";
 import { renderConversas } from "./sections/conversas.js";
@@ -24,13 +25,30 @@ import { renderConfig } from "./sections/config.js";
 
 const LOGIN_URL = "login.html";
 
+/**
+ * URL do servidor local da Cogni (não-Supabase). Duas features passam por ele,
+ * pois dependem de IA/`service_role`: o Resumo Semanal e o Pareamento. É o
+ * servidor que roda junto do robô (ex.: no notebook da apresentação).
+ * Trocar aqui se o servidor subir noutra porta/host.
+ *
+ * Usamos `127.0.0.1` (não `localhost`) de propósito: o servidor escuta só em
+ * IPv4, e navegadores costumam resolver `localhost` para IPv6 (`::1`) primeiro,
+ * o que derruba o fetch com ERR_CONNECTION_RESET. Forçar IPv4 evita isso.
+ */
+export const SERVIDOR_URL = "http://127.0.0.1:3000";
+
 /* ==========================================================================
    Guard de autenticação
    ========================================================================== */
 
 /**
- * Garante que há sessão antes de mostrar o painel. Sem Supabase configurado
- * ou sem usuário logado, redireciona pro login. Retorna o user (ou null).
+ * Garante que há sessão VÁLIDA antes de mostrar o painel. Usa `validateUser()`
+ * (request de rede que valida o JWT no servidor), e não o cache local — assim
+ * uma conta já excluída no Supabase não consegue mais abrir o painel (o cache
+ * sozinho continuaria "logado"). Falha transitória de rede preserva a sessão do
+ * cache (o `validateUser` cuida disso), então o painel ainda abre offline.
+ * Sem Supabase configurado ou sem sessão válida, redireciona pro login.
+ * @returns {Promise<object|null>} o usuário validado, ou null (já redirecionou)
  */
 async function ensureAuth() {
   // Sem o helper de auth não há como validar — manda pro login por segurança.
@@ -39,7 +57,7 @@ async function ensureAuth() {
     return null;
   }
   try {
-    const user = await window.cognifyAuth.getUser();
+    const user = await window.cognifyAuth.validateUser();
     if (!user) {
       window.location.replace(LOGIN_URL);
       return null;
@@ -56,27 +74,12 @@ async function ensureAuth() {
    Sidebar: card da criança pareada
    ========================================================================== */
 
-async function popularCrianca() {
+function popularCardCrianca(crianca) {
   const nameEl = document.querySelector("[data-dash-child-name]");
   const metaEl = document.querySelector("[data-dash-child-meta]");
-  if (!nameEl) return null;
-
-  try {
-    const crianca = await mock.getCrianca();
-    if (!crianca) {
-      // Nenhuma criança pareada ainda (estado de "sem pareamento").
-      nameEl.textContent = "Sem criança pareada";
-      if (metaEl) metaEl.textContent = "";
-      return null;
-    }
-    nameEl.textContent = crianca.nome || "Criança";
-    if (metaEl) metaEl.textContent = idadeLabel(crianca.idade);
-    return crianca;
-  } catch (e) {
-    console.error("[Companion] Erro ao carregar a criança:", e);
-    nameEl.textContent = "Criança";
-    return null;
-  }
+  if (!nameEl) return;
+  nameEl.textContent = (crianca && crianca.nome) || "Criança";
+  if (metaEl) metaEl.textContent = idadeLabel(crianca && crianca.idade);
 }
 
 /* ==========================================================================
@@ -138,22 +141,6 @@ function setupShell() {
 }
 
 /* ==========================================================================
-   Sino de notificações (placeholder — sem backend de notificações no MVP)
-   ========================================================================== */
-
-function setupBell() {
-  const bell = document.querySelector("[data-dash-bell]");
-  if (!bell) return;
-  bell.addEventListener("click", () => {
-    if (window.cognifyToast) {
-      window.cognifyToast.show("Você está em dia! Nenhuma novidade por aqui.", {
-        type: "info",
-      });
-    }
-  });
-}
-
-/* ==========================================================================
    Inicialização
    ========================================================================== */
 
@@ -161,14 +148,8 @@ async function init() {
   const user = await ensureAuth();
   if (!user) return; // já redirecionou
 
-  setupShell();
-  setupBell();
-
-  // Carrega a criança e monta o contexto compartilhado entre as seções.
-  const crianca = await popularCrianca();
-
-  // Nome amigável do responsável (pra saudações nas seções), resolvido como
-  // no site (tabela profiles → fallback metadados).
+  // Nome amigável do responsável (pra saudações e boas-vindas), resolvido como
+  // no site (tabela responsaveis → fallback metadados).
   let nomeResponsavel = "";
   try {
     nomeResponsavel = primeiroNome(
@@ -178,12 +159,37 @@ async function init() {
     nomeResponsavel = primeiroNome(window.cognifyAuth.getDisplayName(user));
   }
 
+  // Carrega a criança pareada (single-child). Sem criança → o pai ainda não
+  // pareou: entra o onboarding de pareamento (toma a tela). Ao parear com
+  // sucesso, recarregamos o painel já com a criança vinculada.
+  let crianca = null;
+  try {
+    crianca = await mock.getCrianca();
+  } catch (e) {
+    console.error("[Companion] Erro ao carregar a criança:", e);
+  }
+
+  if (!crianca) {
+    iniciarOnboarding({
+      user,
+      nomeResponsavel,
+      servidorUrl: SERVIDOR_URL,
+      onPareado: () => window.location.reload(),
+    });
+    return; // o onboarding assume a tela; o painel só monta após parear
+  }
+
+  // Há criança pareada → monta o painel normalmente.
+  setupShell();
+  popularCardCrianca(crianca);
+
   const context = {
     user,
     crianca,
     nomeResponsavel,
     mock, // todas as seções leem/escrevem pelo mesmo módulo de dados
-    now: mock.MOCK_NOW, // "agora" de referência (trocar por new Date() ao integrar)
+    servidorUrl: SERVIDOR_URL, // endpoints não-Supabase (Resumo, desvincular)
+    now: mock.getNow(), // "agora" (data real no modo Supabase; MOCK_NOW no mock)
   };
 
   const outlet = document.querySelector("[data-dash-outlet]");

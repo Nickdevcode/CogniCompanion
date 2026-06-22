@@ -411,36 +411,6 @@
   margin-top: 2px;
 }
 
-/* Sino de notificações */
-.dash-bell {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  color: var(--dash-text-muted);
-  transition: background-color 0.18s ease, color 0.18s ease;
-}
-.dash-bell:hover {
-  background-color: var(--dash-nav-hover-bg);
-  color: var(--dash-text);
-}
-.dash-bell svg {
-  width: 22px;
-  height: 22px;
-}
-.dash-bell__dot {
-  position: absolute;
-  top: 9px;
-  right: 10px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background-color: var(--dash-accent);
-  border: 2px solid var(--dash-header-bg);
-}
-
 /* A badge da conta (injetada pelo session.js) já vem estilizada por
    auth-ui.css. No header do painel ela não tem o bloco .auth pra esconder;
    o session.js simplesmente faz o append do .user-badge--desktop aqui.

@@ -51,6 +51,7 @@
     <link rel="stylesheet" href="css/dashboard-aprendizado.css" />
     <link rel="stylesheet" href="css/dashboard-planos.css" />
     <link rel="stylesheet" href="css/dashboard-config.css" />
+    <link rel="stylesheet" href="css/dashboard-onboarding.css" />
   </head>
   <body class="dash-body">
     <!-- Link de pular para o conteúdo (acessibilidade por teclado) -->
@@ -59,8 +60,9 @@
     <div class="dash-shell" data-dash-shell>
       <!-- ===================== SIDEBAR ===================== -->
       <aside class="dash-sidebar" data-dash-sidebar aria-label="Navegação do painel">
-        <!-- Marca: Cogni Companion (no topo da sidebar) -->
-        <a href="index.html" class="dash-brand" aria-label="Cogni Companion — voltar ao site">
+        <!-- Marca: Cogni Companion (no topo da sidebar). Leva ao início do
+             painel (#/inicio); o retorno ao site fica no menu da conta. -->
+        <a href="#/inicio" class="dash-brand" aria-label="Cogni Companion — ir para o início do painel">
           <span class="dash-brand__mark" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <rect x="4" y="8" width="16" height="12" rx="3" />
@@ -136,7 +138,7 @@
       <div class="dash-main-col">
         <!-- Header do painel (sem links de navegação — só controles).
              Esquerda: hambúrguer (mobile) + marca compacta. Direita:
-             toggle de tema + sino de notificações + badge da conta. -->
+             toggle de tema + badge da conta. -->
         <header class="dash-header">
           <div class="dash-header__left">
             <button
@@ -150,8 +152,9 @@
               <span></span><span></span><span></span>
             </button>
 
-            <!-- Marca compacta que aparece só no mobile (a sidebar fica oculta) -->
-            <a href="index.html" class="dash-header__brand" aria-label="Cogni Companion">
+            <!-- Marca compacta que aparece só no mobile (a sidebar fica oculta).
+                 Mesmo destino do logo da sidebar: o início do painel. -->
+            <a href="#/inicio" class="dash-header__brand" aria-label="Cogni Companion — ir para o início do painel">
               <span class="dash-header__brand-title">Cogni</span>
               <span class="dash-header__brand-sub">Companion</span>
             </a>
@@ -179,20 +182,6 @@
                   <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
                 </svg>
               </span>
-            </button>
-
-            <!-- Sino de notificações (a mais que a landing; placeholder por ora) -->
-            <button
-              type="button"
-              class="dash-bell"
-              data-dash-bell
-              aria-label="Notificações"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5Z" />
-                <path d="M10.5 20a1.8 1.8 0 0 0 3 0" />
-              </svg>
-              <span class="dash-bell__dot" data-dash-bell-dot hidden></span>
             </button>
 
             <!-- A badge da conta (avatar + nome + dropdown) é injetada aqui

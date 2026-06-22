@@ -18,6 +18,12 @@
 
   const LOGIN_URL = "login.html";
   const DASHBOARD_URL = "dashboard.html";
+  const HOME_URL = "index.html";
+
+  // De quanto em quanto tempo revalidar a sessão contra o servidor enquanto a
+  // aba fica aberta (pega contas excluídas/deslogadas remotamente sem pesar cada
+  // clique). 5 min equilibra "pega rápido" e "não martela o servidor de auth".
+  const REVALIDATE_INTERVAL_MS = 5 * 60 * 1000;
 
   // Estamos na página do painel? Define o destino e o rótulo do item do menu:
   // fora do painel ele leva ao Dashboard; dentro dele vira "Voltar ao início".
@@ -280,7 +286,7 @@
       renderLoggedOut();
       return;
     }
-    // Resolve o nome "oficial" (tabela profiles: estável, preserva o nome do
+    // Resolve o nome "oficial" (tabela responsaveis: estável, preserva o nome do
     // primeiro cadastro mesmo após linkar uma conta Google) ANTES de montar a
     // badge — assim renderizamos uma vez só, sem o flash de trocar o nome do
     // metadado (que o Google sobrescreve) pelo nome correto.
@@ -338,6 +344,70 @@
   // do gate de download no momento do clique.
   let lastKnownUser = null;
 
+  /* ====================================================================
+     Revalidação de sessão contra o servidor
+
+     O cache local (getSession/getUser) continua "logado" mesmo depois que a
+     conta é excluída no Supabase — o JWT salvo segue válido pela data de
+     expiração. Para fechar esse buraco, revalidamos contra o servidor com
+     `validateUser()` (faz request de rede). Se a sessão morreu, deslogamos:
+     no painel (privado) redirecionamos pra home; no site, só some a badge.
+     ==================================================================== */
+
+  let revalidating = false; // evita validações concorrentes (foco + intervalo)
+  let revalidateTimer = null;
+
+  // Encerra a sessão na UI quando o servidor diz que ela não vale mais.
+  function handleInvalidSession() {
+    lastKnownUser = null;
+    if (IS_DASHBOARD) {
+      // O painel é privado: sem sessão, não há o que mostrar. Sai pra home.
+      // `replace` evita que o "voltar" do navegador retorne ao painel morto.
+      window.location.replace(HOME_URL);
+      return;
+    }
+    // No site público, basta refletir o logout no header (some a badge).
+    renderLoggedOut();
+  }
+
+  // Pergunta ao servidor se a sessão ainda é válida. Só age (desloga) quando o
+  // cache ACHAVA que havia login — senão não há estado a corrigir. Falhas
+  // transitórias de rede não deslogam (o validateUser preserva a sessão nesse caso).
+  async function enforceValidSession() {
+    if (revalidating) return;
+    if (!window.cognifyAuth || typeof window.cognifyAuth.validateUser !== "function") {
+      return;
+    }
+    // Nada logado segundo o cache → nada a revalidar (no painel, o guard do
+    // main.js já cuida do acesso direto sem sessão).
+    if (!lastKnownUser) return;
+
+    revalidating = true;
+    try {
+      const user = await window.cognifyAuth.validateUser();
+      if (!user) handleInvalidSession();
+    } finally {
+      revalidating = false;
+    }
+  }
+
+  // Liga os gatilhos: ao voltar o foco pra aba e periodicamente. O `pagehide`
+  // limpa o timer pra não vazar quando a página é descartada/bfcache.
+  function setupSessionRevalidation() {
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") enforceValidSession();
+    });
+
+    revalidateTimer = window.setInterval(enforceValidSession, REVALIDATE_INTERVAL_MS);
+
+    window.addEventListener("pagehide", function () {
+      if (revalidateTimer) {
+        window.clearInterval(revalidateTimer);
+        revalidateTimer = null;
+      }
+    });
+  }
+
   /* ==================================================================== */
   function init() {
     if (!window.cognifyAuth) {
@@ -346,13 +416,16 @@
     }
 
     setupDownloadGate();
+    setupSessionRevalidation();
 
     const client = window.cognifyAuth.getClient();
 
-    // Estado inicial.
+    // Estado inicial: pinta rápido pelo cache (sem flash) e, em seguida, valida
+    // a sessão contra o servidor — pega de cara o caso de conta já excluída.
     window.cognifyAuth.getUser().then(function (user) {
       lastKnownUser = user;
       refreshHeader();
+      enforceValidSession();
     });
 
     // Reage a login/logout (inclusive vindo de outra aba) em tempo real.

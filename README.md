@@ -81,6 +81,80 @@ Supabase Auth (hash de senha, sessão/JWT). A chave secreta (`service_role`) **n
 
 ---
 
+## 📊 Painel Companion (Dashboard dos pais)
+
+O `dashboard.html` é o **app dos pais**: uma SPA leve (sidebar + seções trocadas por hash, sem reload)
+onde o responsável acompanha a criança. Ele é **single-child** — um responsável enxerga **uma** criança,
+a que estiver pareada por código. Tudo segue o **contrato de dados** do `docs/COMPANION-PLANO-TECNICO.md`.
+
+### 🔌 De onde vêm os dados
+
+O painel lê de **duas fontes**, e ambas já estão integradas:
+
+| Fonte | O quê | Como |
+| --- | --- | --- |
+| 🗄️ **Supabase** | Criança, conversas (Diário), planos de estudo, perfil | `@supabase/supabase-js` (anon key + RLS). Conversas são **só leitura** pelo site; planos têm CRUD |
+| 🖥️ **Servidor local da Cogni** | Resumo Semanal (IA), pareamento/despareamento, código do perfil | `fetch` nos endpoints `/api/...` (precisa do robô/servidor ligado) |
+
+### 🎛️ A chave que liga tudo: `USAR_SUPABASE`
+
+No topo de `js/dashboard/mock-data.js` há uma flag:
+
+```js
+export const USAR_SUPABASE = true;  // true = dados reais · false = dados de exemplo (mock)
+```
+
+- **`true`** (padrão): o painel usa o **Supabase real** + a data atual (`new Date()`).
+- **`false`**: volta pros **dados de exemplo** (mock), ancorados numa data fixa — útil pra **demonstrar**
+  com telas cheias e bonitas mesmo sem o robô ligado, ou pra desenvolver offline.
+
+As implementações reais ficam isoladas em `js/dashboard/supabase-data.js` (mesma "cara" do mock — por isso
+trocar a flag não muda nenhuma tela).
+
+### 🌐 Servidor local (`SERVIDOR_URL`)
+
+Duas features dependem do servidor que roda junto do robô. A URL fica no topo de `js/dashboard/main.js`:
+
+```js
+export const SERVIDOR_URL = "http://127.0.0.1:3000";
+```
+
+> ⚠️ **Por que `127.0.0.1` e não `localhost`?** O servidor escuta só em IPv4, e os navegadores costumam
+> resolver `localhost` para IPv6 (`::1`) primeiro — o que derruba o `fetch` com `ERR_CONNECTION_RESET`.
+> Forçar `127.0.0.1` (IPv4) evita o problema. Se você subir o servidor noutra máquina/porta, troque aqui.
+
+### 🧩 Onboarding & pareamento
+
+Quando o pai entra e **ainda não tem criança vinculada**, aparece um **onboarding em tela cheia**:
+
+- **Primeira vez** (sem histórico no navegador): 3 telas — duas de apresentação com animação + a de
+  pareamento (código de 6 caracteres).
+- **Depois** (ou se despareou): vai **direto** pra tela de pareamento, sem repetir a apresentação.
+
+O código é validado **pelo servidor** (que seta o vínculo com a `service_role`) — o site **nunca** escreve
+o `responsavel_id` direto. Em **Configurações** dá pra ver o código do perfil e **desvincular** (com
+confirmação). O vínculo é **permanente**: só some se você desvincular.
+
+### 🗃️ Arquivos do painel
+
+| Arquivo | Função |
+| --- | --- |
+| `js/dashboard/main.js` | Bootstrap: guard de auth, decide onboarding × painel, monta o contexto e o router |
+| `js/dashboard/mock-data.js` | **Fonte de dados** (roteia mock ↔ Supabase pela flag `USAR_SUPABASE`) |
+| `js/dashboard/supabase-data.js` | Implementação real das queries/escritas no Supabase |
+| `js/dashboard/onboarding.js` | Boas-vindas + pareamento por código (tela cheia, com motion) |
+| `js/dashboard/resumo-semanal.js` | Card + modal do "Resumo da semana da Cogni" (bilhete por IA) |
+| `js/dashboard/dica.js` | Card "Dica do Cogni" (Início + Aprendizado), gerada por IA no servidor local (`/api/dica`) |
+| `js/dashboard/router.js` | Roteamento por hash (SPA leve) |
+| `js/dashboard/sections/*.js` | As 5 seções: Início, Conversas, Aprendizado, Planos, Configurações |
+| `css/dashboard-onboarding.css` | Estilos do onboarding |
+
+> 🧪 Para testar **com o robô ligado**: suba o servidor da Cogni (`http://127.0.0.1:3000`), pegue o código
+> de pareamento (na tela do servidor ou pedindo pra Cogni falar) e digite no onboarding. Para testar **sem
+> o robô**, vire `USAR_SUPABASE = false` e o painel roda com os dados de exemplo.
+
+---
+
 ## 🗂️ Estrutura de pastas
 
 ```
@@ -91,10 +165,12 @@ Cogni Software/
 ├── instrucoes.html         # Instruções
 ├── login.html              # Login
 ├── cadastro.html           # Cadastro
+├── dashboard.html          # Painel Companion (app dos pais)
 │
 ├── css/                    # Estilos (tokens → base → componentes)
 │   ├── tokens.css          # Design tokens (cor, tipografia, espaçamento)
 │   ├── base.css            # Reset e estilos globais
+│   ├── dashboard*.css      # Estilos do painel (home, conversas, aprendizado…)
 │   └── ...                 # Um arquivo por seção/componente
 │
 ├── js/                     # Comportamento (JS puro, modular)
@@ -106,6 +182,15 @@ Cogni Software/
 │   ├── auth.js             # Login e cadastro (telas)
 │   ├── session.js          # Sessão, badge do usuário e gate de download
 │   ├── toast.js            # Notificações (toasts)
+│   ├── dashboard/          # Painel Companion (SPA)
+│   │   ├── main.js         # Bootstrap (auth, onboarding × painel, router)
+│   │   ├── mock-data.js    # Fonte de dados (flag USAR_SUPABASE: mock ↔ real)
+│   │   ├── supabase-data.js# Queries/escritas reais no Supabase
+│   │   ├── onboarding.js   # Boas-vindas + pareamento por código
+│   │   ├── resumo-semanal.js # Bilhete da semana (IA, servidor local)
+│   │   ├── dica.js         # Dica do Cogni (IA, servidor local)
+│   │   ├── router.js       # Roteamento por hash
+│   │   └── sections/       # Início, Conversas, Aprendizado, Planos, Config
 │   └── ...
 │
 └── assets/                 # Mídia

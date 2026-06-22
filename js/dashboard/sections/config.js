@@ -4,14 +4,13 @@
  * Blocos (escopo MVP atualizado):
  *   - Perfil da criança pareada → card + modal de detalhe com edição FUNCIONAL
  *     (infos da criança + prompt_personalizado). Single-child: 1 perfil só.
- *   - Preferências de notificação → toggles dos avisos do sininho 🔔.
  *   - Conta do responsável (nome/e-mail + sair).
  *   - Tema (claro/escuro).
- *   - Status da conexão do Cogni (bloco informativo).
+ *   - Vínculo com o Cogni: status do pareamento, código do perfil e desvincular.
  *
- * Sem "Filtros de segurança", "Limites de tempo/horário" nem "Adicionar
- * responsável" (anulados no escopo). Edição do perfil salva no mock; ao
- * integrar vira update em `criancas` (RLS protege).
+ * Sem "Filtros de segurança", "Limites de tempo/horário", "Adicionar
+ * responsável" nem "Preferências de notificação" (anulados no escopo). Edição do
+ * perfil é update em `criancas` (RLS protege).
  */
 
 import { el, sectionRoot, pageHead } from "./_shared.js";
@@ -19,40 +18,57 @@ import { ICON, materiaIcon } from "../icons.js";
 import { openModal } from "../modal.js";
 import { MATERIAS, materiaLabel, idadeLabel } from "../format.js";
 
-/* --------------------------------------------------------------------------
-   Preferências de notificação (chaves locais; o backend liga ao sininho).
-   "Conquistas" foi anulado, então não entra aqui.
-   -------------------------------------------------------------------------- */
-const NOTIF_PREFS = [
-  {
-    key: "resumo_diario",
-    titulo: "Resumo diário",
-    desc: "Receba um resumo das atividades da criança.",
-    icon: ICON.calendar,
-    padrao: true,
-  },
-  {
-    key: "novas_conversas",
-    titulo: "Novas conversas",
-    desc: "Avise quando houver conversas novas com a Cogni.",
-    icon: ICON.chat,
-    padrao: true,
-  },
-  {
-    key: "topicos_sensiveis",
-    titulo: "Tópicos sensíveis",
-    desc: "Seja avisado quando um tema sensível for detectado.",
-    icon: ICON.shield,
-    padrao: true,
-  },
-  {
-    key: "novidades_dicas",
-    titulo: "Novidades e dicas",
-    desc: "Dicas para aproveitar melhor o Cogni.",
-    icon: ICON.bulb,
-    padrao: false,
-  },
-];
+/**
+ * Busca o código de pareamento do perfil no servidor local (não-Supabase).
+ *   GET {servidorUrl}/api/pareamento/codigo?usuarioId=<id> → { codigo, nome }
+ * @returns {Promise<string|null>} o código, ou null se indisponível/erro
+ */
+async function buscarCodigoPareamento(servidorUrl, criancaId) {
+  try {
+    const url = `${servidorUrl}/api/pareamento/codigo?usuarioId=${encodeURIComponent(
+      criancaId
+    )}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const dados = await resp.json();
+    return dados && dados.codigo ? dados.codigo : null;
+  } catch (e) {
+    console.error("[Companion] Não consegui buscar o código de pareamento:", e);
+    return null;
+  }
+}
+
+/**
+ * Desvincula a criança do responsável (o pai escolheu desfazer o vínculo).
+ *   POST {servidorUrl}/api/pareamento/desvincular { criancaId, responsavelId }
+ *   → 200 { ok, jaDesvinculado } · 404 · 400
+ * @returns {Promise<{ok:boolean, erro?:string}>}
+ */
+async function desvincularCrianca(servidorUrl, criancaId, responsavelId) {
+  try {
+    const resp = await fetch(`${servidorUrl}/api/pareamento/desvincular`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ criancaId, responsavelId }),
+    });
+    let dados = {};
+    try {
+      dados = await resp.json();
+    } catch (_) {
+      /* sem corpo */
+    }
+    if (resp.ok && dados.ok) return { ok: true };
+    return { ok: false, erro: dados.erro || "Não foi possível desvincular agora." };
+  } catch (e) {
+    console.error("[Companion] Desvincular falhou:", e);
+    return {
+      ok: false,
+      erro:
+        "Não consegui falar com a Cogni. Confirme que o robô/servidor está ligado.",
+    };
+  }
+}
+
 
 /* --------------------------------------------------------------------------
    Componentes de UI
@@ -320,40 +336,6 @@ function formularioPerfil(crianca, { onSubmit, close }) {
 }
 
 /* --------------------------------------------------------------------------
-   Bloco: Preferências de notificação
-   -------------------------------------------------------------------------- */
-function blocoNotificacoes() {
-  const bloco = el("section", { class: "dash-card cfg-block cfg-block--notif" });
-  bloco.appendChild(
-    blocoHead(
-      ICON.bell,
-      "Preferências de notificação",
-      "Escolha quais avisos chegam no sininho."
-    )
-  );
-  const lista = el("div", { class: "cfg-notif-list" });
-  NOTIF_PREFS.forEach((p) => {
-    const row = el("div", {
-      class: "cfg-notif",
-      children: [
-        el("span", { class: "cfg-notif__ico", svg: p.icon }),
-        el("div", {
-          class: "cfg-notif__info",
-          children: [
-            el("span", { class: "cfg-notif__title", text: p.titulo }),
-            el("span", { class: "cfg-notif__desc", text: p.desc }),
-          ],
-        }),
-        toggle(p.padrao, null, p.titulo),
-      ],
-    });
-    lista.appendChild(row);
-  });
-  bloco.appendChild(el("div", { class: "cfg-block__body", children: [lista] }));
-  return bloco;
-}
-
-/* --------------------------------------------------------------------------
    Bloco: Conta do responsável
    -------------------------------------------------------------------------- */
 function blocoConta(responsavel) {
@@ -460,28 +442,22 @@ function blocoTema() {
 }
 
 /* --------------------------------------------------------------------------
-   Bloco: Status da conexão do Cogni (informativo)
+   Bloco: Vínculo com o robô (pareamento real — servidor local)
+   Mostra "Conectado ao perfil de [nome]", o código de pareamento (pra reparear
+   ou compartilhar) e o botão de desvincular (com confirmação). O código e o
+   desvincular passam pelo servidor (service_role); o site nunca escreve o vínculo.
    -------------------------------------------------------------------------- */
-function blocoStatus() {
+function blocoVinculo({ crianca, servidorUrl, user, onDesvinculado }) {
   const bloco = el("section", { class: "dash-card cfg-block cfg-block--status" });
   bloco.appendChild(
-    blocoHead(ICON.robot, "Status da conexão do Cogni", "Informações sobre o robô e a conexão.")
+    blocoHead(
+      ICON.robot,
+      "Vínculo com o Cogni",
+      "O perfil do robô conectado a este painel."
+    )
   );
 
-  const linha = (iconSvg, rotulo, valor, ok) =>
-    el("div", {
-      class: "cfg-status-row",
-      children: [
-        el("span", { class: "cfg-status-row__ico", svg: iconSvg }),
-        el("span", { class: "cfg-status-row__label", text: rotulo }),
-        el("span", {
-          class: "cfg-status-row__value" + (ok ? " is-ok" : ""),
-          text: valor,
-        }),
-      ],
-    });
-
-  // Topo: foto do robô (quadro com borda dourada) + infos de conexão ao lado.
+  // Foto do robô + badge "Conectado ao perfil de [nome]".
   const foto = el("div", {
     class: "cfg-status__photo",
     children: [
@@ -503,66 +479,168 @@ function blocoStatus() {
         class: "cfg-status-badge is-online",
         children: [
           el("span", { class: "cfg-status-badge__dot", attrs: { "aria-hidden": "true" } }),
-          el("span", { text: "Cogni conectada" }),
+          el("span", { text: `Conectado ao perfil de ${crianca.nome}` }),
         ],
       }),
-      linha(ICON.wifi, "Wi-Fi", "Casa Carvalho", false),
-      linha(ICON.wifi, "Sinal", "Excelente", true),
+      el("p", {
+        class: "cfg-vinculo__hint",
+        text: "O vínculo é permanente — só desfaz se você desvincular aqui.",
+      }),
     ],
   });
 
-  // Barra de "última sincronização" com botão de atualizar (refresh) funcional.
-  const syncValor = el("span", {
-    class: "cfg-sync__value",
-    text: "Hoje, 17:48",
+  // Linha do código de pareamento (buscado no servidor; com botão copiar).
+  const codigoValor = el("span", {
+    class: "cfg-codigo__value",
+    text: "······",
   });
-  const refreshBtn = el("button", {
-    class: "cfg-sync__btn",
-    attrs: { type: "button", "aria-label": "Atualizar sincronização" },
-    svg: ICON.refresh,
-  });
-  refreshBtn.addEventListener("click", () => {
-    refreshBtn.classList.add("is-spinning");
-    refreshBtn.disabled = true;
-    // Simula a sincronização; ao integrar, dispara a checagem real e atualiza
-    // o horário com o retorno do servidor. A sincronização ocorre AGORA — daí
-    // usar a hora atual (no navegador new Date() é permitido).
-    window.setTimeout(() => {
-      const agora = new Date();
-      const hh = String(agora.getHours()).padStart(2, "0");
-      const mm = String(agora.getMinutes()).padStart(2, "0");
-      syncValor.textContent = `Hoje, ${hh}:${mm}`;
-      refreshBtn.classList.remove("is-spinning");
-      refreshBtn.disabled = false;
-      if (window.cognifyToast)
-        window.cognifyToast.show("Cogni sincronizada agora.", { type: "success" });
-    }, 900);
+  // Ícone "copiar" (dois retângulos sobrepostos) — markup SVG estático.
+  const ICON_COPY =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+  const copiarBtn = el("button", {
+    class: "cfg-codigo__copy",
+    attrs: {
+      type: "button",
+      "aria-label": "Copiar código de pareamento",
+      disabled: "true",
+    },
+    svg: ICON_COPY,
   });
 
-  const syncBar = el("div", {
-    class: "cfg-sync",
+  let codigoAtual = null;
+  buscarCodigoPareamento(servidorUrl, crianca.id).then((cod) => {
+    if (cod) {
+      codigoAtual = cod;
+      codigoValor.textContent = cod;
+      copiarBtn.removeAttribute("disabled");
+    } else {
+      codigoValor.textContent = "indisponível";
+      codigoValor.classList.add("is-muted");
+    }
+  });
+
+  copiarBtn.addEventListener("click", async () => {
+    if (!codigoAtual) return;
+    try {
+      await navigator.clipboard.writeText(codigoAtual);
+      if (window.cognifyToast)
+        window.cognifyToast.show("Código copiado!", { type: "success" });
+    } catch (e) {
+      if (window.cognifyToast)
+        window.cognifyToast.show("Não consegui copiar. Anote: " + codigoAtual, {
+          type: "info",
+        });
+    }
+  });
+
+  const codigoRow = el("div", {
+    class: "cfg-codigo",
     children: [
       el("div", {
-        class: "cfg-sync__text",
+        class: "cfg-codigo__text",
         children: [
-          el("span", { class: "cfg-sync__label", text: "Última sincronização" }),
-          syncValor,
+          el("span", { class: "cfg-codigo__label", text: "Código de pareamento" }),
+          codigoValor,
         ],
       }),
-      refreshBtn,
+      copiarBtn,
     ],
   });
+
+  // Botão "Desvincular" (com modal de confirmação).
+  const desvBtn = el("button", {
+    class: "cfg-logout cfg-unlink",
+    attrs: { type: "button" },
+    children: [
+      el("span", {
+        class: "cfg-logout__ico",
+        svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 14.5 4 20M14.5 9.5 20 4"/><path d="M7 11 4.5 8.5a3.5 3.5 0 0 1 5-5L12 6M17 13l2.5 2.5a3.5 3.5 0 0 1-5 5L12 18"/></svg>',
+      }),
+      el("span", { text: "Desvincular este perfil" }),
+    ],
+  });
+  desvBtn.addEventListener("click", () =>
+    confirmarDesvincular({ crianca, servidorUrl, user, onDesvinculado })
+  );
 
   bloco.appendChild(
     el("div", {
       class: "cfg-block__body",
       children: [
         el("div", { class: "cfg-status__top", children: [foto, info] }),
-        syncBar,
+        codigoRow,
+        desvBtn,
       ],
     })
   );
   return bloco;
+}
+
+/** Modal de confirmação do desvincular (tira o acesso às conversas do filho). */
+function confirmarDesvincular({ crianca, servidorUrl, user, onDesvinculado }) {
+  openModal({
+    title: "Desvincular perfil",
+    size: "sm",
+    content: ({ close }) => {
+      const wrap = el("div", { class: "pl-confirm" });
+      wrap.appendChild(
+        el("p", {
+          class: "pl-confirm__text",
+          text: `Tem certeza que deseja desvincular o perfil de ${crianca.nome}? Você perderá o acesso às conversas, ao aprendizado e aos planos dele neste painel. Dá pra reconectar depois com o mesmo código.`,
+        })
+      );
+      const feedback = el("p", {
+        class: "ob-feedback",
+        attrs: { role: "status", "aria-live": "polite" },
+      });
+
+      const cancel = el("button", {
+        class: "dash-btn dash-btn--ghost",
+        attrs: { type: "button" },
+        text: "Cancelar",
+      });
+      cancel.addEventListener("click", close);
+
+      const confirm = el("button", {
+        class: "pl-btn pl-btn--danger",
+        attrs: { type: "button" },
+        children: [
+          el("span", {
+            class: "pl-btn__ico",
+            svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 14.5 4 20M14.5 9.5 20 4"/><path d="M7 11 4.5 8.5a3.5 3.5 0 0 1 5-5L12 6M17 13l2.5 2.5a3.5 3.5 0 0 1-5 5L12 18"/></svg>',
+          }),
+          el("span", { text: "Desvincular" }),
+        ],
+      });
+      confirm.addEventListener("click", async () => {
+        confirm.disabled = true;
+        cancel.disabled = true;
+        feedback.textContent = "Desvinculando…";
+        feedback.classList.remove("is-error");
+        const r = await desvincularCrianca(servidorUrl, crianca.id, user.id);
+        if (r.ok) {
+          close();
+          if (window.cognifyToast)
+            window.cognifyToast.show("Perfil desvinculado.", { type: "info" });
+          if (typeof onDesvinculado === "function") onDesvinculado();
+        } else {
+          confirm.disabled = false;
+          cancel.disabled = false;
+          feedback.textContent = r.erro;
+          feedback.classList.add("is-error");
+        }
+      });
+
+      wrap.appendChild(
+        el("div", {
+          class: "pl-confirm__actions",
+          children: [cancel, confirm],
+        })
+      );
+      wrap.appendChild(feedback);
+      return wrap;
+    },
+  });
 }
 
 /* --------------------------------------------------------------------------
@@ -574,7 +652,7 @@ export async function renderConfig(ctx) {
   root.appendChild(
     pageHead({
       title: "Configurações da família",
-      subtitle: "Gerencie o perfil, as notificações e as preferências do Cogni.",
+      subtitle: "Gerencie o perfil, a conta e as preferências do Cogni.",
     })
   );
 
@@ -617,15 +695,27 @@ export async function renderConfig(ctx) {
   }
   renderPerfil();
 
-  // Monta o grid de blocos (2 colunas no desktop).
+  // Bloco de vínculo com o robô (pareamento real). Só faz sentido com uma
+  // criança vinculada — o que sempre ocorre aqui (sem criança, o painel nem
+  // monta: cai no onboarding). Ao desvincular, recarrega → volta ao pareamento.
+  const blocoRobo = criancaAtual
+    ? blocoVinculo({
+        crianca: criancaAtual,
+        servidorUrl: ctx.servidorUrl,
+        user: ctx.user,
+        onDesvinculado: () => window.location.reload(),
+      })
+    : null;
+
+  // Monta o grid de blocos (2 colunas no desktop). Perfil e Vínculo ocupam a
+  // largura toda; Conta e Tema dividem a linha do meio.
   const grid = el("div", {
     class: "cfg-grid",
     children: [
       perfilHost,
-      blocoNotificacoes(),
       blocoConta(responsavel),
       blocoTema(),
-      blocoStatus(),
+      blocoRobo,
     ],
   });
   root.appendChild(grid);

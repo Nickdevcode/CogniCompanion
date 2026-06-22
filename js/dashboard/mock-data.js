@@ -1,20 +1,45 @@
 /**
- * mock-data.js — Fonte de dados de EXEMPLO do painel (front-end isolado).
+ * mock-data.js — Fonte de dados do painel (roteador mock ↔ Supabase).
  *
- * ⚠️ IMPORTANTE PARA A INTEGRAÇÃO (backend/Supabase):
- *   - Todos os campos seguem EXATAMENTE o "Contrato de dados" do documento
- *     `docs/COMPANION-PLANO-TECNICO.md` (snake_case do Postgres).
- *   - As funções abaixo são `async` e devolvem o MESMO shape que as queries
- *     reais devolverão. Para ligar o backend, basta trocar o corpo de cada
- *     função por chamadas `window.cognifyAuth.getClient().from(...)` — as
- *     seções do painel não precisam mudar.
- *   - Companion é SINGLE-CHILD: um responsável ↔ uma criança (a criança
- *     pareada). Não há lista de filhos nem "criança ativa".
+ * Este módulo é o PONTO ÚNICO de dados que as seções importam. Ele decide, pela
+ * flag `USAR_SUPABASE` abaixo, se serve os dados de EXEMPLO (mock, ancorados em
+ * `MOCK_NOW`) ou os dados REAIS do Supabase (delegando a `supabase-data.js`).
+ * A API pública (nomes/assinaturas/shape de retorno) é IDÊNTICA nos dois modos,
+ * então as seções do painel funcionam sem mudar uma linha em qualquer um deles.
  *
- * Nada aqui escreve no banco. Os formulários (Planos, perfil) operam sobre
- * cópias em memória só pra simular a experiência; ao integrar, viram
- * insert/update/delete reais (respeitando o RLS: conversas é read-only).
+ *   ┌─ USAR_SUPABASE = true  → dados reais (Supabase, RLS, snake_case)
+ *   └─ USAR_SUPABASE = false → mock abaixo (demonstração/offline, com MOCK_NOW)
+ *
+ * Por que uma flag? Pra apresentação do TCC: o mock enche as telas com dados
+ * bonitos e estáveis; o modo real prova a integração ponta a ponta. Alternar é
+ * trocar um booleano.
+ *
+ * ⚠️ Contrato (docs/COMPANION-PLANO-TECNICO.md):
+ *   - Todos os campos em snake_case (como o Postgres devolve).
+ *   - Companion é SINGLE-CHILD: um responsável ↔ uma criança (a pareada).
+ *   - `conversas` é read-only pelo site (a RLS bloqueia escrita; grava o servidor).
+ *
+ * No modo mock, nada escreve no banco: os formulários (Planos, perfil) operam
+ * sobre cópias em memória só pra simular a experiência.
  */
+
+import * as supa from "./supabase-data.js";
+
+/**
+ * Liga (true) os dados reais do Supabase; desliga (false) volta pro mock.
+ * Padrão: true (integração ativa). Vire pra false pra demonstrar com o mock.
+ */
+export const USAR_SUPABASE = true;
+
+/**
+ * "Agora" de referência usado pelas seções (rótulos "Hoje/Ontem", janela da
+ * semana, gráficos). No modo real é a data atual; no mock é a data fixa dos
+ * dados de exemplo (`MOCK_NOW`), pra os rótulos relativos baterem.
+ * @returns {Date}
+ */
+export function getNow() {
+  return USAR_SUPABASE ? new Date() : MOCK_NOW;
+}
 
 /* ==========================================================================
    Registros base (espelham as tabelas do contrato)
@@ -252,20 +277,73 @@ let planos = [
 ];
 
 /**
- * Frase de encorajamento (fim do bloco de curiosidades). No app real é montada
- * no front (texto fixo carinhoso). Os tópicos e as curiosidades de repetição
- * NÃO ficam aqui: são DERIVADOS de `conversas.topico` (ver contrato atualizado
- * do backend) — Tópicos explorados = `topico` distintos; Curiosidades = `topico`
- * que repetem na semana. A derivação vive em sections/aprendizado.js.
+ * Dicas da Cogni — espelham a tabela `dicas` (histórico das dicas geradas por IA
+ * no servidor). O servidor grava cada dica nova; o site só lê (read-only, como
+ * `conversas`). A tela Aprendizado mostra a dica ATUAL em destaque (vem do
+ * endpoint `/api/dica`) + este histórico em lista. Mais recentes primeiro.
+ * Datas relativas a `MOCK_NOW` (2026-05-27) pros rótulos "Hoje/Ontem" baterem.
  */
-const fraseEncorajamento =
-  "Continue assim! Pequenas descobertas hoje, grandes aprendizados sempre.";
+const dicas = [
+  {
+    id: 9007,
+    crianca_id: crianca.id,
+    texto:
+      "O Pedro anda curioso sobre dinossauros! Que tal visitarem juntos um " +
+      "museu de ciências (ou um virtual) pra alimentar essa paixão?",
+    criado_em: "2026-05-27T08:10:00-03:00",
+  },
+  {
+    id: 9006,
+    crianca_id: crianca.id,
+    texto:
+      "A tabuada apareceu algumas vezes essa semana. Um joguinho de cartas " +
+      "com multiplicações pode deixar a prática mais leve e divertida.",
+    criado_em: "2026-05-26T08:05:00-03:00",
+  },
+  {
+    id: 9005,
+    crianca_id: crianca.id,
+    texto:
+      "O Pedro pediu ajuda com redação. Ler junto uma história curta antes " +
+      "de dormir ajuda a ampliar o vocabulário sem nem parecer estudo.",
+    criado_em: "2026-05-25T08:00:00-03:00",
+  },
+  {
+    id: 9004,
+    crianca_id: crianca.id,
+    texto:
+      "Ele explorou o sistema solar com entusiasmo! Uma noite olhando as " +
+      "estrelas e conversando sobre os planetas pode render boas perguntas.",
+    criado_em: "2026-05-24T08:00:00-03:00",
+  },
+];
 
-/** "Dica do Cogni" (Início) — no MVP real é gerada por IA 1×/dia. */
-const dicaDoCogni = {
-  titulo: "Pequenas pausas ajudam muito!",
+/**
+ * Último Resumo Semanal salvo — espelha a tabela `resumos_semanais` (bilhete da
+ * semana gerado por IA no servidor). O servidor grava; o site só lê (read-only).
+ * É a fonte ESTÁVEL do card de Resumo da Semana: mostra o último bilhete mesmo
+ * com o robô offline. No modo real, o destaque vem do endpoint /api/resumo-semanal
+ * (mais fresco); este é o fallback persistido. `materias`/`topicos` são jsonb.
+ */
+const resumoSemanal = {
+  id: 5001,
+  crianca_id: crianca.id,
   texto:
-    "Que tal um alongamento rápido ou um copo d'água antes do próximo plano?",
+    "Que semana rica a do Pedro! Ele mergulhou em ciências (puxando bastante " +
+    "papo sobre dinossauros e o sistema solar), praticou a tabuada do 7 e ainda " +
+    "pediu ajuda com a redação da escola. Dá pra ver a curiosidade dele crescendo " +
+    "a cada conversa — continue incentivando essas perguntas!",
+  materias: ["ciencias", "matematica", "portugues", "historia", "geografia"],
+  topicos: [
+    "dinossauros",
+    "sistema solar",
+    "tabuada do 7",
+    "redação",
+    "descobrimento do Brasil",
+  ],
+  total_conversas: 9,
+  periodo_dias: 7,
+  criado_em: "2026-05-27T08:15:00-03:00",
 };
 
 /* ==========================================================================
@@ -284,10 +362,58 @@ function delay(ms = 120) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** @returns {Promise<object>} o responsável logado (linha de `responsaveis`). */
-export async function getResponsavel() {
+/* --- Implementações MOCK (usadas quando USAR_SUPABASE = false) ------------ */
+
+async function _mockResponsavel() {
   await delay();
   return { ...responsavel };
+}
+
+async function _mockCrianca() {
+  await delay();
+  return { ...crianca };
+}
+
+async function _mockConversas() {
+  await delay();
+  return conversas
+    .slice()
+    .sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em))
+    .map((c) => ({ ...c }));
+}
+
+async function _mockPlanos() {
+  await delay();
+  return planos.map((p) => ({ ...p }));
+}
+
+async function _mockDicas() {
+  await delay();
+  return dicas
+    .slice()
+    .sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em))
+    .map((d) => ({ ...d }));
+}
+
+async function _mockResumoSemanal() {
+  await delay();
+  return { ...resumoSemanal };
+}
+
+async function _mockDicaAtual() {
+  await delay();
+  // A mais recente por criado_em (mesma ordenação do select real .limit(1)).
+  const ordenadas = dicas
+    .slice()
+    .sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+  return ordenadas.length ? { ...ordenadas[0] } : null;
+}
+
+/* --- API pública de leitura (roteia mock ↔ Supabase pela flag) ------------ */
+
+/** @returns {Promise<object>} o responsável logado (linha de `responsaveis`). */
+export async function getResponsavel() {
+  return USAR_SUPABASE ? supa.getResponsavel() : _mockResponsavel();
 }
 
 /**
@@ -295,8 +421,7 @@ export async function getResponsavel() {
  * ou null se nenhuma estiver pareada. (Single-child: nunca uma lista.)
  */
 export async function getCrianca() {
-  await delay();
-  return { ...crianca };
+  return USAR_SUPABASE ? supa.getCrianca() : _mockCrianca();
 }
 
 /**
@@ -306,32 +431,49 @@ export async function getCrianca() {
  *     .order('criado_em', { ascending: false })
  */
 export async function getConversas() {
-  await delay();
-  return conversas
-    .slice()
-    .sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em))
-    .map((c) => ({ ...c }));
+  return USAR_SUPABASE ? supa.getConversas() : _mockConversas();
 }
 
 /** @returns {Promise<Array<object>>} planos de estudo da criança. */
 export async function getPlanos() {
-  await delay();
-  return planos.map((p) => ({ ...p }));
+  return USAR_SUPABASE ? supa.getPlanos() : _mockPlanos();
 }
 
 /**
- * @returns {Promise<string>} frase de encorajamento do bloco de curiosidades.
- * (Tópicos e curiosidades de repetição são derivados de `conversas.topico`.)
+ * @returns {Promise<Array<object>>} histórico das Dicas da Cogni da criança,
+ * mais recentes primeiro — equivalente a:
+ *   from('dicas').select('*').eq('crianca_id', id)
+ *     .order('criado_em', { ascending: false })
+ * (A dica ATUAL em destaque não vem daqui: vem do endpoint /api/dica — ver
+ * dica.js. Este é só o histórico persistido.)
  */
-export async function getFraseEncorajamento() {
-  await delay();
-  return fraseEncorajamento;
+export async function getDicas() {
+  return USAR_SUPABASE ? supa.getDicas() : _mockDicas();
 }
 
-/** @returns {Promise<object>} a dica do Cogni (Início). */
-export async function getDicaDoCogni() {
-  await delay();
-  return { ...dicaDoCogni };
+/**
+ * @returns {Promise<object|null>} o último Resumo Semanal salvo da criança
+ * (linha de `resumos_semanais`), ou null se ainda não há nenhum — equivalente a:
+ *   from('resumos_semanais').select('*').eq('crianca_id', id)
+ *     .order('criado_em', { ascending: false }).limit(1)
+ * Fonte ESTÁVEL do card de Resumo (mostra o último bilhete mesmo com o robô
+ * offline). A versão "fresca" do destaque vem do endpoint /api/resumo-semanal —
+ * ver resumo-semanal.js.
+ */
+export async function getResumoSemanal() {
+  return USAR_SUPABASE ? supa.getResumoSemanal() : _mockResumoSemanal();
+}
+
+/**
+ * @returns {Promise<object|null>} a dica ATUAL da criança (linha mais recente de
+ * `dicas`), ou null se a tabela está vazia pra ela — equivalente a:
+ *   from('dicas').select('*').eq('crianca_id', id)
+ *     .order('criado_em', { ascending: false }).limit(1)
+ * Fonte ESTÁVEL do destaque "Dica de agora" (aparece com o robô offline). O
+ * endpoint /api/dica só refresca quando o servidor está ligado — ver dica.js.
+ */
+export async function getDicaAtual() {
+  return USAR_SUPABASE ? supa.getDicaAtual() : _mockDicaAtual();
 }
 
 /* ==========================================================================
@@ -345,12 +487,9 @@ function nextPlanoId() {
   return planos.reduce((max, p) => Math.max(max, p.id), 0) + 1;
 }
 
-/**
- * Cria um plano (mock). Recebe os campos do contrato e devolve o registro.
- * @param {object} dados — { titulo, conteudo, foco, duracao_dias, status }
- * @returns {Promise<object>}
- */
-export async function criarPlano(dados) {
+/* --- Implementações MOCK de escrita (operam em memória) ------------------- */
+
+async function _mockCriarPlano(dados) {
   await delay(80);
   const agora = MOCK_NOW.toISOString();
   const plano = {
@@ -369,13 +508,7 @@ export async function criarPlano(dados) {
   return { ...plano };
 }
 
-/**
- * Atualiza um plano existente (mock).
- * @param {number} id
- * @param {object} patch — campos a sobrescrever
- * @returns {Promise<object|null>}
- */
-export async function atualizarPlano(id, patch) {
+async function _mockAtualizarPlano(id, patch) {
   await delay(80);
   const i = planos.findIndex((p) => p.id === id);
   if (i === -1) return null;
@@ -387,27 +520,65 @@ export async function atualizarPlano(id, patch) {
   return { ...planos[i] };
 }
 
-/**
- * Remove um plano (mock).
- * @param {number} id
- * @returns {Promise<boolean>}
- */
-export async function removerPlano(id) {
+async function _mockRemoverPlano(id) {
   await delay(80);
   const antes = planos.length;
   planos = planos.filter((p) => p.id !== id);
   return planos.length < antes;
 }
 
+async function _mockAtualizarCrianca(patch) {
+  await delay(80);
+  Object.assign(crianca, patch, { atualizado_em: MOCK_NOW.toISOString() });
+  return { ...crianca };
+}
+
+/* --- API pública de escrita (roteia mock ↔ Supabase pela flag) -----------
+   No modo real: Planos viram insert/update/delete e o perfil vira update em
+   `criancas` (RLS protege). Conversas permanecem read-only (não há escrita). */
+
 /**
- * Atualiza o perfil da criança (mock) — inclui o prompt_personalizado e os
- * campos editáveis pelo pai. Ao integrar: update em `criancas` (RLS garante
- * que o pai só edita os próprios filhos).
+ * Cria um plano. Campos do contrato: { titulo, conteudo, foco, duracao_dias,
+ * status }. No modo real, `responsavel_id` (NOT NULL) e `crianca_id` são
+ * preenchidos pela camada de dados.
+ * @param {object} dados
+ * @returns {Promise<object>}
+ */
+export async function criarPlano(dados) {
+  return USAR_SUPABASE ? supa.criarPlano(dados) : _mockCriarPlano(dados);
+}
+
+/**
+ * Atualiza um plano existente.
+ * @param {number} id
+ * @param {object} patch — campos a sobrescrever
+ * @returns {Promise<object|null>}
+ */
+export async function atualizarPlano(id, patch) {
+  return USAR_SUPABASE
+    ? supa.atualizarPlano(id, patch)
+    : _mockAtualizarPlano(id, patch);
+}
+
+/**
+ * Remove um plano.
+ * @param {number} id
+ * @returns {Promise<boolean>}
+ */
+export async function removerPlano(id) {
+  return USAR_SUPABASE ? supa.removerPlano(id) : _mockRemoverPlano(id);
+}
+
+/**
+ * Atualiza o perfil da criança — inclui o prompt_personalizado e os campos
+ * editáveis pelo pai. No modo real, update em `criancas` (a RLS garante que o
+ * pai só edita os próprios filhos; `responsavel_id`/`codigo_pareamento` nunca
+ * são tocados aqui).
  * @param {object} patch
  * @returns {Promise<object>}
  */
 export async function atualizarCrianca(patch) {
-  await delay(80);
-  Object.assign(crianca, patch, { atualizado_em: MOCK_NOW.toISOString() });
-  return { ...crianca };
+  return USAR_SUPABASE
+    ? supa.atualizarCrianca(patch)
+    : _mockAtualizarCrianca(patch);
 }

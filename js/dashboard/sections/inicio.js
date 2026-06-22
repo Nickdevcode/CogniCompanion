@@ -18,6 +18,8 @@ import {
   materiaIcon,
   chevronRight,
 } from "../icons.js";
+import { cardResumoSemanal } from "../resumo-semanal.js";
+import { cardDica } from "../dica.js";
 import {
   formatHora,
   formatDiaRelativo,
@@ -271,18 +273,6 @@ function cardResumoSemana(conversas, now, onRelatorio) {
   return card;
 }
 
-/** Card "Dica do Cogni" — mensagem curta (IA). */
-function cardDica(dica, onMais) {
-  const card = el("article", { class: "dash-card ini-card ini-card--dica" });
-  card.appendChild(cardHead(ICON.bulb, "Dica do Cogni"));
-
-  const body = el("div", { class: "ini-card__body ini-dica__body" });
-  body.appendChild(el("h3", { class: "ini-dica__title", text: dica.titulo }));
-  body.appendChild(el("p", { class: "ini-dica__text", text: dica.texto }));
-  card.appendChild(body);
-  card.appendChild(cardFootLink("Ver mais dicas", onMais));
-  return card;
-}
 
 /* --------------------------------------------------------------------------
    Render principal
@@ -310,11 +300,11 @@ export async function renderInicio(ctx) {
   );
   root.appendChild(head);
 
-  // Busca os dados em paralelo.
-  const [conversas, planos, dica] = await Promise.all([
+  // Busca os dados em paralelo. (A "Dica do Cogni" busca sozinha dentro do card,
+  // como o Resumo Semanal — ambas vêm do servidor local, não do Supabase.)
+  const [conversas, planos] = await Promise.all([
     ctx.mock.getConversas(),
     ctx.mock.getPlanos(),
-    ctx.mock.getDicaDoCogni(),
   ]);
 
   // Plano "próximo": o ativo (ou, na falta, o em andamento).
@@ -334,7 +324,24 @@ export async function renderInicio(ctx) {
       cardUltimaConversa(conversas, nome, ctx.now, go("conversas")),
       cardProximoPlano(planoAtivo, go("planos")),
       cardResumoSemana(conversas, ctx.now, go("aprendizado")),
-      cardDica(dica, go("aprendizado")),
+      // Bilhete da semana gerado por IA. Fonte estável: lê o último resumo salvo
+      // (tabela `resumos_semanais`, via ctx.mock) na hora e atualiza com a versão
+      // fresca do endpoint quando o robô está ligado. Nunca mostra "sem
+      // comunicação" — o módulo resolve os estados internamente.
+      cardResumoSemanal({
+        servidorUrl: ctx.servidorUrl,
+        crianca: ctx.crianca,
+        mock: ctx.mock,
+      }),
+      // Dica do Cogni. Fonte estável: lê a última dica salva (tabela `dicas`, via
+      // ctx.mock) na hora e refresca pelo endpoint quando o robô está ligado.
+      // Nunca cai no texto genérico só por o servidor estar offline.
+      cardDica({
+        servidorUrl: ctx.servidorUrl,
+        crianca: ctx.crianca,
+        mock: ctx.mock,
+        onMais: go("aprendizado"),
+      }),
     ],
   });
   root.appendChild(grid);

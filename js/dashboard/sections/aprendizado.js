@@ -6,7 +6,7 @@
  *   - Cards de tempo por matéria (top matérias)
  *   - Tópicos explorados (chips)
  *   - Gráfico de evolução (min/dia) em SVG, com toggle Semanal/Mensal
- *   - Curiosidades da criança (IA)
+ *   - Dicas da Cogni: dica atual (IA, /api/dica) + histórico (tabela `dicas`)
  *   - Contadores (sem conquistas)
  *
  * Sem conquistas (anulado). O 4º contador vira "Matérias" no lugar.
@@ -15,11 +15,14 @@
 import { el, sectionRoot, pageHead } from "./_shared.js";
 import { ICON, materiaIcon } from "../icons.js";
 import { buildLineChart } from "../linechart.js";
+import { resolverDicaAtual } from "../dica.js";
 import {
   MATERIAS,
   materiaLabel,
   formatDuracao,
   formatMinutos,
+  formatHora,
+  formatDiaRelativo,
   tempoPorMateria,
   tempoPorDia,
   tempoTotal,
@@ -105,27 +108,6 @@ function topicosExplorados(conversas, limite = 8) {
   );
 }
 
-/**
- * Curiosidades por repetição: agrupa `topico` na janela da semana, conta, e
- * monta a frase carinhosa pros que repetem (count >= mínimo). Ordena por count.
- * @returns {Array<{nome:string, count:number, frase:string}>}
- */
-function curiosidadesPorRepeticao(conversasSemana, nome, minimo = 2) {
-  const contagem = new Map();
-  for (const c of conversasSemana) {
-    const t = (c.topico || "").trim();
-    if (!t) continue;
-    contagem.set(t, (contagem.get(t) || 0) + 1);
-  }
-  return Array.from(contagem, ([topico, count]) => ({ nome: topico, count }))
-    .filter((x) => x.count >= minimo)
-    .sort((a, b) => b.count - a.count)
-    .map((x) => ({
-      ...x,
-      frase: `Essa semana ${nome} perguntou ${x.count} vezes sobre ${x.nome}.`,
-    }));
-}
-
 /* --------------------------------------------------------------------------
    Componentes de UI
    -------------------------------------------------------------------------- */
@@ -172,16 +154,102 @@ function chipTopico(topico) {
   });
 }
 
-/** Item de curiosidade. */
-function itemCuriosidade(texto, destaque) {
+/** Item do histórico de dicas: texto + quando foi gerada (relativo). */
+function itemDica(dica, now) {
+  const quando = `${formatDiaRelativo(dica.criado_em, now)}, ${formatHora(
+    dica.criado_em
+  )}`;
   return el("div", {
-    class: "ap-curio" + (destaque ? " ap-curio--accent" : ""),
+    class: "ap-dica",
     children: [
-      el("span", {
-        class: "ap-curio__ico",
-        svg: destaque ? ICON.heart : ICON.bulb,
+      el("span", { class: "ap-dica__ico", svg: ICON.bulb }),
+      el("div", {
+        class: "ap-dica__body",
+        children: [
+          el("p", { class: "ap-dica__text", text: dica.texto }),
+          el("span", { class: "ap-dica__time", text: quando }),
+        ],
       }),
-      el("p", { class: "ap-curio__text", text: texto }),
+    ],
+  });
+}
+
+/**
+ * Card "Dicas da Cogni": dica ATUAL em destaque + HISTÓRICO (tabela `dicas`, mais
+ * recentes primeiro). A dica atual tem fonte ESTÁVEL (igual ao Resumo Semanal): a
+ * última linha de `dicas` aparece na hora — mesmo com o robô offline — e o endpoint
+ * /api/dica só refresca quando o servidor está ligado. Enquanto carrega, mostra
+ * placeholders e a tela nunca quebra. A dica atual costuma coincidir com a 1ª do
+ * histórico — nesse caso ela é omitida da lista pra não duplicar.
+ * @param {{ servidorUrl:string, crianca:object, now:Date, dicas:Array<object>, mock:object }} cfg
+ */
+function cardDicasCogni({ servidorUrl, crianca, now, dicas, mock }) {
+  // Destaque: a dica atual (placeholder até o /api/dica responder).
+  const atualTexto = el("p", {
+    class: "ap-dica-now__text",
+    text: "A Cogni está preparando uma dica pra você…",
+  });
+  const destaque = el("div", {
+    class: "ap-dica-now",
+    children: [
+      el("span", { class: "ap-dica-now__ico", svg: ICON.bulb }),
+      el("div", {
+        class: "ap-dica-now__body",
+        children: [
+          el("span", { class: "ap-dica-now__label", text: "Dica de agora" }),
+          atualTexto,
+        ],
+      }),
+    ],
+  });
+
+  // Histórico: lista rolável (cabe na coluna estreita ao lado do gráfico).
+  const lista = el("div", { class: "ap-dicas__list" });
+  const host = el("div", { class: "ap-dicas__scroll", children: [lista] });
+
+  /** Renderiza a lista do histórico, omitindo a que repete a dica atual. */
+  function pintarHistorico(historico, atual) {
+    const norm = (s) => (s || "").trim();
+    const itens = historico.filter((d) => norm(d.texto) !== norm(atual));
+    lista.replaceChildren(
+      ...(itens.length
+        ? itens.map((d) => itemDica(d, now))
+        : [
+            el("p", {
+              class: "ap-empty",
+              text: "As próximas dicas da Cogni aparecerão aqui.",
+            }),
+          ])
+    );
+  }
+
+  // Pinta o histórico já recebido; ao resolver a dica atual, repinta (pra dedup).
+  // A dica atual vem da fonte estável (tabela + endpoint refresca), igual ao topo
+  // do histórico — então o destaque bate com `dicas[0]` mesmo com o robô offline.
+  //
+  // Na 1ª pintura já omitimos `dicas[0]` (a candidata a virar destaque), em vez de
+  // passar `null`: do contrário a dica mais recente apareceria por um instante na
+  // LISTA e depois saltaria pro destaque amarelo — a "piscada". Quando a dica atual
+  // resolve (caso raro de o endpoint trazer outra), repintamos com o texto real.
+  const provavelAtual = dicas.length ? dicas[0].texto : null;
+  pintarHistorico(dicas, provavelAtual);
+  resolverDicaAtual({ servidorUrl, crianca, mock }).then((textoAtual) => {
+    atualTexto.textContent = textoAtual;
+    pintarHistorico(dicas, textoAtual);
+  });
+
+  return el("article", {
+    class: "dash-card ap-dicas",
+    children: [
+      el("div", {
+        class: "ap-dicas__head",
+        children: [
+          el("h2", { class: "ap-dicas__title", text: "Dicas da Cogni" }),
+          el("span", { class: "ap-dicas__ico", svg: ICON.bulb }),
+        ],
+      }),
+      destaque,
+      host,
     ],
   });
 }
@@ -228,12 +296,12 @@ export async function renderAprendizado(ctx) {
   );
   root.appendChild(head);
 
-  const [conversas, frase] = await Promise.all([
+  const [conversas, dicas] = await Promise.all([
     ctx.mock.getConversas(),
-    ctx.mock.getFraseEncorajamento(),
+    ctx.mock.getDicas(),
   ]);
 
-  // Janela da semana (reusada por curiosidades e contadores).
+  // Janela da semana (usada pelos contadores do rodapé).
   const semana = weekWindow(conversas, ctx.now);
 
   /* ---- Cards de matéria ---- */
@@ -351,30 +419,20 @@ export async function renderAprendizado(ctx) {
     ],
   });
 
-  // Card de curiosidades: derivadas de `topico` que repetem na semana +
-  // a frase carinhosa de encorajamento (sempre por último, com destaque).
-  const curiosTopicos = curiosidadesPorRepeticao(semana, nome, 2);
-  const itensCurios = curiosTopicos.map((c) => itemCuriosidade(c.frase, false));
-  itensCurios.push(itemCuriosidade(frase, true)); // encorajamento em destaque
-
-  const curioCard = el("article", {
-    class: "dash-card ap-curios",
-    children: [
-      el("div", {
-        class: "ap-curios__head",
-        children: [
-          el("h2", { class: "ap-curios__title", text: "Curiosidades da criança" }),
-          el("span", { class: "ap-curios__ico", svg: ICON.heart }),
-        ],
-      }),
-      el("div", { class: "ap-curios__list", children: itensCurios }),
-    ],
+  // Card "Dicas da Cogni": dica atual (servidor) + histórico (tabela `dicas`).
+  // Substitui o antigo bloco de curiosidades. Busca a dica atual sozinho.
+  const dicasCard = cardDicasCogni({
+    servidorUrl: ctx.servidorUrl,
+    crianca: ctx.crianca,
+    now: ctx.now,
+    dicas,
+    mock: ctx.mock,
   });
 
   root.appendChild(
     el("div", {
       class: "ap-grid",
-      children: [chartCard, curioCard],
+      children: [chartCard, dicasCard],
     })
   );
 

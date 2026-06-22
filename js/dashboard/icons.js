@@ -41,7 +41,7 @@ export const ICON = {
   edit: stroke('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
   trash: stroke('<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>'),
   check: stroke('<path d="M20 6 9 17l-5-5"/>', "2.2"),
-  heart: stroke('<path d="M12 20s-7-4.3-9.3-9C1 7.5 3 4.5 6 4.5c1.9 0 3.2 1 4 2 0.8-1 2.1-2 4-2 3 0 5 3 3.3 6.5C19 15.7 12 20 12 20Z"/>'),
+  heart: stroke('<path d="M12 20.5 4.2 12.7a4.6 4.6 0 0 1 6.5-6.5l1.3 1.3 1.3-1.3a4.6 4.6 0 0 1 6.5 6.5L12 20.5Z"/>'),
   alert: stroke('<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/>'),
   bell: stroke('<path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5Z"/><path d="M10.5 20a1.8 1.8 0 0 0 3 0"/>'),
   refresh: stroke('<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/>'),

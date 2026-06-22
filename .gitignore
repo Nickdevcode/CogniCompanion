@@ -31,7 +31,14 @@ $RECYCLE.BIN/
 
 # --- Vercel (gerado no deploy/CLI, não versionar) ---
 .vercel/
-docs/
+
+# --- Documentação interna ---
+# O conteúdo de docs/ é ignorado por padrão (rascunhos, anotações soltas),
+# mas o plano técnico do Companion é versionado de propósito.
+# (Ignoramos docs/* — e não docs/ — pra que a exceção abaixo funcione:
+#  o Git não avalia regras de "des-ignorar" dentro de uma pasta já ignorada.)
+docs/*
+!docs/COMPANION-PLANO-TECNICO.md
 
 # --- Referências de design (screenshots do Figma p/ consulta local) ---
 .design-refs/
@@ -45,7 +52,6 @@ yarn-error.log*
 tmp/
 temp/
 .impeccable/
-.design-refs/
 
 # --- Dependências (caso um dia o projeto ganhe build/ferramentas) ---
 node_modules/
