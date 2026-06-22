@@ -17,6 +17,11 @@
   "use strict";
 
   const LOGIN_URL = "login.html";
+  const DASHBOARD_URL = "dashboard.html";
+
+  // Estamos na página do painel? Define o destino e o rótulo do item do menu:
+  // fora do painel ele leva ao Dashboard; dentro dele vira "Voltar ao início".
+  const IS_DASHBOARD = /(^|\/)dashboard\.html$/i.test(window.location.pathname);
 
   // Ícones (SVG estático — innerHTML aqui é seguro, sem dado do usuário).
   const ICON_USER =
@@ -25,6 +30,9 @@
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
   const ICON_DASHBOARD =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>';
+  // Ícone "voltar ao início" (casinha) — usado pelo item quando no painel.
+  const ICON_HOME =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>';
   const ICON_LOGOUT =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>';
 
@@ -71,15 +79,19 @@
     menu.setAttribute("role", "menu");
     menu.hidden = true;
 
+    // Item contextual: no site, "Dashboard" (vai pro painel); dentro do
+    // painel, "Voltar ao início" (vai pra home). Mesmo item, destino oposto.
     const dashItem = document.createElement("button");
     dashItem.type = "button";
     dashItem.className = "user-menu__item";
     dashItem.setAttribute("role", "menuitem");
-    dashItem.setAttribute("data-action", "dashboard");
+    dashItem.setAttribute("data-action", IS_DASHBOARD ? "home" : "dashboard");
     dashItem.innerHTML =
       '<span class="user-menu__icon">' +
-      ICON_DASHBOARD +
-      '</span><span>Dashboard</span>';
+      (IS_DASHBOARD ? ICON_HOME : ICON_DASHBOARD) +
+      "</span><span>" +
+      (IS_DASHBOARD ? "Voltar ao início" : "Dashboard") +
+      "</span>";
 
     const logoutItem = document.createElement("button");
     logoutItem.type = "button";
@@ -103,12 +115,10 @@
       toggleMenu(wrap);
     });
 
-    // Dashboard ainda não tem destino: apenas informa (combinado com o usuário).
+    // Navega: pro painel (no site) ou de volta pra home (dentro do painel).
     dashItem.addEventListener("click", function () {
       closeAllMenus();
-      if (window.cognifyToast) {
-        window.cognifyToast.show("Dashboard em breve! 🚧", { type: "info" });
-      }
+      window.location.href = IS_DASHBOARD ? "index.html" : DASHBOARD_URL;
     });
 
     logoutItem.addEventListener("click", async function () {
@@ -225,14 +235,19 @@
     // Usa a classe .is-auth-hidden (não o atributo `hidden`) porque o
     // header.css define `.auth { display: flex }`, que venceria o `hidden`
     // (este equivale a display:none, de baixa especificidade).
-    document.querySelectorAll(".header__right").forEach(function (right) {
-      const auth = right.querySelector(".auth");
-      if (auth) auth.classList.add("is-auth-hidden");
-      // evita duplicar se já existe
-      if (!right.querySelector('[data-user-badge="desktop"]')) {
-        right.appendChild(buildBadge(name, "desktop"));
-      }
-    });
+    // O painel (dashboard) usa `.dash-header__right` como container — sem bloco
+    // `.auth` dentro; a badge é só anexada lá (e o CSS do painel a mantém
+    // visível em qualquer tamanho, pois lá não há menu hambúrguer com badge).
+    document
+      .querySelectorAll(".header__right, .dash-header__right")
+      .forEach(function (right) {
+        const auth = right.querySelector(".auth");
+        if (auth) auth.classList.add("is-auth-hidden");
+        // evita duplicar se já existe
+        if (!right.querySelector('[data-user-badge="desktop"]')) {
+          right.appendChild(buildBadge(name, "desktop"));
+        }
+      });
 
     // ---- Mobile: badge dentro do menu (.nav), no lugar dos links de auth ----
     document.querySelectorAll(".nav").forEach(function (nav) {
@@ -243,6 +258,17 @@
         nav.appendChild(buildBadge(name, "mobile"));
       }
     });
+
+    // ---- Painel (mobile): badge no rodapé da sidebar. No mobile o header do
+    // dashboard fica só com toggle + sino; a conta migra pra cá (o CSS do
+    // painel esconde a badge "desktop" do header e mostra esta no <= 900px). ----
+    document
+      .querySelectorAll("[data-dash-sidebar-account]")
+      .forEach(function (slot) {
+        if (!slot.querySelector('[data-user-badge="mobile"]')) {
+          slot.appendChild(buildBadge(name, "mobile"));
+        }
+      });
 
     markAuthState(true);
   }

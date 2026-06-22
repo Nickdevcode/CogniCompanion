@@ -1,0 +1,77 @@
+/**
+ * icons.js — Biblioteca central de ícones SVG do painel.
+ *
+ * Todos os ícones são markup ESTÁTICO (sem dado de usuário), no estilo do
+ * projeto: traço (stroke) com currentColor, viewBox 24×24. Centralizar aqui
+ * evita duplicação e mantém o conjunto coerente entre as seções.
+ *
+ * Uso: passe a string como `svg:` no helper `el()` (ou em innerHTML de markup
+ * controlado). Nunca concatene com conteúdo dinâmico.
+ */
+
+const stroke = (paths, w = "1.9") =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+
+const fill = (paths) =>
+  `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${paths}</svg>`;
+
+/** Conjunto nomeado de ícones reutilizáveis. */
+export const ICON = {
+  // Navegação / genéricos
+  home: stroke('<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/>'),
+  chat: stroke('<path d="M21 11.5a8.5 8.5 0 0 1-12.2 7.7L3 21l1.8-5.8A8.5 8.5 0 1 1 21 11.5Z"/>'),
+  book: stroke('<path d="M3 5.5A2.5 2.5 0 0 1 5.5 4H11v15.5H5.5A2.5 2.5 0 0 0 3 22Z"/><path d="M21 5.5A2.5 2.5 0 0 0 18.5 4H13v15.5h5.5A2.5 2.5 0 0 1 21 22Z"/>'),
+  calendar: stroke('<rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>'),
+  gear: stroke('<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>', "1.7"),
+
+  // Pessoas / robô
+  user: stroke('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
+  robot: stroke('<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V5"/><circle cx="12" cy="3.5" r="1.3" fill="currentColor" stroke="none"/><path d="M2 13v3M22 13v3"/><circle cx="9" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.3" fill="currentColor" stroke="none"/>'),
+
+  // Conteúdo / ações
+  clock: stroke('<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>'),
+  chart: stroke('<path d="M4 19V5M4 19h16"/><path d="m7 14 3.5-4 3 2.5L18 7"/>'),
+  bulb: stroke('<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.8 10.7c.5.4.8 1 .8 1.6v.7h6v-.7c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3Z"/>'),
+  search: stroke('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>'),
+  filter: stroke('<path d="M3 5h18l-7 8v6l-4-2v-4Z"/>'),
+  shield: stroke('<path d="M12 3 5 6v5c0 4.4 3 8.3 7 9 4-0.7 7-4.6 7-9V6Z"/>'),
+  shieldCheck: stroke('<path d="M12 3 5 6v5c0 4.4 3 8.3 7 9 4-0.7 7-4.6 7-9V6Z"/><path d="m9 11.5 2 2 4-4"/>'),
+  wifi: stroke('<path d="M2 8.5a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0M8.5 15.5a6 6 0 0 1 7 0"/><circle cx="12" cy="19" r="1" fill="currentColor" stroke="none"/>'),
+  plus: stroke('<path d="M12 5v14M5 12h14"/>', "2.2"),
+  edit: stroke('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
+  trash: stroke('<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>'),
+  check: stroke('<path d="M20 6 9 17l-5-5"/>', "2.2"),
+  heart: stroke('<path d="M12 20s-7-4.3-9.3-9C1 7.5 3 4.5 6 4.5c1.9 0 3.2 1 4 2 0.8-1 2.1-2 4-2 3 0 5 3 3.3 6.5C19 15.7 12 20 12 20Z"/>'),
+  alert: stroke('<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/>'),
+  bell: stroke('<path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5Z"/><path d="M10.5 20a1.8 1.8 0 0 0 3 0"/>'),
+  refresh: stroke('<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/>'),
+};
+
+/* --------------------------------------------------------------------------
+   Ícones por matéria (conversas.materia / planos.foco)
+   Cada matéria tem um ícone próprio; usados em Início, Conversas e Aprendizado.
+   -------------------------------------------------------------------------- */
+const MATERIA_ICONS = {
+  portugues: stroke('<path d="M4 19.5V6a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 1.5Z"/><path d="M9 8h6M9 12h6"/>'),
+  matematica: stroke('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h2M14 12h2M8 16h2M14 16h2"/>'),
+  ciencias: stroke('<path d="M9 3h6M10 3v6l-5 8.5A2 2 0 0 0 6.7 21h10.6a2 2 0 0 0 1.7-3.5L14 9V3"/>'),
+  historia: stroke('<path d="M4 8h16M5 8 12 4l7 4M6 8v9M10 8v9M14 8v9M18 8v9M4 21h16"/>'),
+  geografia: stroke('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 4 6 4 9s-1.5 6.5-4 9c-2.5-2.5-4-6-4-9s1.5-6.5 4-9Z"/>'),
+  idiomas: stroke('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 4 6 4 9s-1.5 6.5-4 9M12 3c-2.5 2.5-4 6-4 9s1.5 6.5 4 9"/>'),
+  outros: stroke('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5v.4M12 17h.01"/>'),
+};
+
+/** @returns {string} ícone SVG da matéria (fallback: "outros"). */
+export function materiaIcon(materia) {
+  return MATERIA_ICONS[materia] || MATERIA_ICONS.outros;
+}
+
+/** Chevron pequeno pra direita (links "ver mais"). */
+export function chevronRight() {
+  return stroke('<path d="m9 6 6 6-6 6"/>', "2.2");
+}
+
+/** Chevron pequeno pra baixo. */
+export function chevronDown() {
+  return stroke('<path d="m6 9 6 6 6-6"/>', "2.2");
+}

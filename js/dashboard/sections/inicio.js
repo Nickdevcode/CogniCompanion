@@ -1,0 +1,343 @@
+/**
+ * inicio.js — Seção "Início" do painel.
+ *
+ * Cartão de visita do dia, em bento grid:
+ *   - Última conversa (timeline curta dos últimos turnos da criança)
+ *   - Próximo plano de estudo (o plano ativo)
+ *   - Resumo da semana (contadores: conversas · matérias · tempo total)
+ *   - Dica do Cogni (mensagem da IA)
+ *
+ * Tudo lido do contrato (snake_case). Sem chips de humor/concentração e sem
+ * conquistas (anulados no escopo). O 3º contador do resumo é "Tempo total"
+ * (derivado de duracao_ms), no lugar de "Conquistas".
+ */
+
+import { el, sectionRoot, pageHead } from "./_shared.js";
+import {
+  ICON,
+  materiaIcon,
+  chevronRight,
+} from "../icons.js";
+import {
+  formatHora,
+  formatDiaRelativo,
+  formatDuracao,
+  materiaLabel,
+  statusLabel,
+  tempoTotal,
+  primeiroNome,
+} from "../format.js";
+
+/* --------------------------------------------------------------------------
+   Helpers de UI locais
+   -------------------------------------------------------------------------- */
+
+/** Cabeçalho navy de um card do bento (ícone + título). */
+function cardHead(iconSvg, title) {
+  return el("div", {
+    class: "dash-card__head",
+    children: [
+      el("span", { class: "dash-card__head-ico", svg: iconSvg }),
+      el("span", { class: "dash-card__head-title", text: title }),
+    ],
+  });
+}
+
+/** Rodapé de card com link de ação (texto + chevron). */
+function cardFootLink(label, onClick) {
+  const btn = el("button", {
+    class: "ini-cardlink",
+    attrs: { type: "button" },
+    children: [
+      el("span", { text: label }),
+      el("span", { class: "ini-cardlink__chev", svg: chevronRight() }),
+    ],
+  });
+  if (onClick) btn.addEventListener("click", onClick);
+  return el("div", { class: "ini-card__foot", children: [btn] });
+}
+
+/**
+ * Balão de conversa (criança ou Cogni). `autor` = "crianca" | "cogni".
+ * @param {{ autor:string, nome:string, hora:string, texto:string }} cfg
+ */
+function balao({ autor, nome, hora, texto }) {
+  const isCrianca = autor === "crianca";
+  const avatar = el("span", {
+    class: "ini-msg__avatar ini-msg__avatar--" + autor,
+    svg: isCrianca ? ICON.user : ICON.robot,
+    attrs: { "aria-hidden": "true" },
+  });
+
+  const meta = el("div", {
+    class: "ini-msg__meta",
+    children: [
+      el("span", { class: "ini-msg__name", text: nome }),
+      hora ? el("span", { class: "ini-msg__time", text: hora }) : null,
+    ],
+  });
+  const bubble = el("div", {
+    class: "ini-msg__bubble",
+    children: [meta, el("p", { class: "ini-msg__text", text: texto })],
+  });
+
+  return el("div", {
+    class: "ini-msg ini-msg--" + autor,
+    children: isCrianca ? [avatar, bubble] : [bubble, avatar],
+  });
+}
+
+/* --------------------------------------------------------------------------
+   Cards do bento
+   -------------------------------------------------------------------------- */
+
+/** Card "Última conversa" — mostra os últimos turnos (até 3 mensagens). */
+function cardUltimaConversa(conversas, nomeCrianca, now, onVerTodas) {
+  const card = el("article", { class: "dash-card ini-card ini-card--conversa" });
+  card.appendChild(cardHead(ICON.chat, "Última conversa"));
+
+  const body = el("div", { class: "ini-card__body ini-conversa__body" });
+
+  if (!conversas.length) {
+    body.appendChild(
+      el("p", {
+        class: "ini-empty",
+        text: "Ainda não há conversas registradas.",
+      })
+    );
+  } else {
+    // A conversa mais recente: mostramos a pergunta da criança, a resposta da
+    // Cogni e (se houver) o turno seguinte — recriando o "vai e volta".
+    const ultima = conversas[0];
+    const quando = `${formatDiaRelativo(ultima.criado_em, now)}, ${formatHora(
+      ultima.criado_em
+    )}`;
+
+    body.appendChild(
+      balao({
+        autor: "crianca",
+        nome: nomeCrianca,
+        hora: quando,
+        texto: ultima.texto_usuario,
+      })
+    );
+    body.appendChild(
+      balao({
+        autor: "cogni",
+        nome: "Cogni",
+        hora: "",
+        texto: ultima.texto_resposta,
+      })
+    );
+    // Se houver uma conversa anterior próxima, mostra a pergunta dela como 3º
+    // balão (dá a sensação de continuidade, como no design).
+    if (conversas[1]) {
+      const ant = conversas[1];
+      body.appendChild(
+        balao({
+          autor: "crianca",
+          nome: nomeCrianca,
+          hora: `${formatDiaRelativo(ant.criado_em, now)}, ${formatHora(
+            ant.criado_em
+          )}`,
+          texto: ant.texto_usuario,
+        })
+      );
+    }
+  }
+
+  card.appendChild(body);
+  card.appendChild(cardFootLink("Ver todas as conversas", onVerTodas));
+  return card;
+}
+
+/** Card "Próximo plano de estudo" — destaca o plano ativo. */
+function cardProximoPlano(plano, onVerPlano) {
+  const card = el("article", { class: "dash-card ini-card ini-card--plano" });
+  card.appendChild(cardHead(ICON.calendar, "Próximo plano de estudo"));
+
+  const body = el("div", { class: "ini-card__body ini-plano__body" });
+
+  if (!plano) {
+    body.appendChild(
+      el("p", {
+        class: "ini-empty",
+        text: "Nenhum plano ativo no momento. Que tal criar um?",
+      })
+    );
+    card.appendChild(body);
+    return card;
+  }
+
+  // Ícone grande da matéria (disco navy com ícone dourado)
+  const disco = el("div", {
+    class: "ini-plano__disc",
+    children: [el("span", { svg: materiaIcon(plano.foco) })],
+  });
+
+  // Destaque dourado: a matéria de foco do plano.
+  const info = el("div", {
+    class: "ini-plano__info",
+    children: [
+      el("p", { class: "ini-plano__when", text: materiaLabel(plano.foco) }),
+      el("h3", { class: "ini-plano__title", text: plano.titulo }),
+      el("p", { class: "ini-plano__desc", text: plano.conteudo }),
+      el("div", {
+        class: "ini-plano__chips",
+        children: [
+          el("span", {
+            class: "ini-pill",
+            children: [
+              el("span", { class: "ini-pill__ico", svg: ICON.calendar }),
+              el("span", { text: `${plano.duracao_dias} dias` }),
+            ],
+          }),
+          el("span", {
+            class: "ini-pill ini-pill--status",
+            attrs: { "data-status": plano.status },
+            children: [
+              el("span", { class: "ini-pill__dot", attrs: { "aria-hidden": "true" } }),
+              el("span", { text: statusLabel(plano.status) }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+
+  body.appendChild(disco);
+  body.appendChild(info);
+  card.appendChild(body);
+
+  // Botão grande "Ver plano completo"
+  const btn = el("button", {
+    class: "dash-btn dash-btn--primary ini-plano__cta",
+    attrs: { type: "button" },
+    children: [
+      el("span", { text: "Ver plano completo" }),
+      el("span", { class: "ini-cardlink__chev", svg: chevronRight() }),
+    ],
+  });
+  if (onVerPlano) btn.addEventListener("click", onVerPlano);
+  card.appendChild(el("div", { class: "ini-plano__foot", children: [btn] }));
+  return card;
+}
+
+/** Card "Resumo da semana" — 3 contadores (conversas · matérias · tempo). */
+function cardResumoSemana(conversas, now, onRelatorio) {
+  const card = el("article", { class: "dash-card ini-card ini-card--resumo" });
+  card.appendChild(cardHead(ICON.chart, "Resumo da semana"));
+
+  // Janela dos últimos 7 dias a partir do "agora" de referência.
+  const limite = new Date(now);
+  limite.setDate(limite.getDate() - 7);
+  const semana = conversas.filter((c) => new Date(c.criado_em) >= limite);
+
+  const nConversas = semana.length;
+  const nMaterias = new Set(semana.map((c) => c.materia)).size;
+  const tempo = formatDuracao(tempoTotal(semana));
+
+  const body = el("div", { class: "ini-card__body ini-resumo__body" });
+  body.appendChild(
+    el("p", {
+      class: "ini-resumo__lead",
+      text: "Acompanhe o ritmo da semana e continue incentivando essa jornada.",
+    })
+  );
+
+  const counter = (valor, rotulo, iconSvg) =>
+    el("div", {
+      class: "ini-counter",
+      children: [
+        el("span", { class: "ini-counter__ico", svg: iconSvg }),
+        el("span", { class: "ini-counter__value", text: String(valor) }),
+        el("span", { class: "ini-counter__label", text: rotulo }),
+      ],
+    });
+
+  body.appendChild(
+    el("div", {
+      class: "ini-counters",
+      children: [
+        counter(nConversas, "Conversas", ICON.chat),
+        counter(nMaterias, "Matérias", ICON.book),
+        counter(tempo, "Tempo total", ICON.clock),
+      ],
+    })
+  );
+
+  card.appendChild(body);
+  card.appendChild(cardFootLink("Ver relatório completo", onRelatorio));
+  return card;
+}
+
+/** Card "Dica do Cogni" — mensagem curta (IA). */
+function cardDica(dica, onMais) {
+  const card = el("article", { class: "dash-card ini-card ini-card--dica" });
+  card.appendChild(cardHead(ICON.bulb, "Dica do Cogni"));
+
+  const body = el("div", { class: "ini-card__body ini-dica__body" });
+  body.appendChild(el("h3", { class: "ini-dica__title", text: dica.titulo }));
+  body.appendChild(el("p", { class: "ini-dica__text", text: dica.texto }));
+  card.appendChild(body);
+  card.appendChild(cardFootLink("Ver mais dicas", onMais));
+  return card;
+}
+
+/* --------------------------------------------------------------------------
+   Render principal
+   -------------------------------------------------------------------------- */
+
+export async function renderInicio(ctx) {
+  const root = sectionRoot("inicio");
+  const nome = primeiroNome(ctx.crianca && ctx.crianca.nome) || "a criança";
+
+  // Cabeçalho com mascote ao lado (decorativo).
+  const head = pageHead({
+    title: `Como tá indo o ${nome}?`,
+    subtitle: "Um resumo do dia: conversas, plano de estudo e dicas da Cogni.",
+  });
+  head.appendChild(
+    el("img", {
+      class: "ini-mascot",
+      attrs: {
+        src: "assets/images/dash-robot-inicio.png",
+        alt: "",
+        "aria-hidden": "true",
+        loading: "lazy",
+      },
+    })
+  );
+  root.appendChild(head);
+
+  // Busca os dados em paralelo.
+  const [conversas, planos, dica] = await Promise.all([
+    ctx.mock.getConversas(),
+    ctx.mock.getPlanos(),
+    ctx.mock.getDicaDoCogni(),
+  ]);
+
+  // Plano "próximo": o ativo (ou, na falta, o em andamento).
+  const planoAtivo =
+    planos.find((p) => p.status === "ativo") ||
+    planos.find((p) => p.status === "em_andamento") ||
+    null;
+
+  // Navegações entre seções (reusa o roteador por hash).
+  const go = (rota) => () => {
+    window.location.hash = "#/" + rota;
+  };
+
+  const grid = el("div", {
+    class: "ini-grid",
+    children: [
+      cardUltimaConversa(conversas, nome, ctx.now, go("conversas")),
+      cardProximoPlano(planoAtivo, go("planos")),
+      cardResumoSemana(conversas, ctx.now, go("aprendizado")),
+      cardDica(dica, go("aprendizado")),
+    ],
+  });
+  root.appendChild(grid);
+
+  return root;
+}

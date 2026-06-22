@@ -1,0 +1,615 @@
+/* ==========================================================================
+   dashboard-config.css — Seção "Configurações da família"
+   Blocos: perfil da criança (+ modal de detalhe), notificações, conta, tema,
+   status. Usa tokens de dashboard.css. Dois temas.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Grid de blocos (2 colunas no desktop)
+   -------------------------------------------------------------------------- */
+.cfg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1rem, 2vw, 1.5rem);
+  align-items: start;
+}
+/* O bloco de perfil ocupa a largura toda (é o principal) */
+.cfg-perfil-host {
+  grid-column: 1 / -1;
+}
+
+.cfg-block {
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+.cfg-block__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1.1rem;
+}
+.cfg-block__ico {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  background-color: var(--dash-accent-soft);
+  color: var(--dash-accent);
+}
+.cfg-block__ico svg {
+  width: 22px;
+  height: 22px;
+}
+.cfg-block__heading {
+  min-width: 0;
+}
+.cfg-block__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.2rem;
+  color: var(--dash-text);
+  line-height: 1.2;
+}
+.cfg-block__sub {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: var(--dash-text-muted);
+  margin-top: 0.15rem;
+}
+
+/* --------------------------------------------------------------------------
+   Switch (toggle) acessível
+   -------------------------------------------------------------------------- */
+.cfg-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background-color: var(--dash-border-strong);
+  cursor: pointer;
+  transition: background-color 0.22s ease;
+}
+.cfg-switch.is-on {
+  background-color: var(--dash-accent);
+}
+.cfg-switch__knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cfg-switch.is-on .cfg-switch__knob {
+  transform: translateX(20px);
+}
+.cfg-switch:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Bloco: Perfil da criança
+   -------------------------------------------------------------------------- */
+.cfg-child {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 1rem 1.1rem;
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.18s ease, border-color 0.18s ease,
+    transform 0.15s ease;
+}
+.cfg-child:hover {
+  background-color: var(--dash-nav-hover-bg);
+  border-color: var(--dash-border-strong);
+}
+.cfg-child:active {
+  transform: scale(0.995);
+}
+.cfg-child__avatar {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: var(--dash-navy);
+  color: var(--brand-gold);
+  box-shadow: 0 0 0 3px var(--dash-accent-soft);
+}
+[data-theme="dark"] .cfg-child__avatar {
+  background-color: #10142e;
+}
+.cfg-child__avatar svg {
+  width: 28px;
+  height: 28px;
+}
+.cfg-child__info {
+  flex: 1;
+  min-width: 0;
+}
+.cfg-child__namerow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.cfg-child__name {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.1rem;
+  color: var(--dash-text);
+}
+.cfg-child__tag {
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--dash-accent-soft);
+  color: var(--brand-gold-deep);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: var(--fw-semibold);
+}
+[data-theme="dark"] .cfg-child__tag {
+  color: var(--brand-gold);
+}
+.cfg-child__meta {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: var(--dash-text-muted);
+}
+.cfg-child__chev {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--dash-text-faint);
+}
+.cfg-child__chev svg {
+  width: 18px;
+  height: 18px;
+}
+.cfg-nopair__text {
+  font-family: var(--font-body);
+  color: var(--dash-text-muted);
+  padding: 0.5rem 0;
+}
+
+/* --------------------------------------------------------------------------
+   Bloco: Notificações + Tema (linhas com switch)
+   -------------------------------------------------------------------------- */
+.cfg-notif-list {
+  display: flex;
+  flex-direction: column;
+}
+.cfg-notif,
+.cfg-themerow {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--dash-border);
+}
+.cfg-notif:last-child {
+  border-bottom: none;
+}
+.cfg-themerow {
+  border-bottom: none;
+  padding-top: 0;
+}
+.cfg-notif__ico {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background-color: var(--dash-surface-2);
+  color: var(--dash-text-muted);
+}
+.cfg-notif__ico svg {
+  width: 19px;
+  height: 19px;
+}
+.cfg-notif__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cfg-notif__title {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.95rem;
+  color: var(--dash-text);
+}
+.cfg-notif__desc {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  color: var(--dash-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Bloco: Conta
+   -------------------------------------------------------------------------- */
+.cfg-data {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--dash-border);
+}
+.cfg-data__label {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: var(--dash-text-muted);
+}
+.cfg-data__value {
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: 0.95rem;
+  color: var(--dash-text);
+  text-align: right;
+  word-break: break-word;
+}
+.cfg-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.65rem 1.1rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.95rem;
+  color: var(--menu-danger, #c0392b);
+  background-color: var(--menu-danger-hover, rgba(192, 57, 43, 0.1));
+  cursor: pointer;
+  transition: filter 0.18s ease;
+}
+.cfg-logout:hover {
+  filter: brightness(0.97);
+}
+.cfg-logout:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.cfg-logout__ico {
+  display: grid;
+  place-items: center;
+}
+.cfg-logout__ico svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* --------------------------------------------------------------------------
+   Bloco: Status do Cogni
+   -------------------------------------------------------------------------- */
+/* Topo: foto do robô + infos de conexão */
+.cfg-status__top {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  margin-bottom: 1.1rem;
+}
+.cfg-status__photo {
+  position: relative;
+  flex-shrink: 0;
+  width: 96px;
+  height: 96px;
+  border-radius: 16px;
+  border: 3px solid var(--brand-gold);
+  background-color: var(--dash-surface-2);
+  overflow: hidden;
+}
+.cfg-status__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 6px;
+}
+/* Pontinho verde "ao vivo" no canto da foto */
+.cfg-status__live {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--st-ativo);
+  border: 2px solid var(--dash-surface);
+  box-shadow: 0 0 0 3px var(--st-ativo-soft);
+}
+.cfg-status__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.cfg-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.8rem;
+  margin-bottom: 0.5rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.9rem;
+  align-self: flex-start;
+}
+.cfg-status-badge.is-online {
+  color: var(--st-ativo);
+  background-color: var(--st-ativo-soft);
+}
+.cfg-status-badge__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--st-ativo);
+  box-shadow: 0 0 0 3px var(--st-ativo-soft);
+}
+/* Linhas Wi-Fi / Sinal dentro da coluna de info (compactas, sem divisória) */
+.cfg-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.18rem 0;
+}
+.cfg-status-row__ico {
+  display: grid;
+  place-items: center;
+  color: var(--dash-text-muted);
+}
+.cfg-status-row__ico svg {
+  width: 16px;
+  height: 16px;
+}
+.cfg-status-row__label {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: var(--dash-text-muted);
+}
+.cfg-status-row__value {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.88rem;
+  color: var(--dash-text);
+  margin-left: auto;
+}
+.cfg-status-row__value.is-ok {
+  color: var(--st-ativo);
+}
+
+/* Barra "última sincronização" + botão de atualizar */
+.cfg-sync {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+}
+.cfg-sync__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cfg-sync__label {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  color: var(--dash-text-faint);
+}
+.cfg-sync__value {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.95rem;
+  color: var(--dash-text);
+}
+.cfg-sync__btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border-strong);
+  color: var(--dash-text-muted);
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.cfg-sync__btn:hover {
+  background-color: var(--dash-nav-hover-bg);
+  color: var(--dash-accent);
+}
+.cfg-sync__btn:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
+.cfg-sync__btn svg {
+  width: 18px;
+  height: 18px;
+}
+.cfg-sync__btn.is-spinning svg {
+  animation: cfg-spin 0.8s linear infinite;
+}
+@keyframes cfg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cfg-sync__btn.is-spinning svg {
+    animation-duration: 1.6s;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Modal de detalhe do perfil (formulário)
+   -------------------------------------------------------------------------- */
+.cfg-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.cfg-form__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.cfg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.cfg-field--full {
+  grid-column: 1 / -1;
+}
+.cfg-field__label {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.85rem;
+  color: var(--dash-text);
+}
+.cfg-input {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--dash-text);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.cfg-input::placeholder {
+  color: var(--dash-text-faint);
+}
+.cfg-input:focus {
+  outline: none;
+  border-color: var(--dash-accent);
+  box-shadow: 0 0 0 3px var(--dash-accent-soft);
+}
+.cfg-textarea {
+  resize: vertical;
+  line-height: 1.5;
+  min-height: 60px;
+}
+.cfg-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b92a6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 15px;
+  padding-right: 2.2rem;
+  cursor: pointer;
+}
+
+/* Seção destacada do prompt personalizado */
+.cfg-prompt {
+  padding: 1.1rem;
+  background-color: var(--dash-accent-soft);
+  border: 1px solid rgba(240, 163, 21, 0.25);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.cfg-prompt__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+.cfg-prompt__ico {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background-color: var(--dash-navy);
+  color: var(--brand-gold);
+}
+[data-theme="dark"] .cfg-prompt__ico {
+  background-color: #10142e;
+}
+.cfg-prompt__ico svg {
+  width: 20px;
+  height: 20px;
+}
+.cfg-prompt__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.02rem;
+  color: var(--dash-text);
+}
+.cfg-prompt__hint {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  color: var(--dash-text-muted);
+  margin-top: 0.1rem;
+}
+.cfg-textarea--prompt {
+  background-color: var(--dash-surface);
+}
+
+.cfg-form__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding-top: 0.25rem;
+}
+.cfg-form__spacer {
+  flex: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Responsivo
+   -------------------------------------------------------------------------- */
+@media (max-width: 920px) {
+  .cfg-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .cfg-form__grid {
+    grid-template-columns: 1fr;
+  }
+  .cfg-form__actions {
+    flex-wrap: wrap;
+  }
+  .cfg-form__spacer {
+    display: none;
+  }
+  .cfg-form__actions .dash-btn {
+    flex: 1;
+  }
+  .cfg-data {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+  }
+  .cfg-data__value {
+    text-align: left;
+  }
+}

@@ -1,0 +1,501 @@
+/* ==========================================================================
+   dashboard-aprendizado.css — Seção "Aprendizado"
+   Cards de matéria, tópicos, gráfico de evolução (SVG), curiosidades, stats.
+   Usa tokens de dashboard.css (incl. cores por matéria). Dois temas.
+   ========================================================================== */
+
+/* Mascote no cabeçalho */
+.ap-mascot {
+  width: clamp(110px, 14vw, 175px);
+  height: auto;
+  align-self: flex-start;
+  margin-top: -0.5rem;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 12px 22px rgba(8, 12, 56, 0.18));
+}
+
+/* --------------------------------------------------------------------------
+   Cards de matéria
+   -------------------------------------------------------------------------- */
+.ap-mats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(0.75rem, 1.5vw, 1rem);
+  margin-bottom: clamp(1.5rem, 3vw, 2rem);
+}
+.ap-mat {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.1rem 1.1rem 1.1rem 1.25rem;
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: 16px;
+  box-shadow: var(--dash-shadow-card);
+  overflow: hidden;
+}
+/* Borda superior colorida pela matéria */
+.ap-mat__accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background-color: var(--mat-color, var(--dash-accent));
+}
+.ap-mat__ico {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background-color: var(--mat-soft, var(--dash-accent-soft));
+  color: var(--mat-color, var(--dash-accent));
+}
+.ap-mat__ico svg {
+  width: 24px;
+  height: 24px;
+}
+.ap-mat__info {
+  min-width: 0;
+}
+.ap-mat__name {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.05rem;
+  color: var(--dash-text);
+  line-height: 1.2;
+}
+.ap-mat__time {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.95rem;
+  color: var(--dash-text);
+}
+.ap-mat__time-ico {
+  display: grid;
+  place-items: center;
+  color: var(--dash-text-muted);
+}
+.ap-mat__time-ico svg {
+  width: 14px;
+  height: 14px;
+}
+.ap-mat__label {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  color: var(--dash-text-faint);
+}
+
+/* Cores por matéria (mapeadas pros tokens de dashboard.css) */
+.ap-mat[data-materia="portugues"],
+.ap-topic[data-materia="portugues"] {
+  --mat-color: var(--mat-portugues);
+  --mat-soft: var(--mat-portugues-soft);
+}
+.ap-mat[data-materia="matematica"],
+.ap-topic[data-materia="matematica"] {
+  --mat-color: var(--mat-matematica);
+  --mat-soft: var(--mat-matematica-soft);
+}
+.ap-mat[data-materia="ciencias"],
+.ap-topic[data-materia="ciencias"] {
+  --mat-color: var(--mat-ciencias);
+  --mat-soft: var(--mat-ciencias-soft);
+}
+.ap-mat[data-materia="historia"],
+.ap-topic[data-materia="historia"] {
+  --mat-color: var(--mat-historia);
+  --mat-soft: var(--mat-historia-soft);
+}
+.ap-mat[data-materia="geografia"],
+.ap-topic[data-materia="geografia"] {
+  --mat-color: var(--mat-geografia);
+  --mat-soft: var(--mat-geografia-soft);
+}
+.ap-mat[data-materia="idiomas"],
+.ap-topic[data-materia="idiomas"] {
+  --mat-color: var(--mat-idiomas);
+  --mat-soft: var(--mat-idiomas-soft);
+}
+.ap-mat[data-materia="outros"],
+.ap-topic[data-materia="outros"] {
+  --mat-color: var(--mat-outros);
+  --mat-soft: var(--mat-outros-soft);
+}
+
+/* --------------------------------------------------------------------------
+   Blocos genéricos (cabeçalho de seção + tópicos)
+   -------------------------------------------------------------------------- */
+.ap-block {
+  margin-bottom: clamp(1.5rem, 3vw, 2rem);
+}
+.ap-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.ap-section-head__title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.25rem;
+  color: var(--dash-text);
+}
+.ap-section-head__ico {
+  display: grid;
+  place-items: center;
+  color: var(--dash-accent);
+}
+.ap-section-head__ico svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Tópicos (chips) */
+.ap-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+.ap-empty {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--dash-text-muted);
+  padding: 0.5rem 0;
+}
+.ap-topic {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.85rem;
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  font-weight: var(--fw-medium);
+  color: var(--dash-text);
+  box-shadow: var(--dash-shadow-sm);
+}
+.ap-topic__ico {
+  display: grid;
+  place-items: center;
+  color: var(--mat-color, var(--dash-accent));
+}
+.ap-topic__ico svg {
+  width: 16px;
+  height: 16px;
+}
+.ap-topic__check {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: var(--mat-ciencias);
+  color: #fff;
+}
+.ap-topic__check svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* --------------------------------------------------------------------------
+   Grid: gráfico + curiosidades
+   -------------------------------------------------------------------------- */
+.ap-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: clamp(1rem, 2vw, 1.5rem);
+  margin-bottom: clamp(1.5rem, 3vw, 2rem);
+  align-items: stretch;
+}
+
+/* Card do gráfico */
+.ap-chart {
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+}
+.ap-chart__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.ap-chart__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.25rem;
+  color: var(--dash-text);
+}
+/* Segmented control Semanal/Mensal */
+.ap-seg {
+  display: inline-flex;
+  padding: 3px;
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-pill);
+}
+.ap-seg__btn {
+  padding: 0.35rem 0.9rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: var(--fw-semibold);
+  color: var(--dash-text-muted);
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.ap-seg__btn.is-active {
+  background-color: var(--dash-navy);
+  color: #fff;
+}
+[data-theme="dark"] .ap-seg__btn.is-active {
+  background-color: var(--brand-gold);
+  color: #080c38;
+}
+
+.ap-chart__canvas {
+  flex: 1;
+  min-height: 200px;
+}
+
+/* Faixa-resumo abaixo do gráfico */
+.ap-chart__note {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  background-color: var(--dash-accent-soft);
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--dash-text);
+}
+.ap-chart__note-ico {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--dash-accent);
+}
+.ap-chart__note-ico svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* --------------------------------------------------------------------------
+   SVG do gráfico de linha (classes geradas por linechart.js)
+   -------------------------------------------------------------------------- */
+.lc {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 720 / 240;
+  overflow: visible;
+}
+.lc__gridline {
+  stroke: var(--dash-border);
+  stroke-width: 1;
+}
+.lc__ytext,
+.lc__xtext {
+  fill: var(--dash-text-faint);
+  font-family: var(--font-body);
+  font-size: 12px;
+}
+.lc__area {
+  fill: var(--dash-accent);
+  opacity: 0.12;
+}
+.lc__line {
+  fill: none;
+  stroke: var(--dash-accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.lc__dot {
+  fill: var(--dash-accent);
+  stroke: var(--dash-surface);
+  stroke-width: 2;
+}
+.lc__dot--peak {
+  fill: var(--dash-accent);
+  stroke: var(--dash-surface);
+  stroke-width: 3;
+}
+.lc__tipbox {
+  fill: var(--dash-navy);
+}
+[data-theme="dark"] .lc__tipbox {
+  fill: #0b0f24;
+}
+.lc__tiptext {
+  fill: #fff;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* --------------------------------------------------------------------------
+   Curiosidades
+   -------------------------------------------------------------------------- */
+.ap-curios {
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+}
+.ap-curios__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.ap-curios__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.15rem;
+  color: var(--dash-text);
+}
+.ap-curios__ico {
+  display: grid;
+  place-items: center;
+  color: var(--dash-accent);
+}
+.ap-curios__ico svg {
+  width: 20px;
+  height: 20px;
+}
+.ap-curios__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.ap-curio {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.8rem 0.9rem;
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+}
+.ap-curio--accent {
+  background-color: var(--dash-accent-soft);
+  border-color: rgba(240, 163, 21, 0.25);
+}
+.ap-curio__ico {
+  display: grid;
+  place-items: start center;
+  flex-shrink: 0;
+  color: var(--dash-accent);
+}
+.ap-curio__ico svg {
+  width: 18px;
+  height: 18px;
+}
+.ap-curio__text {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--dash-text);
+}
+
+/* --------------------------------------------------------------------------
+   Contadores do rodapé
+   -------------------------------------------------------------------------- */
+.ap-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(0.75rem, 1.5vw, 1rem);
+}
+.ap-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.1rem;
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: 16px;
+  box-shadow: var(--dash-shadow-card);
+}
+.ap-stat__ico {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background-color: var(--dash-accent-soft);
+  color: var(--dash-accent);
+}
+.ap-stat__ico svg {
+  width: 24px;
+  height: 24px;
+}
+.ap-stat__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ap-stat__value {
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-size: 1.5rem;
+  color: var(--dash-text);
+  line-height: 1.1;
+}
+.ap-stat__label {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--dash-text-muted);
+  line-height: 1.25;
+}
+
+/* --------------------------------------------------------------------------
+   Responsivo
+   -------------------------------------------------------------------------- */
+@media (max-width: 1100px) {
+  .ap-mats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ap-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 880px) {
+  .ap-mascot {
+    display: none;
+  }
+  .ap-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .ap-mats {
+    grid-template-columns: 1fr;
+  }
+  .ap-stats {
+    grid-template-columns: 1fr;
+  }
+  .ap-chart__head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+}

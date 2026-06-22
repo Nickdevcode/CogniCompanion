@@ -31,6 +31,10 @@ $RECYCLE.BIN/
 
 # --- Vercel (gerado no deploy/CLI, não versionar) ---
 .vercel/
+docs/
+
+# --- Referências de design (screenshots do Figma p/ consulta local) ---
+.design-refs/
 
 # --- Logs e temporários ---
 *.log
@@ -41,6 +45,7 @@ yarn-error.log*
 tmp/
 temp/
 .impeccable/
+.design-refs/
 
 # --- Dependências (caso um dia o projeto ganhe build/ferramentas) ---
 node_modules/

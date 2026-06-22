@@ -1,0 +1,495 @@
+/* ==========================================================================
+   dashboard-conversas.css — Seção "Conversas" (o Diário)
+   Toolbar (busca + filtros), timeline por dia, balões criança/Cogni.
+   Usa tokens de dashboard.css (incl. cores por matéria). Dois temas.
+   ========================================================================== */
+
+/* Mascote no cabeçalho */
+.cv-mascot {
+  width: clamp(110px, 14vw, 170px);
+  height: auto;
+  align-self: flex-start;
+  margin-top: -0.5rem;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 12px 22px rgba(8, 12, 56, 0.18));
+}
+
+/* --------------------------------------------------------------------------
+   Toolbar: busca + filtros
+   -------------------------------------------------------------------------- */
+.cv-toolbar {
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.cv-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.cv-search__ico {
+  position: absolute;
+  left: 14px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  color: var(--dash-text-faint);
+}
+.cv-search__ico svg {
+  width: 18px;
+  height: 18px;
+}
+.cv-search__input {
+  width: 100%;
+  height: 46px;
+  padding: 0 2.75rem;
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: var(--dash-text);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.cv-search__input::placeholder {
+  color: var(--dash-text-faint);
+}
+.cv-search__input:focus {
+  outline: none;
+  border-color: var(--dash-accent);
+  box-shadow: 0 0 0 3px var(--dash-accent-soft);
+}
+/* Remove o "x" nativo do input[type=search] (usamos o nosso) */
+.cv-search__input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.cv-search__clear {
+  position: absolute;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--dash-text-muted);
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.cv-search__clear:hover {
+  background-color: var(--dash-nav-hover-bg);
+  color: var(--dash-text);
+}
+.cv-search__clear svg {
+  width: 15px;
+  height: 15px;
+}
+
+.cv-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+/* Botão de filtro (dropdown e toggle compartilham a base) */
+.cv-filter {
+  position: relative;
+}
+.cv-filter__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border-strong);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: var(--fw-medium);
+  color: var(--dash-text);
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease,
+    color 0.18s ease;
+}
+.cv-filter__btn:hover {
+  background-color: var(--dash-nav-hover-bg);
+}
+.cv-filter__btn.is-active {
+  border-color: var(--dash-accent);
+  background-color: var(--dash-accent-soft);
+  color: var(--dash-text);
+}
+.cv-filter__ico {
+  display: grid;
+  place-items: center;
+  color: var(--dash-text-muted);
+}
+.cv-filter__btn.is-active .cv-filter__ico {
+  color: var(--dash-accent);
+}
+.cv-filter__ico svg {
+  width: 15px;
+  height: 15px;
+}
+.cv-filter__chev {
+  display: grid;
+  place-items: center;
+  color: var(--dash-text-muted);
+  transition: transform 0.22s ease;
+}
+.cv-filter__chev svg {
+  width: 14px;
+  height: 14px;
+}
+.cv-filter.is-open .cv-filter__chev {
+  transform: rotate(180deg);
+}
+
+/* Menu do dropdown de matéria */
+.cv-filter__menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 60;
+  min-width: 220px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0.4rem;
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: 14px;
+  box-shadow: var(--dash-shadow-pop);
+}
+.cv-filter__opt {
+  display: block;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 9px;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--dash-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+}
+.cv-filter__opt:hover {
+  background-color: var(--dash-nav-hover-bg);
+}
+
+/* --------------------------------------------------------------------------
+   Timeline
+   -------------------------------------------------------------------------- */
+.cv-daygroup__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-size: 1.2rem;
+  color: var(--dash-text);
+  margin: 1.5rem 0 1rem;
+}
+.cv-daygroup__title:first-child {
+  margin-top: 0;
+}
+.cv-daygroup__items {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Cada entrada = trilho (bolinha + hora) + card */
+.cv-entry {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: start;
+}
+.cv-entry__rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 0.35rem;
+  align-self: stretch;
+}
+/* Linha vertical contínua entre marcadores */
+.cv-entry__rail::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: -1rem; /* alcança a próxima entrada (gap) */
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background-color: var(--dash-border);
+}
+.cv-daygroup__items .cv-entry:last-child .cv-entry__rail::before {
+  bottom: 50%; /* última entrada: a linha não continua pra baixo */
+}
+.cv-entry__dot {
+  position: relative;
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--dash-surface);
+  border: 3px solid var(--dash-accent);
+}
+.cv-entry__time {
+  margin-top: 0.4rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: var(--fw-medium);
+  color: var(--dash-text-muted);
+}
+
+.cv-entry__card {
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: 16px;
+  box-shadow: var(--dash-shadow-card);
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.cv-entry__card--sensivel {
+  border-color: rgba(192, 57, 43, 0.35);
+  box-shadow: 0 10px 30px -18px rgba(192, 57, 43, 0.4);
+}
+[data-theme="dark"] .cv-entry__card--sensivel {
+  border-color: rgba(255, 107, 107, 0.4);
+}
+
+.cv-entry__topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+/* Badge de matéria (cor via data-materia) */
+.cv-materia {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 0.95rem;
+  color: var(--mat-color, var(--dash-text));
+}
+.cv-materia__ico {
+  display: grid;
+  place-items: center;
+}
+.cv-materia__ico svg {
+  width: 18px;
+  height: 18px;
+}
+.cv-materia[data-materia="portugues"] {
+  --mat-color: var(--mat-portugues);
+}
+.cv-materia[data-materia="matematica"] {
+  --mat-color: var(--mat-matematica);
+}
+.cv-materia[data-materia="ciencias"] {
+  --mat-color: var(--mat-ciencias);
+}
+.cv-materia[data-materia="historia"] {
+  --mat-color: var(--mat-historia);
+}
+.cv-materia[data-materia="geografia"] {
+  --mat-color: var(--mat-geografia);
+}
+.cv-materia[data-materia="idiomas"] {
+  --mat-color: var(--mat-idiomas);
+}
+.cv-materia[data-materia="outros"] {
+  --mat-color: var(--mat-outros);
+}
+
+/* Flag de tópico sensível */
+.cv-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  background-color: rgba(192, 57, 43, 0.1);
+  border: 1px solid rgba(192, 57, 43, 0.25);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: var(--fw-semibold);
+  color: var(--toast-error, #c0392b);
+}
+[data-theme="dark"] .cv-flag {
+  background-color: rgba(255, 107, 107, 0.14);
+  border-color: rgba(255, 107, 107, 0.3);
+}
+.cv-flag__ico {
+  display: grid;
+  place-items: center;
+}
+.cv-flag__ico svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Balões */
+.cv-msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  max-width: 88%;
+}
+.cv-msg--crianca {
+  align-self: flex-start;
+}
+.cv-msg--cogni {
+  align-self: flex-end;
+}
+.cv-msg__avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.cv-msg__avatar svg {
+  width: 17px;
+  height: 17px;
+}
+.cv-msg__avatar--crianca {
+  background-color: var(--dash-navy);
+  color: var(--brand-gold);
+}
+[data-theme="dark"] .cv-msg__avatar--crianca {
+  background-color: #10142e;
+}
+.cv-msg__avatar--cogni {
+  background-color: var(--dash-surface-2);
+  color: var(--dash-accent);
+  border: 1px solid var(--dash-border);
+}
+.cv-msg__bubble {
+  padding: 0.6rem 0.9rem;
+  border-radius: 16px;
+  min-width: 0;
+}
+.cv-msg--crianca .cv-msg__bubble {
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-bottom-left-radius: 4px;
+}
+/* Cogni com leve destaque dourado (como o design) */
+.cv-msg--cogni .cv-msg__bubble {
+  background-color: var(--dash-accent-soft);
+  border: 1px solid rgba(240, 163, 21, 0.25);
+  border-bottom-right-radius: 4px;
+}
+.cv-msg__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin-bottom: 0.2rem;
+}
+.cv-msg__name {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.78rem;
+}
+.cv-msg--crianca .cv-msg__name {
+  color: #5d78ff;
+}
+.cv-msg--cogni .cv-msg__name {
+  color: var(--brand-gold-deep);
+}
+[data-theme="dark"] .cv-msg--cogni .cv-msg__name {
+  color: var(--brand-gold);
+}
+.cv-msg__time {
+  font-size: 0.7rem;
+  color: var(--dash-text-faint);
+}
+.cv-msg__text {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--dash-text);
+}
+
+/* --------------------------------------------------------------------------
+   Estado vazio
+   -------------------------------------------------------------------------- */
+.cv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--dash-text-muted);
+}
+.cv-empty__ico {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: var(--dash-surface-2);
+  color: var(--dash-text-faint);
+}
+.cv-empty__ico svg {
+  width: 26px;
+  height: 26px;
+}
+.cv-empty__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.2rem;
+  color: var(--dash-text);
+}
+.cv-empty__text {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  max-width: 38ch;
+}
+
+/* --------------------------------------------------------------------------
+   Responsivo
+   -------------------------------------------------------------------------- */
+@media (max-width: 880px) {
+  .cv-mascot {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Trilho mais estreito; a hora vai pra dentro do card pra poupar largura */
+  .cv-entry {
+    grid-template-columns: 28px 1fr;
+    gap: 0.5rem;
+  }
+  .cv-entry__time {
+    display: none; /* a hora do balão da Cogni já mostra o horário */
+  }
+  .cv-msg {
+    max-width: 100%;
+  }
+  .cv-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cv-filter,
+  .cv-filter__btn {
+    width: 100%;
+  }
+  .cv-filter__btn {
+    justify-content: flex-start;
+  }
+  .cv-filter__menu {
+    width: 100%;
+  }
+}

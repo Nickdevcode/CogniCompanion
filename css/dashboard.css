@@ -1,0 +1,1033 @@
+/* ==========================================================================
+   dashboard.css — Shell do painel do Cogni Companion
+   Layout (sidebar + header + conteúdo), navegação e comportamento
+   responsivo (drawer no mobile + tab bar inferior).
+
+   Reusa 100% os design tokens de tokens.css e segue os dois temas.
+   Camadas de conteúdo de cada seção ficam em dashboard-<secao>.css.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Tokens específicos do painel (derivados da identidade do projeto).
+   Centralizam as superfícies do dashboard pra manter claro/escuro coerentes.
+   -------------------------------------------------------------------------- */
+:root,
+[data-theme="light"] {
+  --dash-sidebar-w: 256px;
+  --dash-header-h: 72px;
+
+  --dash-bg: #eef0f4;             /* fundo geral do painel (cinza claro) */
+  --dash-surface: #ffffff;        /* cards e barras */
+  --dash-surface-2: #f6f7f9;      /* superfícies sutis (inputs, hovers) */
+  --dash-sidebar-bg: #ffffff;
+  --dash-header-bg: rgba(255, 255, 255, 0.85);
+
+  --dash-border: rgba(8, 12, 56, 0.1);
+  --dash-border-strong: rgba(8, 12, 56, 0.16);
+  --dash-shadow-sm: 0 1px 2px rgba(8, 12, 56, 0.06);
+  --dash-shadow-card: 0 10px 30px -18px rgba(8, 12, 56, 0.45);
+  --dash-shadow-pop: 0 18px 44px -20px rgba(8, 12, 56, 0.5);
+
+  --dash-text: #20273d;           /* texto padrão do painel */
+  --dash-text-muted: #5b637a;     /* legendas, descrições */
+  --dash-text-faint: #8b92a6;     /* placeholders, metadados */
+
+  --dash-accent: var(--brand-gold);
+  --dash-accent-soft: rgba(240, 163, 21, 0.14);
+  --dash-navy: var(--brand-navy);
+
+  /* Item de navegação ativo (na sidebar): pílula navy, texto claro */
+  --dash-nav-active-bg: var(--brand-navy);
+  --dash-nav-active-text: #ffffff;
+  --dash-nav-hover-bg: rgba(8, 12, 56, 0.05);
+
+  --dash-card-header-bg: var(--brand-navy);
+  --dash-card-header-text: #ffffff;
+
+  /* Cores por matéria (usadas em Conversas e Aprendizado). Tom forte (texto/
+     ícone) + tom suave (fundo da badge), seguindo a paleta do Figma. */
+  --mat-portugues: #e8730f;
+  --mat-portugues-soft: rgba(232, 115, 15, 0.12);
+  --mat-matematica: #2563eb;
+  --mat-matematica-soft: rgba(37, 99, 235, 0.12);
+  --mat-ciencias: #18a058;
+  --mat-ciencias-soft: rgba(24, 160, 88, 0.12);
+  --mat-historia: #8b5cf6;
+  --mat-historia-soft: rgba(139, 92, 246, 0.12);
+  --mat-geografia: #0ea5b7;
+  --mat-geografia-soft: rgba(14, 165, 183, 0.12);
+  --mat-idiomas: #d6409f;
+  --mat-idiomas-soft: rgba(214, 64, 159, 0.12);
+  --mat-outros: #64748b;
+  --mat-outros-soft: rgba(100, 116, 139, 0.12);
+
+  /* Cores por status de plano (usadas em Início e Planos) */
+  --st-ativo: #18a058;
+  --st-ativo-soft: rgba(24, 160, 88, 0.12);
+  --st-andamento: #2563eb;
+  --st-andamento-soft: rgba(37, 99, 235, 0.12);
+  --st-pausado: #e8730f;
+  --st-pausado-soft: rgba(232, 115, 15, 0.12);
+  --st-concluido: #64748b;
+  --st-concluido-soft: rgba(100, 116, 139, 0.12);
+}
+
+[data-theme="dark"] {
+  --dash-bg: #161618;
+  --dash-surface: #242426;
+  --dash-surface-2: #1e1e20;
+  --dash-sidebar-bg: #1d1d1f;
+  --dash-header-bg: rgba(24, 24, 26, 0.82);
+
+  --dash-border: rgba(255, 255, 255, 0.1);
+  --dash-border-strong: rgba(255, 255, 255, 0.16);
+  --dash-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --dash-shadow-card: 0 12px 32px -18px rgba(0, 0, 0, 0.7);
+  --dash-shadow-pop: 0 20px 48px -20px rgba(0, 0, 0, 0.75);
+
+  --dash-text: #f1f1f1;
+  --dash-text-muted: #b6bccb;
+  --dash-text-faint: #8990a1;
+
+  --dash-accent: var(--brand-gold);
+  --dash-accent-soft: rgba(240, 163, 21, 0.18);
+  --dash-navy: #10142e;
+
+  /* No dark, o item ativo fica dourado pra destacar sobre superfície escura */
+  --dash-nav-active-bg: var(--brand-gold);
+  --dash-nav-active-text: #080c38;
+  --dash-nav-hover-bg: rgba(255, 255, 255, 0.06);
+
+  --dash-card-header-bg: #10142e;
+  --dash-card-header-text: #ffffff;
+
+  /* Matérias no dark: cores um pouco mais claras + fundos mais presentes
+     pra contrastar com a superfície escura. */
+  --mat-portugues: #f59e4b;
+  --mat-portugues-soft: rgba(245, 158, 75, 0.18);
+  --mat-matematica: #6ea0ff;
+  --mat-matematica-soft: rgba(110, 160, 255, 0.18);
+  --mat-ciencias: #4ed699;
+  --mat-ciencias-soft: rgba(78, 214, 153, 0.18);
+  --mat-historia: #b794ff;
+  --mat-historia-soft: rgba(183, 148, 255, 0.18);
+  --mat-geografia: #4ad6e6;
+  --mat-geografia-soft: rgba(74, 214, 230, 0.18);
+  --mat-idiomas: #f06fc4;
+  --mat-idiomas-soft: rgba(240, 111, 196, 0.18);
+  --mat-outros: #94a3b8;
+  --mat-outros-soft: rgba(148, 163, 184, 0.18);
+
+  /* Status no dark: cores mais claras + fundos mais presentes */
+  --st-ativo: #4ed699;
+  --st-ativo-soft: rgba(78, 214, 153, 0.18);
+  --st-andamento: #6ea0ff;
+  --st-andamento-soft: rgba(110, 160, 255, 0.18);
+  --st-pausado: #f59e4b;
+  --st-pausado-soft: rgba(245, 158, 75, 0.18);
+  --st-concluido: #94a3b8;
+  --st-concluido-soft: rgba(148, 163, 184, 0.18);
+}
+
+/* --------------------------------------------------------------------------
+   Base da página do painel (sobrescreve o fundo do site nesta tela)
+   -------------------------------------------------------------------------- */
+.dash-body {
+  background-color: var(--dash-bg);
+  background-image: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--dash-text);
+}
+
+/* Link de pular pro conteúdo: some até receber foco por teclado */
+.dash-skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 300;
+  padding: 0.6rem 1rem;
+  background-color: var(--dash-navy);
+  color: #fff;
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.95rem;
+  transform: translateY(-150%);
+  transition: transform 0.2s ease;
+}
+.dash-skip-link:focus {
+  transform: translateY(0);
+}
+
+/* --------------------------------------------------------------------------
+   Grid do shell: sidebar fixa à esquerda + coluna principal
+   -------------------------------------------------------------------------- */
+.dash-shell {
+  display: grid;
+  grid-template-columns: var(--dash-sidebar-w) 1fr;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* ==========================================================================
+   SIDEBAR
+   ========================================================================== */
+.dash-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem 1rem;
+  background-color: var(--dash-sidebar-bg);
+  border-right: 1px solid var(--dash-border);
+  transition: var(--theme-transition);
+  z-index: 120;
+}
+
+/* --- Marca: Cogni Companion (topo da sidebar) --- */
+.dash-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 14px;
+  color: var(--dash-text);
+  transition: background-color 0.2s ease;
+}
+.dash-brand:hover {
+  background-color: var(--dash-nav-hover-bg);
+}
+.dash-brand__mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background-color: var(--dash-navy);
+  color: var(--brand-gold);
+}
+[data-theme="dark"] .dash-brand__mark {
+  background-color: #10142e;
+}
+.dash-brand__mark svg {
+  width: 24px;
+  height: 24px;
+}
+.dash-brand__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+.dash-brand__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-size: 1.4rem;
+  letter-spacing: 0.01em;
+  color: var(--dash-navy);
+}
+[data-theme="dark"] .dash-brand__title {
+  color: var(--brand-gold);
+}
+.dash-brand__subtitle {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.78rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--dash-accent);
+  margin-top: 3px;
+}
+
+/* --- Card do perfil da criança pareada --- */
+.dash-child {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1.1rem 1rem 1.25rem;
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: 18px;
+  box-shadow: var(--dash-shadow-sm);
+  text-align: center;
+}
+.dash-child__avatar {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: var(--dash-navy);
+  color: var(--brand-gold);
+  box-shadow: 0 0 0 3px var(--dash-accent-soft);
+}
+[data-theme="dark"] .dash-child__avatar {
+  background-color: #10142e;
+}
+.dash-child__avatar svg {
+  width: 34px;
+  height: 34px;
+}
+.dash-child__name {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.05rem;
+  color: var(--dash-text);
+  line-height: 1.2;
+}
+.dash-child__meta {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--dash-text-muted);
+}
+.dash-child__meta:empty {
+  display: none;
+}
+
+/* --- Navegação principal --- */
+.dash-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+.dash-nav__link {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: 1rem;
+  color: var(--dash-text-muted);
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.dash-nav__link:hover {
+  background-color: var(--dash-nav-hover-bg);
+  color: var(--dash-text);
+}
+.dash-nav__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: currentColor;
+}
+.dash-nav__icon svg {
+  width: 21px;
+  height: 21px;
+  display: block;
+}
+.dash-nav__link.is-active {
+  background-color: var(--dash-nav-active-bg);
+  color: var(--dash-nav-active-text);
+  font-weight: var(--fw-semibold);
+  box-shadow: var(--dash-shadow-sm);
+}
+
+/* Slot da conta no rodapé da sidebar: empurra pro fim e só aparece no mobile
+   (no desktop a badge fica no header). */
+.dash-sidebar__account {
+  margin-top: auto;
+}
+.dash-sidebar__account:empty {
+  display: none;
+}
+@media (min-width: 901px) {
+  /* No desktop, a conta vive no header — esconde o slot da sidebar. */
+  .dash-sidebar__account {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   COLUNA PRINCIPAL (header + conteúdo + tab bar)
+   ========================================================================== */
+.dash-main-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* impede que conteúdo largo estoure o grid */
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* --- Header do painel --- */
+.dash-header {
+  position: sticky;
+  top: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: var(--dash-header-h);
+  padding: 0.75rem clamp(1.25rem, 3vw, 2.5rem);
+  background-color: var(--dash-header-bg);
+  border-bottom: 1px solid var(--dash-border);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  transition: var(--theme-transition);
+}
+.dash-header__left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+.dash-header__right {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.6rem, 1.5vw, 1rem);
+}
+
+/* Marca compacta do header — só aparece no mobile (sidebar oculta) */
+.dash-header__brand {
+  display: none;
+  flex-direction: column;
+  line-height: 1;
+}
+.dash-header__brand-title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-size: 1.2rem;
+  color: var(--dash-navy);
+}
+[data-theme="dark"] .dash-header__brand-title {
+  color: var(--brand-gold);
+}
+.dash-header__brand-sub {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--dash-accent);
+  margin-top: 2px;
+}
+
+/* Sino de notificações */
+.dash-bell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  color: var(--dash-text-muted);
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.dash-bell:hover {
+  background-color: var(--dash-nav-hover-bg);
+  color: var(--dash-text);
+}
+.dash-bell svg {
+  width: 22px;
+  height: 22px;
+}
+.dash-bell__dot {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background-color: var(--dash-accent);
+  border: 2px solid var(--dash-header-bg);
+}
+
+/* A badge da conta (injetada pelo session.js) já vem estilizada por
+   auth-ui.css. No header do painel ela não tem o bloco .auth pra esconder;
+   o session.js simplesmente faz o append do .user-badge--desktop aqui.
+   Diferente do site, NÃO há menu hambúrguer com badge mobile no painel, então
+   a variante "desktop" da badge deve aparecer em QUALQUER tamanho de tela
+   (auth-ui.css a esconde abaixo de 980px — revertemos isso só aqui). */
+.dash-header__right .user-badge--desktop {
+  display: inline-block;
+}
+
+/* --- Toggle de tema (claro/escuro) ---
+   Portado de header.css porque o painel não carrega aquele arquivo. Mantém o
+   mesmo visual e comportamento do switch deslizante do site. */
+.dash-header .theme-toggle {
+  --track-w: 96px;
+  --track-h: 36px;
+  position: relative;
+  width: var(--track-w);
+  height: var(--track-h);
+  border-radius: var(--radius-header);
+  background-color: var(--toggle-track);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: var(--theme-transition);
+}
+.dash-header .theme-toggle__label {
+  position: absolute;
+  font-family: var(--font-body);
+  font-weight: var(--fw-medium);
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--toggle-label);
+  pointer-events: none;
+  transition: var(--theme-transition);
+}
+.dash-header .theme-toggle__knob {
+  position: absolute;
+  top: 50%;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: var(--toggle-knob);
+  box-shadow: 0 0 0 3px var(--toggle-knob-ring) inset, 0 2px 4px rgba(0, 0, 0, 0.3);
+  transform: translateY(-50%);
+  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.45s ease, box-shadow 0.45s ease;
+  display: grid;
+  place-items: center;
+  color: var(--toggle-knob-ring);
+}
+.dash-header .theme-toggle__knob svg {
+  width: 16px;
+  height: 16px;
+}
+.dash-header .theme-toggle__label .label-off {
+  display: none;
+}
+[data-theme="dark"] .dash-header .theme-toggle__label .label-on {
+  display: none;
+}
+[data-theme="dark"] .dash-header .theme-toggle__label .label-off {
+  display: inline;
+}
+[data-theme="light"] .dash-header .theme-toggle__label {
+  right: 12px;
+}
+[data-theme="light"] .dash-header .theme-toggle__knob {
+  left: 4px;
+}
+[data-theme="light"] .dash-header .theme-toggle__icon--moon {
+  display: none;
+}
+[data-theme="dark"] .dash-header .theme-toggle__label {
+  left: 14px;
+}
+[data-theme="dark"] .dash-header .theme-toggle__knob {
+  left: calc(var(--track-w) - 30px - 4px);
+}
+[data-theme="dark"] .dash-header .theme-toggle__icon--sun {
+  display: none;
+}
+
+/* --- Hambúrguer (mobile) --- */
+.dash-menu-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  border-radius: 10px;
+}
+.dash-menu-toggle span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background-color: var(--dash-text);
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+.dash-shell.is-sidebar-open .dash-menu-toggle span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.dash-shell.is-sidebar-open .dash-menu-toggle span:nth-child(2) {
+  opacity: 0;
+}
+.dash-shell.is-sidebar-open .dash-menu-toggle span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* --- Conteúdo da seção --- */
+.dash-main {
+  flex: 1;
+  padding: clamp(1.5rem, 3vw, 2.5rem) clamp(1.25rem, 3vw, 2.5rem) clamp(2.5rem, 5vw, 4rem);
+  outline: none;
+}
+
+/* Animação de entrada de cada seção (respeitando reduced-motion via base.css) */
+.dash-section {
+  animation: dash-fade-in 0.32s ease both;
+}
+@keyframes dash-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Skeleton de carregamento inicial */
+.dash-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 50vh;
+  color: var(--dash-text-muted);
+  font-family: var(--font-body);
+}
+.dash-loading__spinner {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid var(--dash-border-strong);
+  border-top-color: var(--dash-accent);
+  animation: dash-spin 0.8s linear infinite;
+}
+@keyframes dash-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Estado de erro genérico (ex.: seção não encontrada) */
+.dash-error {
+  max-width: 460px;
+  margin: 12vh auto;
+  text-align: center;
+  color: var(--dash-text-muted);
+}
+.dash-error h2 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.5rem;
+  color: var(--dash-text);
+  margin-bottom: 0.5rem;
+}
+
+/* ==========================================================================
+   TAB BAR INFERIOR (mobile) — escondida no desktop
+   ========================================================================== */
+.dash-tabbar {
+  display: none;
+}
+
+/* ==========================================================================
+   BACKDROP do drawer (mobile)
+   ========================================================================== */
+.dash-backdrop {
+  display: none;
+}
+
+/* ==========================================================================
+   PEÇAS COMPARTILHADAS entre seções (card base, cabeçalho de página, chips)
+   Ficam aqui pra evitar duplicação entre os CSS de cada seção.
+   ========================================================================== */
+
+/* Cabeçalho de uma seção: título display + subtítulo + (opcional) ação */
+.dash-pagehead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: clamp(1.5rem, 3vw, 2rem);
+}
+.dash-pagehead__title {
+  position: relative;
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-size: clamp(1.6rem, 3.5vw, 2.1rem);
+  color: var(--dash-text);
+  line-height: 1.1;
+}
+/* Traço dourado sob o título (como nas telas do Figma) */
+.dash-pagehead__title--underline::after {
+  content: "";
+  display: block;
+  width: 72%;
+  max-width: 280px;
+  height: 4px;
+  margin-top: 0.5rem;
+  border-radius: 4px;
+  background-color: var(--dash-accent);
+}
+.dash-pagehead__subtitle {
+  margin-top: 0.6rem;
+  font-family: var(--font-body);
+  font-size: clamp(0.95rem, 2vw, 1.05rem);
+  color: var(--dash-text-muted);
+  max-width: 60ch;
+}
+
+/* Card genérico do painel */
+.dash-card {
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: 18px;
+  box-shadow: var(--dash-shadow-card);
+  transition: var(--theme-transition);
+}
+
+/* Cabeçalho navy de card (estilo das telas Início/Figma) */
+.dash-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 1rem 1.25rem;
+  background-color: var(--dash-card-header-bg);
+  color: var(--dash-card-header-text);
+  border-radius: 18px 18px 0 0;
+  /* Traço dourado na divisa com o corpo via inset shadow: fica reto na base
+     sem brigar com os cantos arredondados do topo (border-bottom clasharia). */
+  box-shadow: inset 0 -3px 0 0 var(--dash-accent);
+}
+.dash-card__head svg {
+  width: 20px;
+  height: 20px;
+  color: var(--dash-accent);
+}
+.dash-card__head-title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.1rem;
+}
+
+/* Chip / pílula informativa reutilizável */
+.dash-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: var(--fw-medium);
+  color: var(--dash-text);
+  white-space: nowrap;
+}
+.dash-chip svg {
+  width: 15px;
+  height: 15px;
+  color: var(--dash-accent);
+}
+
+/* Botão primário do painel (navy → dourado no dark, seguindo o site) */
+.dash-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.4rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.18s ease, filter 0.18s ease, var(--theme-transition);
+}
+.dash-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+}
+.dash-btn:active {
+  transform: translateY(0);
+}
+.dash-btn--primary {
+  background-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+}
+.dash-btn--ghost {
+  background-color: transparent;
+  border: 1px solid var(--dash-border-strong);
+  color: var(--dash-text);
+}
+.dash-btn--ghost:hover {
+  background-color: var(--dash-nav-hover-bg);
+}
+.dash-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Placeholder "em construção" (usado pelas seções até receberem conteúdo) */
+.dash-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center;
+  min-height: 42vh;
+  padding: 2rem;
+  background-color: var(--dash-surface);
+  border: 1px dashed var(--dash-border-strong);
+  border-radius: 20px;
+  color: var(--dash-text-muted);
+}
+.dash-placeholder__icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: var(--dash-accent-soft);
+  color: var(--dash-accent);
+}
+.dash-placeholder__icon svg {
+  width: 32px;
+  height: 32px;
+}
+.dash-placeholder__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.4rem;
+  color: var(--dash-text);
+}
+.dash-placeholder__text {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  max-width: 42ch;
+}
+
+/* ==========================================================================
+   MODAL / DIÁLOGO (compartilhado — usado por Planos e Configurações)
+   ========================================================================== */
+.dash-modal__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1rem, 4vw, 2rem);
+  background-color: rgba(8, 12, 56, 0.5);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+  overflow-y: auto;
+}
+[data-theme="dark"] .dash-modal__overlay {
+  background-color: rgba(0, 0, 0, 0.62);
+}
+.dash-modal__overlay.is-open {
+  opacity: 1;
+}
+.dash-modal {
+  width: 100%;
+  max-width: 540px;
+  margin: auto;
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: 20px;
+  box-shadow: var(--dash-shadow-pop);
+  transform: translateY(14px) scale(0.98);
+  opacity: 0;
+  transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.24s ease;
+}
+.dash-modal__overlay.is-open .dash-modal {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+.dash-modal--sm {
+  max-width: 420px;
+}
+.dash-modal--md {
+  max-width: 560px;
+}
+.dash-modal--lg {
+  max-width: 720px;
+}
+.dash-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--dash-border);
+}
+.dash-modal__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.3rem;
+  color: var(--dash-text);
+}
+.dash-modal__close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  color: var(--dash-text-muted);
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.dash-modal__close:hover {
+  background-color: var(--dash-nav-hover-bg);
+  color: var(--dash-text);
+}
+.dash-modal__close svg {
+  width: 18px;
+  height: 18px;
+}
+.dash-modal__body {
+  padding: 1.5rem;
+}
+
+/* ==========================================================================
+   RESPONSIVO
+   ========================================================================== */
+
+/* --- Tablet/desktop estreito: sidebar um pouco menor --- */
+@media (max-width: 1100px) {
+  :root,
+  [data-theme="light"],
+  [data-theme="dark"] {
+    --dash-sidebar-w: 224px;
+  }
+}
+
+/* --- Mobile: sidebar vira drawer; surge header com marca + tab bar --- */
+@media (max-width: 900px) {
+  .dash-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: min(86vw, 320px);
+    height: 100vh;
+    height: 100dvh;
+    transform: translateX(-105%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--dash-shadow-pop);
+    overflow-y: auto;
+  }
+  .dash-shell.is-sidebar-open .dash-sidebar {
+    transform: translateX(0);
+  }
+
+  .dash-menu-toggle {
+    display: flex;
+  }
+  .dash-header__brand {
+    display: flex;
+  }
+
+  /* No mobile, a conta (badge + dropdown) migra do header pro rodapé da
+     sidebar — o header fica só com toggle + sino, mais respirável. */
+  .dash-header__right .user-badge--desktop {
+    display: none !important;
+  }
+  /* Sino + toggle alinhados à direita do header, com respiro da borda. */
+  .dash-header__right {
+    margin-left: auto;
+    gap: 0.5rem;
+  }
+
+  /* Slot da conta no rodapé da sidebar (mobile): separador no topo e respiro. */
+  .dash-sidebar__account {
+    padding-top: 0.85rem;
+    margin-top: auto;
+    border-top: 1px solid var(--dash-border);
+  }
+  /* A badge mobile já é full-width (auth-ui.css); o trigger usa as cores do
+     painel pra combinar com a sidebar. */
+  .dash-sidebar__account .user-badge--mobile {
+    margin-top: 0;
+    border-top: none;
+    padding-top: 0;
+  }
+
+  /* Backdrop ativo */
+  .dash-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 115;
+    background-color: rgba(8, 12, 56, 0.45);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+  .dash-shell.is-sidebar-open .dash-backdrop {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  /* Espaço pra tab bar não cobrir o conteúdo */
+  .dash-main {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px) + 1.5rem);
+  }
+
+  /* Tab bar inferior */
+  .dash-tabbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 113;
+    display: flex;
+    justify-content: space-around;
+    align-items: stretch;
+    gap: 0.15rem;
+    padding: 0.4rem 0.4rem calc(0.4rem + env(safe-area-inset-bottom, 0px));
+    background-color: var(--dash-header-bg);
+    border-top: 1px solid var(--dash-border);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+  }
+  .dash-tabbar__link {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 0.4rem 0.2rem;
+    border-radius: 12px;
+    color: var(--dash-text-faint);
+    transition: color 0.18s ease, background-color 0.18s ease;
+  }
+  .dash-tabbar__icon svg {
+    width: 22px;
+    height: 22px;
+    display: block;
+  }
+  .dash-tabbar__label {
+    font-family: var(--font-body);
+    font-size: 0.68rem;
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.01em;
+  }
+  .dash-tabbar__link.is-active {
+    color: var(--dash-accent);
+  }
+  .dash-tabbar__link.is-active .dash-tabbar__icon {
+    transform: translateY(-1px);
+  }
+}
+
+@media (max-width: 560px) {
+  .dash-header .theme-toggle {
+    --track-w: 84px;
+  }
+}
+
+@media (max-width: 420px) {
+  .dash-tabbar__label {
+    font-size: 0.62rem;
+  }
+}

@@ -1,0 +1,414 @@
+/* ==========================================================================
+   dashboard-home.css — Seção "Início"
+   Bento: última conversa, próximo plano, resumo da semana, dica do Cogni.
+   Usa os tokens e componentes de dashboard.css. Dois temas.
+   ========================================================================== */
+
+/* Mascote ao lado do cabeçalho (decorativo) */
+.ini-mascot {
+  width: clamp(120px, 16vw, 190px);
+  height: auto;
+  align-self: flex-start;
+  margin-top: -0.5rem;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 12px 22px rgba(8, 12, 56, 0.18));
+}
+
+/* --------------------------------------------------------------------------
+   Bento grid
+   Coluna esquerda: Última conversa + Resumo da semana.
+   Coluna direita:  Próximo plano + Dica do Cogni.
+   -------------------------------------------------------------------------- */
+.ini-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "conversa plano"
+    "resumo   dica";
+  gap: clamp(1rem, 2vw, 1.5rem);
+  align-items: start;
+}
+.ini-card--conversa {
+  grid-area: conversa;
+}
+.ini-card--plano {
+  grid-area: plano;
+}
+.ini-card--resumo {
+  grid-area: resumo;
+}
+.ini-card--dica {
+  grid-area: dica;
+}
+
+/* Card base do Início: cabeçalho navy já vem de .dash-card__head */
+.ini-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dash-card__head-ico {
+  display: grid;
+  place-items: center;
+}
+.dash-card__head-ico svg {
+  width: 20px;
+  height: 20px;
+  color: var(--dash-accent);
+}
+.ini-card__body {
+  padding: 1.25rem;
+  flex: 1;
+}
+
+/* Rodapé com link "ver mais" */
+.ini-card__foot {
+  padding: 0.5rem 1.25rem 1rem;
+  border-top: 1px solid var(--dash-border);
+  margin-top: auto;
+}
+.ini-cardlink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.95rem;
+  color: var(--dash-navy);
+  cursor: pointer;
+  transition: color 0.18s ease, gap 0.18s ease;
+}
+[data-theme="dark"] .ini-cardlink {
+  color: var(--brand-gold);
+}
+.ini-cardlink:hover {
+  gap: 0.75rem;
+}
+.ini-cardlink__chev {
+  display: grid;
+  place-items: center;
+}
+.ini-cardlink__chev svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ini-empty {
+  font-family: var(--font-body);
+  color: var(--dash-text-muted);
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+/* --------------------------------------------------------------------------
+   Balões de conversa (card "Última conversa")
+   -------------------------------------------------------------------------- */
+.ini-conversa__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.ini-msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  max-width: 92%;
+}
+.ini-msg--crianca {
+  align-self: flex-start;
+}
+.ini-msg--cogni {
+  align-self: flex-end;
+  flex-direction: row; /* bolha + avatar (a ordem dos nós já põe a bolha antes) */
+}
+.ini-msg__avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.ini-msg__avatar svg {
+  width: 18px;
+  height: 18px;
+}
+.ini-msg__avatar--crianca {
+  background-color: var(--dash-navy);
+  color: var(--brand-gold);
+}
+[data-theme="dark"] .ini-msg__avatar--crianca {
+  background-color: #10142e;
+}
+.ini-msg__avatar--cogni {
+  background-color: var(--dash-surface-2);
+  color: var(--dash-accent);
+  border: 1px solid var(--dash-border);
+}
+.ini-msg__bubble {
+  padding: 0.6rem 0.85rem;
+  border-radius: 16px;
+  min-width: 0;
+}
+.ini-msg--crianca .ini-msg__bubble {
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-bottom-left-radius: 4px;
+}
+.ini-msg--cogni .ini-msg__bubble {
+  background-color: var(--dash-navy);
+  border-bottom-right-radius: 4px;
+}
+[data-theme="dark"] .ini-msg--cogni .ini-msg__bubble {
+  background-color: #10142e;
+}
+.ini-msg__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin-bottom: 0.2rem;
+}
+.ini-msg__name {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.78rem;
+}
+.ini-msg--crianca .ini-msg__name {
+  color: #5d78ff;
+}
+.ini-msg--cogni .ini-msg__name {
+  color: var(--brand-gold);
+}
+.ini-msg__time {
+  font-size: 0.7rem;
+  color: var(--dash-text-faint);
+}
+.ini-msg--cogni .ini-msg__time {
+  color: rgba(255, 255, 255, 0.6);
+}
+.ini-msg__text {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--dash-text);
+}
+.ini-msg--cogni .ini-msg__text {
+  color: #fff;
+}
+
+/* --------------------------------------------------------------------------
+   Card "Próximo plano de estudo"
+   -------------------------------------------------------------------------- */
+.ini-plano__body {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+.ini-plano__disc {
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  flex-shrink: 0;
+  border-radius: 24px;
+  background-color: var(--dash-navy);
+  color: var(--brand-gold);
+  box-shadow: 0 10px 24px -12px rgba(8, 12, 56, 0.6);
+}
+[data-theme="dark"] .ini-plano__disc {
+  background-color: #10142e;
+}
+.ini-plano__disc svg {
+  width: 52px;
+  height: 52px;
+}
+.ini-plano__info {
+  min-width: 0;
+}
+.ini-plano__when {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.8rem;
+  color: var(--dash-accent);
+  margin-bottom: 0.25rem;
+}
+.ini-plano__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.4rem;
+  color: var(--dash-text);
+  line-height: 1.15;
+  margin-bottom: 0.35rem;
+}
+.ini-plano__desc {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--dash-text-muted);
+  line-height: 1.45;
+  margin-bottom: 0.75rem;
+}
+.ini-plano__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.ini-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-radius: 9px;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: var(--fw-medium);
+  color: var(--dash-text);
+}
+.ini-pill__ico {
+  display: grid;
+  place-items: center;
+}
+.ini-pill__ico svg {
+  width: 13px;
+  height: 13px;
+  color: var(--dash-text-muted);
+}
+/* Chip de status com bolinha colorida (usa os tokens de status do dashboard) */
+.ini-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--st-color, var(--dash-text-muted));
+}
+.ini-pill--status[data-status="ativo"] {
+  --st-color: var(--st-ativo);
+}
+.ini-pill--status[data-status="em_andamento"] {
+  --st-color: var(--st-andamento);
+}
+.ini-pill--status[data-status="pausado"] {
+  --st-color: var(--st-pausado);
+}
+.ini-pill--status[data-status="concluido"] {
+  --st-color: var(--st-concluido);
+}
+.ini-plano__foot {
+  padding: 0 1.25rem 1.25rem;
+  margin-top: auto;
+}
+.ini-plano__cta {
+  width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   Card "Resumo da semana"
+   -------------------------------------------------------------------------- */
+.ini-resumo__lead {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--dash-text-muted);
+  line-height: 1.45;
+  margin-bottom: 1rem;
+}
+.ini-counters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+.ini-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 1rem 0.5rem;
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-radius: 14px;
+  text-align: center;
+}
+.ini-counter__ico {
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.15rem;
+}
+.ini-counter__ico svg {
+  width: 20px;
+  height: 20px;
+  color: var(--dash-accent);
+}
+.ini-counter__value {
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-size: 1.6rem;
+  color: var(--dash-text);
+  line-height: 1;
+}
+.ini-counter__label {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: var(--fw-medium);
+  color: var(--dash-text-muted);
+  letter-spacing: 0.02em;
+}
+
+/* --------------------------------------------------------------------------
+   Card "Dica do Cogni"
+   -------------------------------------------------------------------------- */
+.ini-dica__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.ini-dica__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.1rem;
+  color: #5d78ff;
+}
+[data-theme="dark"] .ini-dica__title {
+  color: #8aa0ff;
+}
+.ini-dica__text {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--dash-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Responsivo
+   -------------------------------------------------------------------------- */
+@media (max-width: 880px) {
+  .ini-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "conversa"
+      "plano"
+      "resumo"
+      "dica";
+  }
+  .ini-mascot {
+    display: none; /* libera espaço no mobile; cabeçalho fica limpo */
+  }
+}
+
+@media (max-width: 420px) {
+  .ini-plano__body {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .ini-counters {
+    gap: 0.5rem;
+  }
+  .ini-counter {
+    padding: 0.85rem 0.3rem;
+  }
+  .ini-counter__value {
+    font-size: 1.35rem;
+  }
+}
