@@ -1,0 +1,443 @@
+/* ==========================================================================
+   Editor de Rosto — a tela da CRIANÇA
+   --------------------------------------------------------------------------
+   O resto do Companion é um painel pra adulto: denso, sóbrio, informativo. Esta
+   seção é o oposto de propósito — é a única tela que a criança usa, e a pesquisa
+   que a motiva depende dela parecer brincadeira, não configuração. Daí controles
+   grandes, formas redondas e alvos de toque generosos.
+
+   Todo o desvio de estilo é ESCOPADO em .dash-rosto: os tokens abaixo só existem
+   dentro dela e não vazam pro painel adulto. As cores continuam saindo dos tokens
+   do projeto (--brand-gold, --dash-*), então tema claro/escuro segue funcionando
+   sem uma paleta paralela.
+   ========================================================================== */
+
+.dash-rosto {
+  --rosto-raio: 22px;
+  --rosto-raio-sm: 14px;
+  --rosto-gap: 20px;
+  /* 44px é o alvo de toque confortável recomendado; num controle feito pra dedo
+     pequeno e impreciso, esticamos além disso. */
+  --rosto-alvo: 52px;
+  --rosto-trilho: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   Palco: a tela do robô
+   -------------------------------------------------------------------------- */
+
+.dash-rosto__palco {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+/* Moldura que sugere o corpo do robô em volta da tela OLED. */
+.dash-rosto__moldura {
+  width: min(100%, 460px);
+  padding: 18px;
+  border-radius: var(--rosto-raio);
+  background: linear-gradient(160deg, #2b3350, var(--brand-navy));
+  box-shadow: var(--dash-shadow-pop), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.dash-rosto__tela {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  /* O brilho esverdeado imita a OLED monocromática do robô sem colorir os olhos:
+     o glow fica FORA do SVG (que é preto e branco puros, como a tela real). */
+  box-shadow: 0 0 22px rgba(120, 200, 255, 0.18);
+}
+
+/* --------------------------------------------------------------------------
+   Status do robô — três estados, nenhum deles de erro
+   -------------------------------------------------------------------------- */
+
+.dash-rosto__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  padding: 9px 18px;
+  border-radius: var(--radius-pill);
+  font-size: 0.95rem;
+  font-weight: var(--fw-semibold);
+  line-height: 1.3;
+  text-align: center;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.dash-rosto__status-ico {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+.dash-rosto__status-ico svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Aplicado no robô agora: o único estado "verde".
+   O verde é escuro porque sobre o próprio fundo esverdeado um tom médio fica em
+   4.1:1 — abaixo do mínimo AA (4.5:1) pra este tamanho de texto. */
+.dash-rosto__status[data-estado="aplicado"] {
+  background: rgba(34, 160, 96, 0.15);
+  color: #0f5c37;
+}
+[data-theme="dark"] .dash-rosto__status[data-estado="aplicado"] {
+  color: #57d497;
+}
+
+/* Salvo mas o robô não viu (desligado, outro perfil, servidor fora do ar).
+   Deliberadamente âmbar e não vermelho: não houve falha nenhuma.
+
+   O texto é mais escuro que --brand-gold-deep de propósito: o dourado da marca
+   sobre este fundo âmbar dá só 2.7:1, e este chip carrega a informação mais
+   importante da tela ("a Cogni ainda não viu"). Precisa ser legível de verdade. */
+.dash-rosto__status[data-estado="salvo"] {
+  background: var(--dash-accent-soft);
+  color: #9a4a02;
+}
+[data-theme="dark"] .dash-rosto__status[data-estado="salvo"] {
+  color: var(--brand-gold);
+}
+
+.dash-rosto__status[data-estado="salvando"] {
+  background: var(--dash-surface-2);
+  color: var(--dash-text-muted);
+}
+.dash-rosto__status[data-estado="salvando"] .dash-rosto__status-ico {
+  animation: rosto-girar 0.9s linear infinite;
+}
+
+@keyframes rosto-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Blocos
+   -------------------------------------------------------------------------- */
+
+.dash-rosto__bloco {
+  margin-bottom: 28px;
+}
+
+.dash-rosto__titulo {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: var(--fw-semibold);
+  color: var(--dash-text);
+}
+
+/* --------------------------------------------------------------------------
+   Presets — a porta de entrada da tela
+   -------------------------------------------------------------------------- */
+
+.dash-rosto__presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: var(--rosto-gap);
+}
+
+.dash-rosto__preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 10px;
+  border: 2px solid var(--dash-border);
+  border-radius: var(--rosto-raio);
+  background: var(--dash-surface);
+  color: var(--dash-text);
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.dash-rosto__preset:hover {
+  transform: translateY(-3px);
+  border-color: var(--dash-accent);
+  box-shadow: var(--dash-shadow-card);
+}
+
+.dash-rosto__preset:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.dash-rosto__preset.is-ativo {
+  border-color: var(--dash-accent);
+  background: var(--dash-accent-soft);
+  box-shadow: var(--dash-shadow-card);
+}
+
+/* Mini-preview: a criança escolhe pela CARA, não pela palavra — é o que permite
+   usar a tela antes de saber ler bem. */
+.dash-rosto__mini {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+  background: #000;
+}
+
+.dash-rosto__preset-nome {
+  font-size: 1rem;
+  font-weight: var(--fw-semibold);
+}
+
+/* --------------------------------------------------------------------------
+   Sliders — o ajuste fino
+   -------------------------------------------------------------------------- */
+
+.dash-rosto__controles {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid var(--dash-border);
+  border-radius: var(--rosto-raio);
+  background: var(--dash-surface);
+  box-shadow: var(--dash-shadow-sm);
+}
+
+.dash-rosto__rotulo {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1.1rem;
+  font-weight: var(--fw-semibold);
+  color: var(--dash-text);
+}
+
+.dash-rosto__pista {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Rótulos das pontas: dão sentido ao arrastar sem mostrar um número sequer.
+   Usam --dash-text-muted e não --dash-text-faint: o faint só alcança 3.1:1 neste
+   tamanho (13.6px), abaixo dos 4.5:1 que o WCAG AA exige pra texto normal. */
+.dash-rosto__ponta {
+  flex: none;
+  min-width: 72px;
+  font-size: 0.85rem;
+  color: var(--dash-text-muted);
+}
+.dash-rosto__ponta:last-child {
+  text-align: right;
+}
+
+.dash-rosto__slider {
+  flex: 1;
+  height: var(--rosto-alvo);
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.dash-rosto__slider:focus-visible {
+  outline: 3px solid var(--dash-accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-pill);
+}
+
+/* WebKit e Firefox exigem os seletores duplicados: um navegador ignora a regra
+   do outro, e uma lista combinada seria descartada inteira. */
+.dash-rosto__slider::-webkit-slider-runnable-track {
+  height: var(--rosto-trilho);
+  border-radius: var(--radius-pill);
+  background: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+}
+.dash-rosto__slider::-moz-range-track {
+  height: var(--rosto-trilho);
+  border-radius: var(--radius-pill);
+  background: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+}
+
+.dash-rosto__slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 40px;
+  height: 40px;
+  /* Centraliza o polegar no trilho: metade da diferença entre os dois. */
+  margin-top: calc((var(--rosto-trilho) - 40px) / 2);
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--dash-accent);
+  box-shadow: var(--dash-shadow-card);
+  transition: transform 0.12s ease;
+}
+.dash-rosto__slider::-moz-range-thumb {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--dash-accent);
+  box-shadow: var(--dash-shadow-card);
+  transition: transform 0.12s ease;
+}
+
+.dash-rosto__slider:active::-webkit-slider-thumb {
+  transform: scale(1.14);
+}
+.dash-rosto__slider:active::-moz-range-thumb {
+  transform: scale(1.14);
+}
+
+/* --------------------------------------------------------------------------
+   Voltar ao original
+   -------------------------------------------------------------------------- */
+
+.dash-rosto__rodape {
+  display: flex;
+  justify-content: center;
+}
+
+.dash-rosto__reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px 26px;
+  border: 2px solid var(--dash-border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--dash-text-muted);
+  font-size: 1rem;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.dash-rosto__reset:hover {
+  border-color: var(--dash-accent);
+  background: var(--dash-accent-soft);
+  color: var(--dash-text);
+}
+
+.dash-rosto__reset:focus-visible {
+  outline: 3px solid var(--dash-accent);
+  outline-offset: 3px;
+}
+
+.dash-rosto__reset-ico {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+}
+.dash-rosto__reset-ico svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   Card de chamada no Início
+   -------------------------------------------------------------------------- */
+
+.dash-rosto-convite {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 22px;
+  border-radius: var(--rosto-raio, 22px);
+  background: linear-gradient(135deg, #2b3350, var(--brand-navy));
+  color: #fff;
+  text-decoration: none;
+  box-shadow: var(--dash-shadow-card);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.dash-rosto-convite:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--dash-shadow-pop);
+}
+
+.dash-rosto-convite:focus-visible {
+  outline: 3px solid var(--brand-gold);
+  outline-offset: 3px;
+}
+
+.dash-rosto-convite__tela {
+  flex: none;
+  width: 108px;
+  border-radius: 8px;
+}
+
+.dash-rosto-convite__txt {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dash-rosto-convite__titulo {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: var(--fw-semibold);
+}
+
+.dash-rosto-convite__sub {
+  margin: 0;
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.4;
+}
+
+/* --------------------------------------------------------------------------
+   Responsivo
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 560px) {
+  .dash-rosto__presets {
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+    gap: 12px;
+  }
+
+  .dash-rosto__controles {
+    padding: 16px;
+  }
+
+  /* Empilha o rótulo da ponta sob o slider seria pior: em tela estreita, some com
+     as pontas e deixa o slider ocupar a largura toda. O aria-valuetext continua
+     descrevendo o valor pra quem usa leitor de tela. */
+  .dash-rosto__ponta {
+    display: none;
+  }
+
+  .dash-rosto-convite {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .dash-rosto-convite__tela {
+    width: 100%;
+  }
+}
+
+/* Respeita quem pediu menos movimento no sistema. */
+@media (prefers-reduced-motion: reduce) {
+  .dash-rosto__preset,
+  .dash-rosto__reset,
+  .dash-rosto-convite,
+  .dash-rosto__slider::-webkit-slider-thumb,
+  .dash-rosto__slider::-moz-range-thumb {
+    transition: none;
+  }
+  .dash-rosto__status[data-estado="salvando"] .dash-rosto__status-ico {
+    animation: none;
+  }
+  .dash-rosto__preset:hover,
+  .dash-rosto-convite:hover {
+    transform: none;
+  }
+}

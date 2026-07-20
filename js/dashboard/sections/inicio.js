@@ -20,6 +20,7 @@ import {
 } from "../icons.js";
 import { cardResumoSemanal } from "../resumo-semanal.js";
 import { cardDica } from "../dica.js";
+import { criarPreviewRosto, ROSTO_PADRAO } from "../rosto-preview.js";
 import {
   formatHora,
   formatDiaRelativo,
@@ -346,5 +347,49 @@ export async function renderInicio(ctx) {
   });
   root.appendChild(grid);
 
+  // Convite pro editor de rosto. Fica FORA do grid e depois dele de propósito: os
+  // cards acima são leitura pro pai, e este é o único elemento do Início que pede
+  // pra ele passar o aparelho pra criança. Mostra o rosto atual dela, não um
+  // genérico — é o que faz o pai (e ela) reconhecerem do que se trata.
+  root.appendChild(conviteRosto(ctx.crianca, nome));
+
   return root;
+}
+
+/**
+ * Faixa de chamada pro editor de rosto, com preview do rosto atual da criança.
+ * @param {object} crianca — linha de `criancas` (usa `rosto_robo`)
+ * @param {string} nome — primeiro nome, pra falar dela e não "da criança"
+ * @returns {HTMLElement}
+ */
+function conviteRosto(crianca, nome) {
+  const preview = criarPreviewRosto({
+    class: "dash-rosto-convite__tela",
+    // O texto ao lado já diz o que é; o SVG só repetiria pro leitor de tela.
+    decorativo: true,
+  });
+  preview.atualizar((crianca && crianca.rosto_robo) || ROSTO_PADRAO);
+
+  return el("a", {
+    class: "dash-rosto-convite",
+    attrs: { href: "#/rosto" },
+    children: [
+      preview.node,
+      el("div", {
+        class: "dash-rosto-convite__txt",
+        children: [
+          el("p", {
+            class: "dash-rosto-convite__titulo",
+            text: "Deixa o " + nome + " desenhar o rosto da Cogni",
+          }),
+          el("p", {
+            class: "dash-rosto-convite__sub",
+            text:
+              "Esta parte é da criança: ela escolhe os olhos e a Cogni muda de " +
+              "cara na hora.",
+          }),
+        ],
+      }),
+    ],
+  });
 }

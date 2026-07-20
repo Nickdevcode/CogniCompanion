@@ -281,6 +281,9 @@ export async function atualizarCrianca(patch) {
     "como_aprende",
     "estilo_linguagem",
     "prompt_personalizado",
+    // Rosto do robô (jsonb). Quem escreve aqui é o editor da CRIANÇA, não o pai —
+    // é o mesmo caminho de escrita porque é a mesma linha e a mesma RLS.
+    "rosto_robo",
   ];
   const campos = {};
   for (const k of EDITAVEIS) if (k in patch) campos[k] = patch[k];

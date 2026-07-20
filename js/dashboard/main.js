@@ -21,6 +21,7 @@ import { renderInicio } from "./sections/inicio.js";
 import { renderConversas } from "./sections/conversas.js";
 import { renderAprendizado } from "./sections/aprendizado.js";
 import { renderPlanos } from "./sections/planos.js";
+import { renderRosto } from "./sections/rosto.js";
 import { renderConfig } from "./sections/config.js";
 
 const LOGIN_URL = "login.html";
@@ -199,6 +200,7 @@ async function init() {
   router.register("conversas", renderConversas);
   router.register("aprendizado", renderAprendizado);
   router.register("planos", renderPlanos);
+  router.register("rosto", renderRosto);
   router.register("config", renderConfig);
 
   router.start();

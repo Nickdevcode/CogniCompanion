@@ -146,12 +146,73 @@ confirmação). O vínculo é **permanente**: só some se você desvincular.
 | `js/dashboard/resumo-semanal.js` | Card + modal do "Resumo da semana da Cogni" (bilhete por IA) |
 | `js/dashboard/dica.js` | Card "Dica do Cogni" (Início + Aprendizado), gerada por IA no servidor local (`/api/dica`) |
 | `js/dashboard/router.js` | Roteamento por hash (SPA leve) |
-| `js/dashboard/sections/*.js` | As 5 seções: Início, Conversas, Aprendizado, Planos, Configurações |
+| `js/dashboard/rosto-preview.js` | Desenho do rosto do robô em SVG (módulo puro, sem rede) |
+| `js/dashboard/rosto-api.js` | Leitura/gravação do rosto: PUT ao vivo no robô + persistência no Supabase |
+| `js/dashboard/sections/*.js` | As 6 seções: Início, Conversas, Aprendizado, Planos, **Rosto da Cogni**, Configurações |
 | `css/dashboard-onboarding.css` | Estilos do onboarding |
+| `css/dashboard-rosto.css` | Estilos do editor de rosto (estética infantil, escopada em `.dash-rosto`) |
 
 > 🧪 Para testar **com o robô ligado**: suba o servidor da Cogni (`http://127.0.0.1:3000`), pegue o código
 > de pareamento (na tela do servidor ou pedindo pra Cogni falar) e digite no onboarding. Para testar **sem
 > o robô**, vire `USAR_SUPABASE = false` e o painel roda com os dados de exemplo.
+
+---
+
+## 🎨 Rosto da Cogni — a tela da criança
+
+A única seção do Companion feita **pra criança**, e não pro pai. Ela escolhe os olhos do robô e a Cogni
+muda de cara **ao vivo**, enquanto o dedo ainda está no slider. Isso não é enfeite: é a contribuição
+científica do TCC — pesquisa de 2025 mostrou que um rosto **desenhado pela própria criança** tem
+inteligência social percebida bem maior que um rosto genérico.
+
+### 🎛️ Os 4 parâmetros (e só esses)
+
+O robô desenha os olhos **proceduralmente** numa tela OLED 128×64 monocromática. Qualquer chave além
+destas o firmware ignora — não adianta inventar cor, pupila ou brilho.
+
+| Campo | Faixa | Padrão | O que muda |
+| --- | --- | --- | --- |
+| `largura` | 14 – 48 px | 36 | Olho fino ↔ largo |
+| `altura` | 12 – 48 px | 36 | Espremido ↔ arregalado |
+| `raio` | 0 – 16 px | 8 | 0 = quadradão (sério), 16 = redondo (fofo) |
+| `espaco` | −4 – 34 px | 10 | Distância entre os olhos; negativo cruza (vesguinho) |
+
+> 📏 **O teto do `espaco` depende da `largura`.** Os dois olhos e o vão entre eles dividem os mesmos 128 px,
+> então vale `espaco ≤ 128 − 2×largura`. Na prática só morde com `largura = 48`, onde o máximo cai de 34
+> pra 32 (eram as únicas 2 combinações que cortavam os olhos na tela). Quem cede é o espaço, não a largura —
+> o tamanho do olho é o que a criança vê primeiro. A regra vale nos três lados: firmware, preview e slider.
+
+### ⚡ Como o "ao vivo" funciona
+
+Cada mexida dispara um `PUT {SERVIDOR}/api/esp/rosto` com **debounce de 150 ms** — é isso que faz o robô
+acompanhar o dedo. A gravação no Supabase é separada, com debounce mais folgado (1,2 s), porque é só
+persistência e não precisa de tempo real.
+
+O preview em SVG **replica a matemática do firmware** (a lib RoboEyes que posiciona os olhos),
+então o que aparece na tela é pixel a pixel o que vai aparecer no robô. Ele é síncrono e local: funciona
+com o robô **e** o servidor desligados.
+
+### 🔌 Três estados, nenhum deles de erro
+
+| Situação | O que a criança vê |
+| --- | --- |
+| Robô ligado nesse perfil | 🟢 "A Cogni tá com essa carinha agora!" |
+| `aplicadoNoRobo: false` | 🟡 "Guardei! Ela vai fazer essa cara quando ligar." |
+| Servidor fora do ar | 🟡 A mesma coisa — e o desenho **salva do mesmo jeito** |
+
+> ⚠️ `aplicadoNoRobo: false` **não é falha**: significa que o robô estava desligado ou usando outro perfil.
+> O rosto foi salvo e vale na próxima conexão.
+
+### 🗃️ Onde o dado mora
+
+Na coluna `criancas.rosto_robo` (`jsonb`, nullable — sem valor = rosto de fábrica):
+
+```sql
+alter table criancas add column if not exists rosto_robo jsonb;
+```
+
+Não precisa de RLS nova: o policy de `update` de `criancas` já existe e filtra por linha, não por coluna.
+O robô lê do perfil local, que já é hidratado do Supabase pelo caminho normal — **não há sincronismo novo**.
 
 ---
 
@@ -190,7 +251,7 @@ Cogni Software/
 │   │   ├── resumo-semanal.js # Bilhete da semana (IA, servidor local)
 │   │   ├── dica.js         # Dica do Cogni (IA, servidor local)
 │   │   ├── router.js       # Roteamento por hash
-│   │   └── sections/       # Início, Conversas, Aprendizado, Planos, Config
+│   │   └── sections/       # Início, Conversas, Aprendizado, Planos, Rosto, Config
 │   └── ...
 │
 └── assets/                 # Mídia
