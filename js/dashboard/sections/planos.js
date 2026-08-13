@@ -235,8 +235,16 @@ function formularioPlano(plano, { onSubmit, onDelete, close }) {
   actions.append(spacer, cancelBtn, saveBtn);
   form.appendChild(actions);
 
+  // Aviso de falha de gravação (rede/RLS). Fica junto das ações, com aria-live
+  // pra o leitor de tela anunciar sem precisar de foco.
+  const erroSalvar = el("p", {
+    class: "pl-form__erro",
+    attrs: { role: "status", "aria-live": "polite" },
+  });
+  form.appendChild(erroSalvar);
+
   // Validação + submit
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     let ok = true;
 
@@ -258,13 +266,32 @@ function formularioPlano(plano, { onSubmit, onDelete, close }) {
       return;
     }
 
-    onSubmit({
-      titulo,
-      conteudo: txtConteudo.value.trim(),
-      foco: selFoco.value,
-      duracao_dias: dur,
-      status: selStatus.value,
-    });
+    // Trava o botão durante a gravação: sem isso, um duplo clique (ou uma rede
+    // lenta) cria dois planos iguais. E, se a escrita falhar, o pai PRECISA
+    // saber — antes o erro morria como promise rejeitada e o modal ficava
+    // parado, dando a impressão de que salvou.
+    const rotulo = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Salvando…";
+    erroSalvar.textContent = "";
+    try {
+      await onSubmit({
+        titulo,
+        conteudo: txtConteudo.value.trim(),
+        foco: selFoco.value,
+        duracao_dias: dur,
+        status: selStatus.value,
+      });
+    } catch (err) {
+      console.error("[Companion] Falha ao salvar o plano:", err);
+      erroSalvar.textContent =
+        "Não consegui salvar agora. Verifique sua conexão e tente de novo.";
+      toast("Não foi possível salvar o plano.", "error");
+    } finally {
+      // Em caso de sucesso o modal já fechou (nó removido) — inofensivo.
+      saveBtn.disabled = false;
+      saveBtn.textContent = rotulo;
+    }
   });
 
   return form;
@@ -408,7 +435,7 @@ export async function renderPlanos(ctx) {
 
   /* ---- Modal criar/editar ---- */
   function abrirCriar() {
-    const modal = openModal({
+    openModal({
       title: "Criar novo plano",
       size: "md",
       content: ({ close }) =>
@@ -471,13 +498,29 @@ export async function renderPlanos(ctx) {
             el("span", { text: "Excluir plano" }),
           ],
         });
+        const erro = el("p", {
+          class: "pl-form__erro",
+          attrs: { role: "status", "aria-live": "polite" },
+        });
         confirm.addEventListener("click", async () => {
-          await ctx.mock.removerPlano(plano.id);
-          await carregar();
-          renderLista();
-          close(); // fecha confirmação
-          if (typeof closeEdit === "function") closeEdit(); // fecha edição
-          toast("Plano excluído.", "info");
+          confirm.disabled = true;
+          cancel.disabled = true;
+          erro.textContent = "";
+          try {
+            await ctx.mock.removerPlano(plano.id);
+            await carregar();
+            renderLista();
+            close(); // fecha confirmação
+            if (typeof closeEdit === "function") closeEdit(); // fecha edição
+            toast("Plano excluído.", "info");
+          } catch (err) {
+            // Falha de rede/RLS não pode sumir em silêncio: sem isto o modal
+            // ficava aberto e parecia que o plano tinha sido excluído.
+            console.error("[Companion] Falha ao excluir o plano:", err);
+            confirm.disabled = false;
+            cancel.disabled = false;
+            erro.textContent = "Não consegui excluir agora. Tente de novo.";
+          }
         });
         wrap.appendChild(
           el("div", {
@@ -485,6 +528,7 @@ export async function renderPlanos(ctx) {
             children: [cancel, confirm],
           })
         );
+        wrap.appendChild(erro);
         return wrap;
       },
     });

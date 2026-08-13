@@ -403,6 +403,23 @@
   gap: 0.65rem;
 }
 
+/* Falha de gravação (rede/RLS) no formulário e na confirmação de exclusão.
+   Some quando vazio pra não abrir espaço à toa. */
+.pl-form__erro {
+  margin-top: 0.6rem;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  text-align: right;
+  color: var(--toast-error, #c0392b);
+}
+[data-theme="dark"] .pl-form__erro {
+  color: var(--toast-error, #ff6b6b);
+}
+.pl-form__erro:empty {
+  display: none;
+}
+
 /* --------------------------------------------------------------------------
    Responsivo
    -------------------------------------------------------------------------- */

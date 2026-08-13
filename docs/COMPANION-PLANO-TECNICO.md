@@ -64,7 +64,7 @@ Sidebar: **Início · Conversas · Aprendizado · Planos · Configurações** (a
 | --- | --- | --- |
 | 🏠 **Início** | Tempo de uso do dia, última conversa, próximo plano, resumo da semana (**sem conquistas**), Dica do Cogni (IA) | Tempo de uso = soma da duração das conversas. Dica = IA 1×/dia com base em memórias + tópicos recentes |
 | 🗣️ **Conversas** | Timeline por dia; cada conversa com **matéria** + **horário**; balões criança/Cogni; filtro de **tópicos sensíveis**; busca + filtro por matéria | Gravado a cada turno (ver Diário). Sensível = a **IA** marca (bullying, tristeza, medo… mesmo sem palavra-chave) + `verificarEntrada()` do `safety.js` como rede de segurança |
-| 📚 **Aprendizado** | Tempo por matéria, tópicos explorados, gráfico de evolução (min/dia), **Dicas da Cogni** (era "Curiosidades da criança"), contadores (**sem conquistas**) | Tempo por matéria/gráfico = soma das durações por matéria. Tópicos = extraídos das conversas. **Dicas da Cogni** = dica atual (`/api/dica`) + histórico (tabela `dicas`). As "curiosidades da criança" (frases tipo "perguntou 4× sobre X") foram **aposentadas** (jun/2026) — a seção virou Dicas da Cogni |
+| 📚 **Aprendizado** | Tempo por matéria, **Trilha de aprendizado** (praticando × já domina), tópicos explorados, gráfico de evolução (min/dia), **Dicas da Cogni** (era "Curiosidades da criança"), contadores (**sem conquistas**) | Tempo por matéria/gráfico = soma das durações por matéria. Trilha = `criancas.progresso` (ver seção própria; read-only pro site). Tópicos = extraídos das conversas. **Dicas da Cogni** = dica atual (`/api/dica`) + histórico (tabela `dicas`). As "curiosidades da criança" (frases tipo "perguntou 4× sobre X") foram **aposentadas** (jun/2026) — a seção virou Dicas da Cogni |
 | ✏️ **Planos** | Lista (Ativos/Todos/Concluídos) + criar/editar. Campos: título, conteúdo, foco, duração (dias), status | O **pai digita**. O plano ativo é injetado no system prompt da Cogni |
 | ⚙️ **Configurações** (inclui "Família") | Perfil da criança pareada → detalhe (ver/editar infos + prompt personalizado); conta; tema; status da conexão do robô | Edição bidirecional do perfil (pai edita no site, robô capta por voz — os dois mexem no mesmo registro). O pai pode preencher infos antes mesmo do robô captar. **Editar o perfil no site já conta como onboarding feito**: a Cogni não refaz as perguntas de apresentação (ver instrumentação) |
 | 📬 **Resumo Semanal** | Bilhete carinhoso por IA | IA resume as conversas da semana (depende do Diário; feito por último) |
@@ -125,6 +125,7 @@ Um dado, três coelhos. 🎯
 | `responsavel_id` | uuid | FK → responsaveis(id), nullable até parear |
 | `codigo_pareamento` | text unique | **novo** — código FIXO do perfil (6 chars, sem ambíguos), gerado no nascimento do perfil, permanente. O pai usa pra vincular no Companion |
 | `rosto_robo` | jsonb | **novo** — a geometria dos olhos que a **criança** desenhou (ver "🎨 O editor de rosto"). Nullable: sem valor = rosto de fábrica. Cada criança tem o seu, e trocar de perfil troca a cara do robô na hora |
+| `progresso` | jsonb | **novo (ago/2026)** — a trilha de aprendizado (o *student model*): array de `{conceito, materia, status, acertos, vezes, visto, proxima}`, default `[]`. Quem escreve é **só o servidor**; o site trata como **read-only**. É o que permite a retomada espaçada da Cogni e, no Companion, alimenta o Painel (ver "📈 Trilha de aprendizado" abaixo) |
 | `criado_em` | timestamptz | |
 | `ultimo_acesso` | timestamptz | |
 | `atualizado_em` | timestamptz | |
@@ -315,6 +316,70 @@ Ou seja: o Diário e o Resumo Semanal vinham lendo respostas mutiladas em qualqu
 ### 3. Nenhuma migração pendente
 
 O contrato de dados, as tabelas, a RLS e todos os endpoints seguem exatamente como documentados acima. As correções foram internas ao servidor, ao firmware e à interface local.
+
+---
+
+## 📈 Trilha de aprendizado (`criancas.progresso`) — reforma pedagógica de ago/2026
+
+> [!warning] Tem **uma** coluna nova (já criada pelo Nicolas)
+> Diferente da auditoria acima, aqui existe schema novo: `criancas.progresso` (jsonb, default `[]`). O site **não quebra** sem fazer nada — mas passa a ter um dado novo e valioso disponível.
+
+O cérebro da Cogni ganhou um *student model*: ela agora registra **o que a criança estudou, no que travou e quando aquilo deve ser revisado**, e usa isso para retomar o assunto dias depois (prática espaçada). Antes, cada conversa recomeçava do zero pedagogicamente.
+
+### O formato
+
+`criancas.progresso` é um array de itens assim:
+
+```json
+[
+  {
+    "conceito": "soma de fracoes",
+    "materia": "matematica",
+    "status": "travou",
+    "acertos": 0,
+    "vezes": 2,
+    "visto": "2026-08-10T21:03:00.000Z",
+    "proxima": "2026-08-11T21:03:00.000Z"
+  }
+]
+```
+
+| Campo | O que é |
+| --- | --- |
+| `conceito` | o tema fino (1 a 4 palavras), extraído pela IA — mesma fonte do `conversas.topico` |
+| `materia` | uma das matérias canônicas, ou `null` |
+| `status` | `"travou"` ou `"aprendeu"` — como ela se saiu da última vez |
+| `acertos` | acertos seguidos; é o que faz o intervalo de revisão crescer (travar zera) |
+| `vezes` | quantas vezes o tema apareceu no total |
+| `visto` | quando foi a última vez |
+| `proxima` | quando deve voltar. Vencido (`proxima <= agora`) = a Cogni vai puxar o assunto |
+
+Escada de revisão: **travou → 1 dia**; **acertou → 2, 5, 12, 30, 60 dias**. Travar de novo reseta. Máximo de 40 itens por criança (a poda descarta os já dominados mais antigos, nunca os que ela travou).
+
+### Regra de escrita: o site NÃO escreve aqui
+
+Quem alimenta é só o servidor, no pipeline pós-resposta. **O Companion trata `progresso` como read-only.**
+
+> ✅ **Isso já está seguro hoje, sem mudar nada.** O `atualizarCrianca()` em `js/dashboard/supabase-data.js` monta o update a partir de uma **allowlist** (`EDITAVEIS`) e só envia os campos dessa lista. Como `progresso` não está lá, o site nunca sobrescreve a coluna. Se um dia essa allowlist virar um "manda o objeto inteiro", a trilha da criança é apagada a cada edição de perfil — então **não** troque a allowlist por spread do objeto.
+
+### ✅ No Companion: bloco "Trilha de aprendizado" (feito — ago/2026)
+
+O Painel de Aprendizado (`js/dashboard/sections/aprendizado.js`) lê `progresso` e monta duas colunas, logo abaixo dos cards de tempo por matéria:
+
+| Bloco | Regra de seleção | O que a linha mostra |
+| --- | --- | --- |
+| 🌱 **Praticando agora** | `status: "travou"` **ou** `"aprendeu"` com `acertos < 2` | conceito + selo (*precisa de reforço* / *quase lá*) + matéria · quando foi visto · **quando a Cogni retoma** (de `proxima`) |
+| ✅ **Já domina** | `status: "aprendeu"` e `acertos >= 2` | conceito + matéria · nº de acertos seguidos · quando foi visto |
+
+Decisões que valem registro:
+
+- O item com **1 acerto** entra em "Praticando" (como *quase lá*) em vez de ficar de fora das duas listas — assim nenhum tema some da tela sem explicação.
+- **`proxima` vencida** vira *"a Cogni retoma na próxima conversa"*; no futuro, *"amanhã"/"em 5 dias"*. É a resposta pra "o que ela vai revisar com ele?" sem precisar de um terceiro bloco.
+- Máximo de **5 itens por coluna** (recorte acionável, não histórico), ordenados por urgência (quem precisa de reforço primeiro) e por consolidação (mais acertos primeiro).
+- A seção **relê o perfil** (`getCrianca()`) ao abrir, em vez de usar o `ctx.crianca` do boot do painel: a trilha muda a cada conversa do robô. Se essa releitura falhar, o bloco cai no perfil do boot — o resto da tela não quebra.
+- Cada item passa por um **saneamento** (o jsonb é livre): conceito vazio, status desconhecido, matéria fora da lista canônica ou data inválida são descartados/normalizados.
+
+> ⚠️ **Cuidado de tom, e isso importa:** o rótulo `travou` é linguagem interna e **não aparece na tela** — o pai lê "precisa de reforço", "quase lá", "já domina", nunca nota ou ranking. O mesmo cuidado já aplicado no robô, que é proibido de dizer à criança "aquilo que você travou". O bloco ainda vem com uma linha explícita: *"Não é nota: é o que a Cogni guarda pra retomar os assuntos nos próximos dias."*
 
 ---
 

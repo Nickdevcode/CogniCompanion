@@ -93,7 +93,7 @@ O painel lê de **duas fontes**, e ambas já estão integradas:
 
 | Fonte | O quê | Como |
 | --- | --- | --- |
-| 🗄️ **Supabase** | Criança, conversas (Diário), planos de estudo, perfil | `@supabase/supabase-js` (anon key + RLS). Conversas são **só leitura** pelo site; planos têm CRUD |
+| 🗄️ **Supabase** | Criança, conversas (Diário), planos de estudo, perfil, **trilha de aprendizado** | `@supabase/supabase-js` (anon key + RLS). Conversas e trilha são **só leitura** pelo site; planos têm CRUD |
 | 🖥️ **Servidor local da Cogni** | Resumo Semanal (IA), pareamento/despareamento, código do perfil | `fetch` nos endpoints `/api/...` (precisa do robô/servidor ligado) |
 
 ### 🎛️ A chave que liga tudo: `USAR_SUPABASE`
@@ -134,6 +134,27 @@ Quando o pai entra e **ainda não tem criança vinculada**, aparece um **onboard
 O código é validado **pelo servidor** (que seta o vínculo com a `service_role`) — o site **nunca** escreve
 o `responsavel_id` direto. Em **Configurações** dá pra ver o código do perfil e **desvincular** (com
 confirmação). O vínculo é **permanente**: só some se você desvincular.
+
+### 📈 Trilha de aprendizado (no Painel de Aprendizado)
+
+O cérebro da Cogni tem um *student model*: a cada conversa ele anota **o assunto estudado, como a criança
+se saiu e quando aquilo deve voltar** (prática espaçada), tudo na coluna `criancas.progresso` (jsonb).
+O painel lê isso e transforma em duas perguntas que o pai não conseguia responder antes:
+
+| Bloco | O que mostra | Vem de |
+| --- | --- | --- |
+| 🌱 **Praticando agora** | O que ainda precisa de reforço + o que ela acertou só uma vez ("quase lá"), com a matéria, quando foi visto e **quando a Cogni retoma** | `status: "travou"`, ou `"aprendeu"` com menos de 2 acertos |
+| ✅ **Já domina** | O que ela acertou sozinha mais de uma vez, com o nº de acertos seguidos | `status: "aprendeu"` e `acertos >= 2` |
+
+Três regras que valem a pena não esquecer:
+
+- 🔒 **`progresso` é read-only pro site.** Quem escreve é **só o servidor**. A allowlist `EDITAVEIS` em
+  `supabase-data.js` garante isso — se ela um dia virar um "manda o objeto inteiro", a trilha da criança
+  é apagada a cada edição de perfil pelo pai.
+- 💬 **O tom é de apoio, nunca de boletim.** `travou` é linguagem interna e **não aparece na tela**: o pai
+  lê "precisa de reforço", "quase lá", "já domina". Nada de nota, ranking ou vermelho de erro.
+- 🛡️ **Dado torto não derruba a tela.** Como é jsonb livre, cada item passa por um saneamento (conceito
+  vazio, status desconhecido, matéria inventada ou data inválida são descartados/normalizados).
 
 ### 🗃️ Arquivos do painel
 

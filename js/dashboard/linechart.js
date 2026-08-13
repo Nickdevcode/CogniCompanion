@@ -26,6 +26,24 @@ function svgEl(tag, attrs = {}) {
   return node;
 }
 
+/** Quantas divisões de grade mirar no eixo Y (legibilidade > precisão). */
+const LINHAS_ALVO = 4;
+
+/**
+ * Passo "redondo" (1·10ⁿ, 2·10ⁿ ou 5·10ⁿ) que divide o eixo Y em ~4 faixas.
+ * Piso de 5 minutos: abaixo disso a grade fica densa sem acrescentar nada.
+ * @param {number} max — maior valor da série
+ * @returns {number}
+ */
+function escolherPasso(max) {
+  const bruto = Math.max(Number(max) || 0, 1) / LINHAS_ALVO;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(bruto)));
+  const normalizado = bruto / magnitude;
+  const multiplo =
+    normalizado <= 1 ? 1 : normalizado <= 2 ? 2 : normalizado <= 5 ? 5 : 10;
+  return Math.max(5, multiplo * magnitude);
+}
+
 /**
  * @param {object} cfg
  * @param {Array<{label:string, value:number}>} cfg.points
@@ -47,9 +65,12 @@ export function buildLineChart({ points, formatValue, ariaLabel } = {}) {
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
-  // Escala Y: de 0 ao "teto" arredondado acima do máximo (passos de 15).
+  // Escala Y: de 0 ao "teto" arredondado acima do máximo. O passo é calculado a
+  // partir do maior valor (e não fixo em 15) porque a mesma escala serve pro modo
+  // Semanal (dezenas de minutos) e pro Mensal (centenas): com passo fixo, uma
+  // semana de 5h renderia 20 linhas de grade e os rótulos se sobrepunham.
   const maxVal = data.reduce((m, p) => Math.max(m, p.value || 0), 0);
-  const step = 15;
+  const step = escolherPasso(maxVal);
   const top = Math.max(step, Math.ceil((maxVal || 1) / step) * step);
 
   const x = (i) =>

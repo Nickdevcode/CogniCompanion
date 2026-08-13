@@ -77,6 +77,75 @@ const crianca = {
     "Incentive a curiosidade do Pedro sobre ciências e use exemplos com " +
     "dinossauros quando possível. Evite respostas longas demais.",
   responsavel_id: responsavel.id,
+  // Trilha de aprendizado (student model). READ-ONLY pro site: quem escreve é o
+  // servidor, no pipeline pós-resposta. Datas relativas a MOCK_NOW (2026-05-27)
+  // e coerentes com as conversas de exemplo abaixo — é o que o Painel de
+  // Aprendizado lê pra montar "Praticando agora" e "Já domina".
+  progresso: [
+    {
+      conceito: "tabuada do 7",
+      materia: "matematica",
+      status: "travou", // rótulo INTERNO — a tela nunca mostra esta palavra
+      acertos: 0,
+      vezes: 3,
+      visto: "2026-05-26T20:41:00-03:00",
+      proxima: "2026-05-27T20:41:00-03:00",
+    },
+    {
+      conceito: "redação",
+      materia: "portugues",
+      status: "aprendeu",
+      acertos: 1, // 1 acerto ainda não é domínio → aparece como "quase lá"
+      vezes: 2,
+      visto: "2026-05-27T18:32:00-03:00",
+      proxima: "2026-05-29T18:32:00-03:00",
+    },
+    {
+      conceito: "animais em inglês",
+      materia: "idiomas",
+      status: "aprendeu",
+      acertos: 1,
+      vezes: 1,
+      visto: "2026-05-25T15:48:00-03:00",
+      proxima: "2026-05-27T15:48:00-03:00",
+    },
+    {
+      conceito: "dinossauros",
+      materia: "ciencias",
+      status: "aprendeu",
+      acertos: 3,
+      vezes: 5,
+      visto: "2026-05-27T16:05:00-03:00",
+      proxima: "2026-06-08T16:05:00-03:00",
+    },
+    {
+      conceito: "sistema solar",
+      materia: "ciencias",
+      status: "aprendeu",
+      acertos: 2,
+      vezes: 3,
+      visto: "2026-05-24T16:30:00-03:00",
+      proxima: "2026-05-29T16:30:00-03:00",
+    },
+    {
+      conceito: "descobrimento do Brasil",
+      materia: "historia",
+      status: "aprendeu",
+      acertos: 2,
+      vezes: 2,
+      visto: "2026-05-25T17:22:00-03:00",
+      proxima: "2026-05-30T17:22:00-03:00",
+    },
+    {
+      conceito: "capitais do mundo",
+      materia: "geografia",
+      status: "aprendeu",
+      acertos: 2,
+      vezes: 2,
+      visto: "2026-05-23T14:12:00-03:00",
+      proxima: "2026-05-28T14:12:00-03:00",
+    },
+  ],
   criado_em: "2026-04-02T13:25:00-03:00",
   ultimo_acesso: "2026-05-27T18:33:00-03:00",
   atualizado_em: "2026-05-20T10:00:00-03:00",
@@ -529,7 +598,11 @@ async function _mockRemoverPlano(id) {
 
 async function _mockAtualizarCrianca(patch) {
   await delay(80);
-  Object.assign(crianca, patch, { atualizado_em: MOCK_NOW.toISOString() });
+  // Espelha a regra do modo real (allowlist EDITAVEIS em supabase-data.js): a
+  // trilha de aprendizado é escrita SÓ pelo servidor. O mock ignora `progresso`
+  // pra que um bug de escrita apareça igual nos dois modos, e não só em produção.
+  const { progresso, ...editaveis } = patch || {};
+  Object.assign(crianca, editaveis, { atualizado_em: MOCK_NOW.toISOString() });
   return { ...crianca };
 }
 

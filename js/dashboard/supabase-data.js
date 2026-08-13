@@ -67,12 +67,29 @@ export async function getResponsavel() {
 }
 
 /**
- * Criança pareada ao responsável logado (single-child). A RLS só devolve a
- * criança vinculada a ele.
- * @returns {Promise<object|null>} a criança, ou `null` se ainda não pareou
- *   (estado que dispara o onboarding de pareamento).
+ * Cache curto da criança pareada.
+ *
+ * Toda leitura daqui precisa do id da criança, e cada seção dispara várias de
+ * uma vez (o Início chama conversas + planos + dica + resumo). Sem cache, cada
+ * uma refazia o mesmo SELECT em `criancas`: 8 requisições onde 5 bastam.
+ *
+ * O TTL é curto DE PROPÓSITO. O perfil muda por fora do site — o robô grava
+ * memórias e a trilha de aprendizado (`progresso`) a cada conversa —, então uma
+ * tela aberta depois tem que enxergar o dado novo. Aqui o cache só coalesce as
+ * chamadas de um mesmo render.
  */
-export async function getCrianca() {
+const TTL_CRIANCA_MS = 10000;
+
+/** @type {{promessa: Promise<object|null>, gravadaEm: number}|null} */
+let criancaCache = null;
+
+/** Descarta o cache (após escrever no perfil, pra reler o estado real). */
+function invalidarCacheCrianca() {
+  criancaCache = null;
+}
+
+/** O SELECT de verdade — sem cache. */
+async function buscarCrianca() {
   const user = await currentUser();
   const { data, error } = await client()
     .from("criancas")
@@ -81,6 +98,27 @@ export async function getCrianca() {
     .maybeSingle();
   if (error) throw error;
   return data || null;
+}
+
+/**
+ * Criança pareada ao responsável logado (single-child). A RLS só devolve a
+ * criança vinculada a ele. Resultado compartilhado por até `TTL_CRIANCA_MS`.
+ * @returns {Promise<object|null>} a criança, ou `null` se ainda não pareou
+ *   (estado que dispara o onboarding de pareamento).
+ */
+export async function getCrianca() {
+  const agora = Date.now();
+  if (criancaCache && agora - criancaCache.gravadaEm < TTL_CRIANCA_MS) {
+    return criancaCache.promessa;
+  }
+  const promessa = buscarCrianca();
+  criancaCache = { promessa, gravadaEm: agora };
+  // Falha não pode ficar grudada no cache (o painel ficaria "quebrado" por 10s
+  // depois de uma piscada de rede): a próxima chamada tenta de novo.
+  promessa.catch(() => {
+    if (criancaCache && criancaCache.promessa === promessa) invalidarCacheCrianca();
+  });
+  return promessa;
 }
 
 /**
@@ -295,5 +333,8 @@ export async function atualizarCrianca(patch) {
     .select()
     .single();
   if (error) throw error;
+  // O cache guarda a linha ANTES desta escrita — descarta pra próxima leitura
+  // trazer o perfil salvo (e não o de antes de o pai editar).
+  invalidarCacheCrianca();
   return data;
 }

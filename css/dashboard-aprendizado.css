@@ -96,37 +96,44 @@
 
 /* Cores por matéria (mapeadas pros tokens de dashboard.css) */
 .ap-mat[data-materia="portugues"],
-.ap-topic[data-materia="portugues"] {
+.ap-topic[data-materia="portugues"],
+.ap-titem[data-materia="portugues"] {
   --mat-color: var(--mat-portugues);
   --mat-soft: var(--mat-portugues-soft);
 }
 .ap-mat[data-materia="matematica"],
-.ap-topic[data-materia="matematica"] {
+.ap-topic[data-materia="matematica"],
+.ap-titem[data-materia="matematica"] {
   --mat-color: var(--mat-matematica);
   --mat-soft: var(--mat-matematica-soft);
 }
 .ap-mat[data-materia="ciencias"],
-.ap-topic[data-materia="ciencias"] {
+.ap-topic[data-materia="ciencias"],
+.ap-titem[data-materia="ciencias"] {
   --mat-color: var(--mat-ciencias);
   --mat-soft: var(--mat-ciencias-soft);
 }
 .ap-mat[data-materia="historia"],
-.ap-topic[data-materia="historia"] {
+.ap-topic[data-materia="historia"],
+.ap-titem[data-materia="historia"] {
   --mat-color: var(--mat-historia);
   --mat-soft: var(--mat-historia-soft);
 }
 .ap-mat[data-materia="geografia"],
-.ap-topic[data-materia="geografia"] {
+.ap-topic[data-materia="geografia"],
+.ap-titem[data-materia="geografia"] {
   --mat-color: var(--mat-geografia);
   --mat-soft: var(--mat-geografia-soft);
 }
 .ap-mat[data-materia="idiomas"],
-.ap-topic[data-materia="idiomas"] {
+.ap-topic[data-materia="idiomas"],
+.ap-titem[data-materia="idiomas"] {
   --mat-color: var(--mat-idiomas);
   --mat-soft: var(--mat-idiomas-soft);
 }
 .ap-mat[data-materia="outros"],
-.ap-topic[data-materia="outros"] {
+.ap-topic[data-materia="outros"],
+.ap-titem[data-materia="outros"] {
   --mat-color: var(--mat-outros);
   --mat-soft: var(--mat-outros-soft);
 }
@@ -160,6 +167,19 @@
 .ap-section-head__ico svg {
   width: 20px;
   height: 20px;
+}
+/* Variante empilhada: título + linha explicativa embaixo (Trilha) */
+.ap-section-head--stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+.ap-section-head__note {
+  max-width: 68ch;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--dash-text-muted);
 }
 
 /* Tópicos (chips) */
@@ -209,6 +229,156 @@
 .ap-topic__check svg {
   width: 11px;
   height: 11px;
+}
+
+/* --------------------------------------------------------------------------
+   Trilha de aprendizado (criancas.progresso)
+   Duas colunas: o que está sendo praticado e o que já foi dominado. O tom é de
+   apoio — nada de vermelho, alerta ou linguagem de boletim (ver plano técnico).
+   -------------------------------------------------------------------------- */
+.ap-trilha {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: clamp(0.75rem, 1.5vw, 1.25rem);
+  align-items: start;
+}
+.ap-tcard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.15rem;
+  /* Faixa fina no topo, na cor do estado: contexto sem virar semáforo. */
+  border-top: 3px solid var(--ap-tone, var(--dash-accent));
+}
+.ap-tcard--praticando {
+  --ap-tone: var(--st-pausado);
+  --ap-tone-soft: var(--st-pausado-soft);
+}
+.ap-tcard--dominou {
+  --ap-tone: var(--st-ativo);
+  --ap-tone-soft: var(--st-ativo-soft);
+}
+.ap-tcard__head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.ap-tcard__ico {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  background-color: var(--ap-tone-soft);
+  color: var(--ap-tone);
+}
+.ap-tcard__ico svg {
+  width: 20px;
+  height: 20px;
+}
+.ap-tcard__heading {
+  min-width: 0;
+}
+.ap-tcard__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.1rem;
+  line-height: 1.2;
+  color: var(--dash-text);
+}
+.ap-tcard__sub {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--dash-text-faint);
+}
+
+/* Lista de conceitos */
+.ap-tlist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ap-titem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.7rem 0.8rem;
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+}
+.ap-titem__ico {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background-color: var(--mat-soft, var(--dash-accent-soft));
+  color: var(--mat-color, var(--dash-accent));
+}
+/* No card "Já domina" o ícone é o check — verde, e não a cor da matéria. */
+.ap-tcard--dominou .ap-titem__ico {
+  background-color: var(--st-ativo-soft);
+  color: var(--st-ativo);
+}
+.ap-titem__ico svg {
+  width: 16px;
+  height: 16px;
+}
+.ap-titem__body {
+  min-width: 0;
+  flex: 1;
+}
+.ap-titem__top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
+}
+.ap-titem__name {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.95rem;
+  line-height: 1.25;
+  color: var(--dash-text);
+}
+.ap-titem__selo {
+  padding: 0.12rem 0.5rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
+.ap-titem__selo[data-tom="reforco"] {
+  background-color: var(--st-pausado-soft);
+  color: var(--st-pausado);
+}
+.ap-titem__selo[data-tom="quase"] {
+  background-color: var(--st-andamento-soft);
+  color: var(--st-andamento);
+}
+.ap-titem__meta {
+  display: block;
+  margin-top: 0.2rem;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--dash-text-faint);
+}
+
+/* Estado vazio com mais respiro (usado no lugar dos cards de matéria) */
+.ap-empty--lead {
+  padding: 1.1rem 1.15rem;
+  margin-bottom: clamp(1.5rem, 3vw, 2rem);
+  background-color: var(--dash-surface);
+  border: 1px dashed var(--dash-border-strong);
+  border-radius: 16px;
 }
 
 /* --------------------------------------------------------------------------
@@ -546,7 +716,8 @@
   .ap-mascot {
     display: none;
   }
-  .ap-grid {
+  .ap-grid,
+  .ap-trilha {
     grid-template-columns: 1fr;
   }
 }

@@ -4,6 +4,7 @@
  * Painel de progresso, DERIVADO das conversas (a "chave de ouro" do doc:
  * somar duracao_ms por matéria e por dia resolve tempo/matéria + gráfico):
  *   - Cards de tempo por matéria (top matérias)
+ *   - Trilha de aprendizado (o student model: `criancas.progresso`)
  *   - Tópicos explorados (chips)
  *   - Gráfico de evolução (min/dia) em SVG, com toggle Semanal/Mensal
  *   - Dicas da Cogni: dica atual (IA, /api/dica) + histórico (tabela `dicas`)
@@ -23,6 +24,8 @@ import {
   formatMinutos,
   formatHora,
   formatDiaRelativo,
+  formatQuandoVisto,
+  formatQuandoRevisar,
   tempoPorMateria,
   tempoPorDia,
   tempoTotal,
@@ -109,6 +112,99 @@ function topicosExplorados(conversas, limite = 8) {
 }
 
 /* --------------------------------------------------------------------------
+   Trilha de aprendizado (`criancas.progresso`)
+
+   O servidor registra, a cada conversa, o que a criança estudou e como se saiu,
+   pra retomar o assunto dias depois (prática espaçada). O site só LÊ essa coluna
+   — quem escreve é o servidor (ver o contrato em docs/COMPANION-PLANO-TECNICO.md
+   e a allowlist EDITAVEIS em supabase-data.js).
+
+   ⚠️ Tom: `travou` é rótulo INTERNO e nunca chega à tela. Pro pai isto é apoio
+   ("está praticando", "precisa de reforço"), nunca boletim, nota ou ranking — o
+   mesmo cuidado que o robô já aplica ao falar com a criança.
+   -------------------------------------------------------------------------- */
+
+/** Valores de `progresso[].status` gravados pelo servidor (uso interno). */
+const STATUS_REFORCO = "travou";
+const STATUS_ACERTOU = "aprendeu";
+
+/** Acertos seguidos a partir dos quais o conceito conta como consolidado. */
+const ACERTOS_DOMINIO = 2;
+
+/** Itens por coluna: a tela é um recorte acionável, não um histórico. */
+const MAX_TRILHA = 5;
+
+/** Timestamp numérico tolerante (data inválida/ausente vira 0, nunca NaN). */
+function ts(valor) {
+  const t = Date.parse(valor);
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * Saneia um item cru do jsonb. A coluna é escrita pelo servidor, mas é jsonb
+ * livre: um item malformado não pode derrubar a seção inteira.
+ * @returns {object|null} o item normalizado, ou null se não der pra usar
+ */
+function normalizarItemTrilha(item) {
+  if (!item || typeof item !== "object") return null;
+  const conceito = String(item.conceito || "").trim();
+  if (!conceito) return null;
+  if (item.status !== STATUS_REFORCO && item.status !== STATUS_ACERTOU) return null;
+  return {
+    conceito,
+    materia: MATERIAS.includes(item.materia) ? item.materia : "outros",
+    status: item.status,
+    acertos: Number(item.acertos) || 0,
+    vezes: Number(item.vezes) || 0,
+    visto: item.visto || null,
+    proxima: item.proxima || null,
+  };
+}
+
+/**
+ * Separa a trilha nas duas leituras que interessam ao pai.
+ *
+ * "Praticando" junta o que ela travou E o que acertou uma vez só: os dois ainda
+ * estão em construção, e deixar o de 1 acerto fora das duas listas faria o tema
+ * sumir da tela sem explicação.
+ *
+ * @param {object|null} crianca — linha de `criancas` (usa `progresso`)
+ * @returns {{praticando: Array<object>, dominados: Array<object>, total: number}}
+ */
+function trilhaAprendizado(crianca) {
+  const bruto =
+    crianca && Array.isArray(crianca.progresso) ? crianca.progresso : [];
+  const itens = bruto.map(normalizarItemTrilha).filter(Boolean);
+
+  const praticando = [];
+  const dominados = [];
+  for (const it of itens) {
+    if (it.status === STATUS_ACERTOU && it.acertos >= ACERTOS_DOMINIO) {
+      dominados.push(it);
+    } else {
+      praticando.push(it);
+    }
+  }
+
+  // Praticando: quem precisa de reforço vem primeiro (é o mais acionável), e
+  // dentro de cada grupo o visto mais recentemente.
+  praticando.sort((a, b) => {
+    if (a.status !== b.status) return a.status === STATUS_REFORCO ? -1 : 1;
+    return ts(b.visto) - ts(a.visto);
+  });
+  // Dominados: o mais consolidado primeiro; empate desempata pelo mais recente.
+  dominados.sort((a, b) => b.acertos - a.acertos || ts(b.visto) - ts(a.visto));
+
+  return { praticando, dominados, total: itens.length };
+}
+
+/** Primeira letra maiúscula — os conceitos vêm minúsculos da IA. */
+function capitalizar(texto) {
+  const t = String(texto || "");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/* --------------------------------------------------------------------------
    Componentes de UI
    -------------------------------------------------------------------------- */
 
@@ -150,6 +246,168 @@ function chipTopico(topico) {
       el("span", { class: "ap-topic__ico", svg: materiaIcon(topico.materia) }),
       el("span", { class: "ap-topic__name", text: topico.nome }),
       el("span", { class: "ap-topic__check", svg: ICON.check }),
+    ],
+  });
+}
+
+/**
+ * Item da trilha: ícone da matéria + conceito + selo + linha de contexto.
+ * @param {object} item — item já normalizado por `normalizarItemTrilha`
+ * @param {{now: Date, dominado: boolean}} cfg
+ */
+function itemTrilha(item, { now, dominado }) {
+  // Selo curto. Nada de "travou"/"errou": o pai lê apoio, não diagnóstico.
+  const selo = dominado
+    ? null
+    : item.status === STATUS_REFORCO
+    ? { texto: "precisa de reforço", tom: "reforco" }
+    : { texto: "quase lá", tom: "quase" };
+
+  const partes = [materiaLabel(item.materia)];
+  if (dominado) {
+    partes.push(`${item.acertos} acertos seguidos`);
+    const quando = formatQuandoVisto(item.visto, now);
+    if (quando) partes.push(`visto ${quando}`);
+  } else {
+    const quando = formatQuandoVisto(item.visto, now);
+    if (quando) partes.push(`visto ${quando}`);
+    const revisao = formatQuandoRevisar(item.proxima, now);
+    if (revisao) partes.push(`a Cogni retoma ${revisao}`);
+  }
+
+  const topo = el("div", {
+    class: "ap-titem__top",
+    children: [
+      el("span", { class: "ap-titem__name", text: capitalizar(item.conceito) }),
+      selo
+        ? el("span", {
+            class: "ap-titem__selo",
+            attrs: { "data-tom": selo.tom },
+            text: selo.texto,
+          })
+        : null,
+    ],
+  });
+
+  return el("li", {
+    class: "ap-titem",
+    attrs: { "data-materia": item.materia },
+    children: [
+      el("span", {
+        class: "ap-titem__ico",
+        svg: dominado ? ICON.check : materiaIcon(item.materia),
+        attrs: { "aria-hidden": "true" },
+      }),
+      el("div", {
+        class: "ap-titem__body",
+        children: [
+          topo,
+          el("span", { class: "ap-titem__meta", text: partes.join(" · ") }),
+        ],
+      }),
+    ],
+  });
+}
+
+/**
+ * Card de uma coluna da trilha (Praticando / Já domina).
+ * @param {{titulo:string, subtitulo:string, iconSvg:string, variante:string,
+ *   itens:Array<object>, vazio:string, now:Date, dominado:boolean}} cfg
+ */
+function cardTrilha({ titulo, subtitulo, iconSvg, variante, itens, vazio, now, dominado }) {
+  const lista = itens.length
+    ? el("ul", {
+        class: "ap-tlist",
+        children: itens
+          .slice(0, MAX_TRILHA)
+          .map((it) => itemTrilha(it, { now, dominado })),
+      })
+    : el("p", { class: "ap-empty", text: vazio });
+
+  return el("article", {
+    class: `dash-card ap-tcard ap-tcard--${variante}`,
+    children: [
+      el("div", {
+        class: "ap-tcard__head",
+        children: [
+          el("span", { class: "ap-tcard__ico", svg: iconSvg, attrs: { "aria-hidden": "true" } }),
+          el("div", {
+            class: "ap-tcard__heading",
+            children: [
+              el("h3", { class: "ap-tcard__title", text: titulo }),
+              el("p", { class: "ap-tcard__sub", text: subtitulo }),
+            ],
+          }),
+        ],
+      }),
+      lista,
+    ],
+  });
+}
+
+/**
+ * Bloco "Trilha de aprendizado": o que a criança está praticando e o que já
+ * domina, a partir de `criancas.progresso` (read-only pro site).
+ *
+ * Sempre renderiza — inclusive vazio — porque a explicação do que vai aparecer
+ * ali é, ela mesma, informação útil pro pai que acabou de parear.
+ *
+ * @param {{crianca: object|null, nome: string, now: Date}} cfg
+ * @returns {HTMLElement}
+ */
+function blocoTrilha({ crianca, nome, now }) {
+  const { praticando, dominados, total } = trilhaAprendizado(crianca);
+
+  const head = el("div", {
+    class: "ap-section-head ap-section-head--stack",
+    children: [
+      el("h2", {
+        class: "ap-section-head__title",
+        children: [
+          el("span", { class: "ap-section-head__ico", svg: ICON.sprout }),
+          el("span", { text: "Trilha de aprendizado" }),
+        ],
+      }),
+      el("p", {
+        class: "ap-section-head__note",
+        text: total
+          ? `Não é nota: é o que a Cogni guarda pra retomar os assuntos com o ${nome} nos próximos dias.`
+          : `Conforme o ${nome} estuda, a Cogni anota os assuntos aqui pra retomá-los depois.`,
+      }),
+    ],
+  });
+
+  return el("section", {
+    class: "ap-block",
+    children: [
+      head,
+      el("div", {
+        class: "ap-trilha",
+        children: [
+          cardTrilha({
+            titulo: "Praticando agora",
+            subtitulo: "Assuntos que a Cogni vai reforçar",
+            iconSvg: ICON.sprout,
+            variante: "praticando",
+            itens: praticando,
+            vazio: total
+              ? "Nada pendente de reforço no momento. 🎉"
+              : "Os assuntos em que a Cogni estiver ajudando aparecerão aqui.",
+            now,
+            dominado: false,
+          }),
+          cardTrilha({
+            titulo: "Já domina",
+            subtitulo: "Acertou sozinho mais de uma vez",
+            iconSvg: ICON.check,
+            variante: "dominou",
+            itens: dominados,
+            vazio: "Assim que um assunto for dominado, ele aparece aqui.",
+            now,
+            dominado: true,
+          }),
+        ],
+      }),
     ],
   });
 }
@@ -296,21 +554,35 @@ export async function renderAprendizado(ctx) {
   );
   root.appendChild(head);
 
-  const [conversas, dicas] = await Promise.all([
+  const [conversas, dicas, criancaFresca] = await Promise.all([
     ctx.mock.getConversas(),
     ctx.mock.getDicas(),
+    // A trilha muda a cada conversa do robô, então relemos o perfil em vez de
+    // usar o `ctx.crianca` do boot do painel (que pode ter horas de idade). Se a
+    // leitura falhar, caímos no do boot — a trilha some, o resto da tela não.
+    ctx.mock.getCrianca().catch((e) => {
+      console.debug("[Companion] Trilha: releitura do perfil falhou.", e);
+      return null;
+    }),
   ]);
+  const crianca = criancaFresca || ctx.crianca;
 
   // Janela da semana (usada pelos contadores do rodapé).
   const semana = weekWindow(conversas, ctx.now);
 
   /* ---- Cards de matéria ---- */
   const mats = topMaterias(conversas, 4);
-  const matsGrid = el("div", {
-    class: "ap-mats",
-    children: mats.map(cardMateria),
-  });
-  root.appendChild(matsGrid);
+  root.appendChild(
+    mats.length
+      ? el("div", { class: "ap-mats", children: mats.map(cardMateria) })
+      : el("p", {
+          class: "ap-empty ap-empty--lead",
+          text: `O tempo dedicado a cada matéria aparece aqui assim que o ${nome} conversar com a Cogni.`,
+        })
+  );
+
+  /* ---- Trilha de aprendizado (criancas.progresso — read-only) ---- */
+  root.appendChild(blocoTrilha({ crianca, nome, now: ctx.now }));
 
   /* ---- Tópicos explorados ---- */
   const topicosHead = el("div", {
@@ -369,14 +641,18 @@ export async function renderAprendizado(ctx) {
       modo === "mensal"
         ? serie.reduce((s, p) => s + p.value, 0)
         : Math.round(tempoTotal(weekWindow(conversas, ctx.now)) / 60000);
+    // Sem minutos no período não cabe elogio ("Muito bem! …dedicou 0 min" soa
+    // irônico justamente pro pai que abriu o painel e não achou nada).
+    const texto = !total
+      ? modo === "mensal"
+        ? `Ainda não há tempo de estudo registrado nas últimas 4 semanas.`
+        : `Ainda não há tempo de estudo registrado nesta semana.`
+      : modo === "mensal"
+      ? `Nas últimas 4 semanas, ${nome} estudou ${formatMinutos(total)}.`
+      : `Muito bem! ${nome} dedicou ${formatMinutos(total)} aos estudos essa semana.`;
     resumoFaixa.replaceChildren(
       el("span", { class: "ap-chart__note-ico", svg: ICON.chart }),
-      el("p", {
-        text:
-          modo === "mensal"
-            ? `Nas últimas 4 semanas, ${nome} estudou ${formatMinutos(total)}.`
-            : `Muito bem! ${nome} dedicou ${formatMinutos(total)} aos estudos essa semana.`,
-      })
+      el("p", { text: texto })
     );
   }
 

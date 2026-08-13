@@ -147,6 +147,68 @@ export function formatDiaRelativo(value, now = new Date()) {
   return label;
 }
 
+const DIA_MS = 86400000;
+
+/**
+ * Diferença em dias de CALENDÁRIO local entre dois instantes (`fim` − `ini`).
+ * Comparamos meia-noite a meia-noite (e não 24h corridas) pelo mesmo motivo de
+ * `formatDiaRelativo`: pro pai, algo visto às 23h de ontem é "ontem", não "há
+ * 8 horas".
+ * @returns {number} dias inteiros, ou NaN se alguma data for inválida.
+ */
+function diffDias(ini, fim) {
+  const a = toDate(ini);
+  const b = toDate(fim);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return NaN;
+  const ma = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const mb = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((mb - ma) / DIA_MS);
+}
+
+/**
+ * "Quando isso aconteceu", no passado: "hoje", "ontem", "há 3 dias"…
+ * Usado na Trilha de aprendizado (`progresso.visto`). Linguagem de conversa,
+ * não de relatório.
+ * @param {string|Date} value
+ * @param {Date} [now]
+ * @returns {string} (vazio se a data for inválida)
+ */
+export function formatQuandoVisto(value, now = new Date()) {
+  const d = diffDias(value, now);
+  if (!Number.isFinite(d)) return "";
+  if (d <= 0) return "hoje";
+  if (d === 1) return "ontem";
+  if (d < 7) return `há ${d} dias`;
+  if (d < 14) return "há uma semana";
+  if (d < 30) return `há ${Math.round(d / 7)} semanas`;
+  if (d < 60) return "há um mês";
+  return `há ${Math.round(d / 30)} meses`;
+}
+
+/**
+ * "Quando isso volta", no futuro: "na próxima conversa" (já venceu), "amanhã",
+ * "em 5 dias"… Usado na Trilha (`progresso.proxima`), onde uma data vencida
+ * significa que a Cogni já vai puxar o assunto no próximo papo.
+ * @param {string|Date} value
+ * @param {Date} [now]
+ * @returns {string} (vazio se a data for inválida)
+ */
+export function formatQuandoRevisar(value, now = new Date()) {
+  const alvo = toDate(value).getTime();
+  if (Number.isNaN(alvo)) return "";
+  // Vencido é comparação de RELÓGIO, não de calendário: algo que venceu às 8h de
+  // hoje já está na fila da Cogni, ainda que "hoje" pelo calendário.
+  if (alvo <= toDate(now).getTime()) return "na próxima conversa";
+  const d = diffDias(now, value);
+  if (!Number.isFinite(d)) return "";
+  if (d <= 0) return "ainda hoje";
+  if (d === 1) return "amanhã";
+  if (d < 7) return `em ${d} dias`;
+  if (d < 14) return "na semana que vem";
+  if (d < 60) return `em ${Math.round(d / 7)} semanas`;
+  return `em ${Math.round(d / 30)} meses`;
+}
+
 /* --------------------------------------------------------------------------
    Derivações sobre conversas
    -------------------------------------------------------------------------- */

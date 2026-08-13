@@ -316,20 +316,48 @@ function formularioPerfil(crianca, { onSubmit, close }) {
     })
   );
 
-  form.addEventListener("submit", (e) => {
+  // Aviso de falha (rede/RLS). Mesma classe do formulário de Planos — o painel
+  // já compartilha essas peças de formulário entre as seções.
+  const erroSalvar = el("p", {
+    class: "pl-form__erro",
+    attrs: { role: "status", "aria-live": "polite" },
+  });
+  form.appendChild(erroSalvar);
+
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const idadeVal = parseInt(inIdade.value, 10);
-    onSubmit({
-      nome: inNome.value.trim() || crianca.nome,
-      idade: Number.isNaN(idadeVal) ? null : idadeVal,
-      serie: inSerie.value.trim(),
-      materia_favorita: selFav.value || null,
-      materia_dificil: selDif.value || null,
-      hobbies: inHobbies.value.trim(),
-      como_aprende: inComoAprende.value.trim(),
-      estilo_linguagem: inEstilo.value.trim(),
-      prompt_personalizado: inPrompt.value.trim(),
-    });
+
+    // Trava o botão durante o update e mostra a falha se ela vier: o perfil
+    // alimenta o prompt da Cogni, então "achei que tinha salvado" é caro aqui.
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Salvando…";
+    erroSalvar.textContent = "";
+    try {
+      await onSubmit({
+        nome: inNome.value.trim() || crianca.nome,
+        idade: Number.isNaN(idadeVal) ? null : idadeVal,
+        serie: inSerie.value.trim(),
+        materia_favorita: selFav.value || null,
+        materia_dificil: selDif.value || null,
+        hobbies: inHobbies.value.trim(),
+        como_aprende: inComoAprende.value.trim(),
+        estilo_linguagem: inEstilo.value.trim(),
+        prompt_personalizado: inPrompt.value.trim(),
+      });
+    } catch (err) {
+      console.error("[Companion] Falha ao salvar o perfil:", err);
+      erroSalvar.textContent =
+        "Não consegui salvar agora. Verifique sua conexão e tente de novo.";
+      if (window.cognifyToast) {
+        window.cognifyToast.show("Não foi possível salvar o perfil.", {
+          type: "error",
+        });
+      }
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Salvar perfil";
+    }
   });
 
   return form;
@@ -428,6 +456,13 @@ function blocoTema() {
 
   // Mantém o switch em sincronia se o tema mudar pelo toggle do header.
   const obs = new MutationObserver(() => {
+    // O router não avisa quando desmonta uma seção, então o observer se aposenta
+    // sozinho ao perceber que o switch saiu do DOM. Sem isso, cada visita a
+    // Configurações deixaria mais um observer vivo, segurando o nó antigo.
+    if (!sw.isConnected) {
+      obs.disconnect();
+      return;
+    }
     const on = isDark();
     sw.classList.toggle("is-on", on);
     sw.setAttribute("aria-checked", String(on));
