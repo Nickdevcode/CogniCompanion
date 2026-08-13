@@ -338,6 +338,7 @@ O cérebro da Cogni ganhou um *student model*: ela agora registra **o que a cria
     "status": "travou",
     "acertos": 0,
     "vezes": 2,
+    "nivel": 1,
     "visto": "2026-08-10T21:03:00.000Z",
     "proxima": "2026-08-11T21:03:00.000Z"
   }
@@ -346,15 +347,25 @@ O cérebro da Cogni ganhou um *student model*: ela agora registra **o que a cria
 
 | Campo | O que é |
 | --- | --- |
-| `conceito` | o tema fino (1 a 4 palavras), extraído pela IA — mesma fonte do `conversas.topico` |
+| `conceito` | o tema fino (1 a 4 palavras). Vem da IA (igual ao `conversas.topico`) **ou** do ciclo de prática, e aí é o nome da habilidade: `tabuada`, `porcentagem`, `silabas`… |
 | `materia` | uma das matérias canônicas, ou `null` |
 | `status` | `"travou"` ou `"aprendeu"` — como ela se saiu da última vez |
 | `acertos` | acertos seguidos; é o que faz o intervalo de revisão crescer (travar zera) |
 | `vezes` | quantas vezes o tema apareceu no total |
+| `nivel` | **(novo, ago/2026)** dificuldade calibrada do próximo exercício daquele conceito: `1`, `2` ou `3`. Sobe quando ela acerta de primeira, desce quando trava. Itens antigos não têm o campo — trate ausente como `1` |
 | `visto` | quando foi a última vez |
 | `proxima` | quando deve voltar. Vencido (`proxima <= agora`) = a Cogni vai puxar o assunto |
 
 Escada de revisão: **travou → 1 dia**; **acertou → 2, 5, 12, 30, 60 dias**. Travar de novo reseta. Máximo de 40 itens por criança (a poda descarta os já dominados mais antigos, nunca os que ela travou).
+
+### Quem alimenta a trilha (ago/2026: agora são duas fontes)
+
+1. **A análise da conversa** (como antes): a IA auxiliar infere `travou`/`aprendeu` do turno e grava o tópico. Palpite bom, mas palpite.
+2. **O ciclo de prática** (novo): a Cogni **propõe exercícios** gerados pelo servidor, e a resposta da criança é conferida por **aritmética exata** — não pelo modelo. Quando existe veredito de prática no turno, ele **vence** o palpite da IA (e o da IA não é gravado, pra não contar o mesmo acerto duas vezes).
+
+Isso muda a qualidade do dado que chega ao Companion: parte dos `travou`/`aprendeu` agora vem de **acerto/erro conferido**, não de inferência. Conceitos vindos da prática têm nome de habilidade (`tabuada`, `porcentagem`, `soma de fracoes`, `silabas`, `equacao do primeiro grau`, `teorema de pitagoras`…), então repetem entre crianças e são bons para agrupar.
+
+> Nada disso exige mudança no site: é a mesma coluna, com um campo a mais e dado mais confiável. O bloco do painel (abaixo) continua funcionando exatamente como está.
 
 ### Regra de escrita: o site NÃO escreve aqui
 
@@ -378,6 +389,15 @@ Decisões que valem registro:
 - Máximo de **5 itens por coluna** (recorte acionável, não histórico), ordenados por urgência (quem precisa de reforço primeiro) e por consolidação (mais acertos primeiro).
 - A seção **relê o perfil** (`getCrianca()`) ao abrir, em vez de usar o `ctx.crianca` do boot do painel: a trilha muda a cada conversa do robô. Se essa releitura falhar, o bloco cai no perfil do boot — o resto da tela não quebra.
 - Cada item passa por um **saneamento** (o jsonb é livre): conceito vazio, status desconhecido, matéria fora da lista canônica ou data inválida são descartados/normalizados.
+- **Selo "subiu de nível" (feito — ago/2026), lendo o campo `nivel`:** um selo discreto (contorno, sem cor de estado) ao lado do selo de status em "Praticando agora". É a evidência mais direta de progresso real — a criança está resolvendo exercícios mais duros do mesmo assunto, e o nível só sobe quando ela acerta **de primeira, sem pista**. A regra de exibição é mais estreita do que "nível > 1", e de propósito:
+
+| Onde | Aparece? | Por quê |
+| --- | --- | --- |
+| "Praticando agora", último veredito **bom** (`aprendeu`) e `nivel >= 2` | ✅ sim | todo conceito começa no nível 1, então estar acima disso significa que ela acertou de primeira ali |
+| "Praticando agora", em **reforço** (`travou`), mesmo com `nivel >= 2` | ❌ não | `nivel` é um **retrato do presente, não um evento** — não existe "nível anterior" no jsonb — e travar **derruba** o nível. Um item em reforço com nível 2 acabou de CAIR do 3: dizer "subiu de nível" ali descreveria justamente o que deixou de valer |
+| "Já domina" | ❌ não | a linha já fala em acertos seguidos; empilhar mais um selo transformaria o card em placar |
+
+  O saneamento cobre o campo: ausente (item anterior à prática), sujo ou fora da faixa vira `1` — o mesmo piso que o servidor aplica. O texto explicativo ("A Cogni já propõe exercícios mais difíceis de X") fica no `title`, como complemento: quem lê só a pílula continua entendendo a linha.
 
 > ⚠️ **Cuidado de tom, e isso importa:** o rótulo `travou` é linguagem interna e **não aparece na tela** — o pai lê "precisa de reforço", "quase lá", "já domina", nunca nota ou ranking. O mesmo cuidado já aplicado no robô, que é proibido de dizer à criança "aquilo que você travou". O bloco ainda vem com uma linha explícita: *"Não é nota: é o que a Cogni guarda pra retomar os assuntos nos próximos dias."*
 

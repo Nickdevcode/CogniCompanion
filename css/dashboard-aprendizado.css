@@ -363,6 +363,29 @@
   background-color: var(--st-andamento-soft);
   color: var(--st-andamento);
 }
+/* "Subiu de nível" divide a linha com o selo de status, então vem em contorno e
+   sem cor de estado: informação secundária, que apoia sem competir — e sem o
+   peso visual que faria a trilha parecer um placar. */
+.ap-titem__selo[data-tom="nivel"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-inline: 0.45rem;
+  background-color: transparent;
+  border: 1px solid var(--dash-border-strong);
+  color: var(--dash-text-muted);
+  font-weight: var(--fw-medium);
+}
+.ap-titem__selo-ico {
+  display: inline-grid;
+  place-items: center;
+  width: 10px;
+  height: 10px;
+}
+.ap-titem__selo-ico svg {
+  width: 100%;
+  height: 100%;
+}
 .ap-titem__meta {
   display: block;
   margin-top: 0.2rem;

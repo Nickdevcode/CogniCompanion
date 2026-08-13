@@ -81,6 +81,12 @@ const crianca = {
   // servidor, no pipeline pós-resposta. Datas relativas a MOCK_NOW (2026-05-27)
   // e coerentes com as conversas de exemplo abaixo — é o que o Painel de
   // Aprendizado lê pra montar "Praticando agora" e "Já domina".
+  //
+  // `nivel` (1 a 3) é a dificuldade do próximo exercício, calibrada pelo ciclo de
+  // prática. Os itens abaixo cobrem de propósito os três casos que a tela precisa
+  // distinguir: subiu e o último veredito foi bom (selo "subiu de nível"), subiu
+  // mas depois travou (sem selo — ela caiu de nível, não subiu) e item legado,
+  // gravado antes do campo existir (ausente = 1, também sem selo).
   progresso: [
     {
       conceito: "tabuada do 7",
@@ -88,6 +94,7 @@ const crianca = {
       status: "travou", // rótulo INTERNO — a tela nunca mostra esta palavra
       acertos: 0,
       vezes: 3,
+      nivel: 2, // caiu do 3 ao travar → NÃO ganha o selo de nível
       visto: "2026-05-26T20:41:00-03:00",
       proxima: "2026-05-27T20:41:00-03:00",
     },
@@ -97,6 +104,7 @@ const crianca = {
       status: "aprendeu",
       acertos: 1, // 1 acerto ainda não é domínio → aparece como "quase lá"
       vezes: 2,
+      nivel: 2, // acertou de primeira e subiu → "quase lá" + "subiu de nível"
       visto: "2026-05-27T18:32:00-03:00",
       proxima: "2026-05-29T18:32:00-03:00",
     },
@@ -106,6 +114,7 @@ const crianca = {
       status: "aprendeu",
       acertos: 1,
       vezes: 1,
+      // Sem `nivel` de propósito: item anterior ao ciclo de prática (ausente = 1).
       visto: "2026-05-25T15:48:00-03:00",
       proxima: "2026-05-27T15:48:00-03:00",
     },
@@ -115,6 +124,7 @@ const crianca = {
       status: "aprendeu",
       acertos: 3,
       vezes: 5,
+      nivel: 3,
       visto: "2026-05-27T16:05:00-03:00",
       proxima: "2026-06-08T16:05:00-03:00",
     },
@@ -124,6 +134,7 @@ const crianca = {
       status: "aprendeu",
       acertos: 2,
       vezes: 3,
+      nivel: 2,
       visto: "2026-05-24T16:30:00-03:00",
       proxima: "2026-05-29T16:30:00-03:00",
     },

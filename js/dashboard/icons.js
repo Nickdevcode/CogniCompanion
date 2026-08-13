@@ -45,6 +45,9 @@ export const ICON = {
   alert: stroke('<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/>'),
   bell: stroke('<path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5Z"/><path d="M10.5 20a1.8 1.8 0 0 0 3 0"/>'),
   refresh: stroke('<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v5h-5"/>'),
+  // Seta pra cima: acompanha o selo "subiu de nível" na Trilha. Traço mais
+  // grosso porque ela é renderizada bem pequena (10px) dentro da pílula.
+  arrowUp: stroke('<path d="M12 19V5M6 11l6-6 6 6"/>', "2.4"),
   // Broto: usado na Trilha de aprendizado pro que a criança ainda está
   // praticando. Escolhido de propósito no lugar de alerta/aviso — é crescimento
   // em curso, não problema (ver o cuidado de tom no plano técnico).

@@ -146,6 +146,12 @@ O painel lê isso e transforma em duas perguntas que o pai não conseguia respon
 | 🌱 **Praticando agora** | O que ainda precisa de reforço + o que ela acertou só uma vez ("quase lá"), com a matéria, quando foi visto e **quando a Cogni retoma** | `status: "travou"`, ou `"aprendeu"` com menos de 2 acertos |
 | ✅ **Já domina** | O que ela acertou sozinha mais de uma vez, com o nº de acertos seguidos | `status: "aprendeu"` e `acertos >= 2` |
 
+Desde a reforma pedagógica de ago/2026 a Cogni também **propõe exercícios** e confere a resposta por conta
+própria, calibrando um `nivel` (1 a 3) por assunto. Em "Praticando agora", quem passou do nível inicial
+ganha um selo discreto **↑ subiu de nível**: ela está resolvendo exercícios mais difíceis do mesmo assunto.
+Ele só aparece quando o último veredito foi bom — num item que travou o nível acabou de *cair*, então o
+selo seria mentira. Item antigo sem o campo conta como nível 1.
+
 Três regras que valem a pena não esquecer:
 
 - 🔒 **`progresso` é read-only pro site.** Quem escreve é **só o servidor**. A allowlist `EDITAVEIS` em

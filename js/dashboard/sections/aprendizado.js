@@ -134,10 +134,30 @@ const ACERTOS_DOMINIO = 2;
 /** Itens por coluna: a tela é um recorte acionável, não um histórico. */
 const MAX_TRILHA = 5;
 
+/**
+ * Faixa do `nivel` — a dificuldade calibrada do PRÓXIMO exercício daquele
+ * conceito. Espelha o servidor (`pratica.js`: NIVEL_MIN/NIVEL_MAX): todo
+ * conceito começa no 1, sobe só quando a criança acerta de primeira (sem pista)
+ * e desce quando ela trava.
+ */
+const NIVEL_MIN = 1;
+const NIVEL_MAX = 3;
+
 /** Timestamp numérico tolerante (data inválida/ausente vira 0, nunca NaN). */
 function ts(valor) {
   const t = Date.parse(valor);
   return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * Nível saneado (1 a 3). Itens gravados antes do ciclo de prática não têm o
+ * campo, e o jsonb é livre — ausente, sujo ou fora da faixa vira o piso, o mesmo
+ * que o servidor faz ao ler a trilha.
+ */
+function normalizarNivel(valor) {
+  const n = Math.trunc(Number(valor));
+  if (!Number.isFinite(n)) return NIVEL_MIN;
+  return Math.min(Math.max(n, NIVEL_MIN), NIVEL_MAX);
 }
 
 /**
@@ -156,6 +176,7 @@ function normalizarItemTrilha(item) {
     status: item.status,
     acertos: Number(item.acertos) || 0,
     vezes: Number(item.vezes) || 0,
+    nivel: normalizarNivel(item.nivel),
     visto: item.visto || null,
     proxima: item.proxima || null,
   };
@@ -263,6 +284,19 @@ function itemTrilha(item, { now, dominado }) {
     ? { texto: "precisa de reforço", tom: "reforco" }
     : { texto: "quase lá", tom: "quase" };
 
+  // "Subiu de nível": a evidência mais direta de progresso conferido por código
+  // (a criança está resolvendo exercícios mais duros do MESMO assunto), já que o
+  // nível só sobe quando ela acerta de primeira, sem pista.
+  //
+  // Só entra quando o último veredito foi BOM, e por um motivo concreto: `nivel`
+  // é um retrato do presente, não um evento — não há "nível anterior" no jsonb —,
+  // e travar DERRUBA o nível. Num item em reforço, um nível 2 significa que ela
+  // acabou de CAIR do 3; anunciar "subiu de nível" ali descreveria justamente o
+  // que deixou de valer. Em "Já domina" também não aparece: lá a linha já fala em
+  // acertos seguidos, e empilhar mais um selo transformaria o card num placar.
+  const subiuDeNivel =
+    !dominado && item.status === STATUS_ACERTOU && item.nivel > NIVEL_MIN;
+
   const partes = [materiaLabel(item.materia)];
   if (dominado) {
     partes.push(`${item.acertos} acertos seguidos`);
@@ -284,6 +318,26 @@ function itemTrilha(item, { now, dominado }) {
             class: "ap-titem__selo",
             attrs: { "data-tom": selo.tom },
             text: selo.texto,
+          })
+        : null,
+      subiuDeNivel
+        ? el("span", {
+            class: "ap-titem__selo",
+            attrs: {
+              "data-tom": "nivel",
+              // Complementa sem ser essencial: quem só lê a pílula continua
+              // entendendo a linha. Explica o que "nível" quer dizer aqui, que
+              // pro pai não é óbvio.
+              title: `A Cogni já propõe exercícios mais difíceis de ${item.conceito}.`,
+            },
+            children: [
+              el("span", {
+                class: "ap-titem__selo-ico",
+                svg: ICON.arrowUp,
+                attrs: { "aria-hidden": "true" },
+              }),
+              el("span", { text: "subiu de nível" }),
+            ],
           })
         : null,
     ],
