@@ -124,6 +124,7 @@ Um dado, três coelhos. 🎯
 | `prompt_personalizado` | text | **novo** — instruções do pai pra Cogni sobre esse filho |
 | `responsavel_id` | uuid | FK → responsaveis(id), nullable até parear |
 | `codigo_pareamento` | text unique | **novo** — código FIXO do perfil (6 chars, sem ambíguos), gerado no nascimento do perfil, permanente. O pai usa pra vincular no Companion |
+| `rosto_robo` | jsonb | **novo** — a geometria dos olhos que a **criança** desenhou (ver "🎨 O editor de rosto"). Nullable: sem valor = rosto de fábrica. Cada criança tem o seu, e trocar de perfil troca a cara do robô na hora |
 | `criado_em` | timestamptz | |
 | `ultimo_acesso` | timestamptz | |
 | `atualizado_em` | timestamptz | |
@@ -215,6 +216,51 @@ O site lê/escreve via `@supabase/supabase-js` (anon key, já carregado nos HTML
 
 ---
 
+## 🎨 O editor de rosto (a criança desenha os olhos do robô)
+
+Essa é a única tela do Companion feita **para a criança**, não para o pai — e é a que tem respaldo acadêmico mais direto: um estudo de 2025 mostrou que um rosto **desenhado pela própria criança** tem *inteligência social percebida* significativamente maior que um rosto genérico, e aponta que quase todo robô infantil é projetado da perspectiva de um adulto. No TCC isso vira hipótese testável com grupo de controle: mesmo robô, mesmo conteúdo, mudando só quem desenhou a cara dele.
+
+### O que a criança controla
+
+O robô desenha os olhos **proceduralmente** (não são imagens), então o que o editor expõe são cinco parâmetros — e só esses cinco. Qualquer coisa fora dessa lista o firmware ignora.
+
+| Campo | Tipo | Faixa aceita | Padrão | O que muda na cara |
+| --- | --- | --- | --- | --- |
+| `largura` | int (px) | 14 – 48 | 36 | Olho fino ou largo |
+| `altura` | int (px) | 12 – 48 | 36 | Olho espremido ou arregalado |
+| `raio` | int (px) | 0 – 16 | 8 | **0 = quadradão (sério/robótico)**, 16 = bem redondo (fofo) |
+| `espaco` | int (px) | −4 – 34 | 10 | Distância entre os olhos; negativo cruza (vesguinho permanente) |
+| `sobrancelhas` | boolean | — | `true` | Liga/desliga as sobrancelhas |
+
+> ⚠️ **A faixa é validada no firmware**, que é quem conhece a tela de 128×64. O site deve respeitar os limites acima na UI (sliders), mas não precisa se preocupar em blindar: um valor fora da faixa é **grampeado**, nunca desenha fora da tela.
+
+### Os dois endpoints
+
+Ambos no servidor local da Cogni (`{SERVIDOR}`), porque quem fala com o robô é ele:
+
+```
+GET  {SERVIDOR}/api/esp/rosto?usuarioId=<id>
+  → { rostoRobo: { largura, altura, raio, espaco, sobrancelhas }, padrao: {...} }
+
+PUT  {SERVIDOR}/api/esp/rosto
+  body: { usuarioId, largura, altura, raio, espaco, sobrancelhas }
+  → { rostoRobo, aplicadoNoRobo: true|false }
+```
+
+`aplicadoNoRobo` diz se o robô estava conectado **e** usando aquele perfil. `false` não é erro: o rosto foi salvo e vai valer na próxima conexão.
+
+### O detalhe que faz a tela ser divertida
+
+O `PUT` aplica **na hora** no robô físico. Então o editor deve mandar a cada mudança de slider (com um *debounce* de ~150 ms) e a criança vê **o robô de verdade mudando de cara ao vivo** enquanto arrasta. É isso que transforma um formulário numa brincadeira — sem o preview ao vivo, a feature perde a graça inteira.
+
+Recomendado: um preview em SVG/Canvas no próprio site (dois retângulos arredondados + as barrinhas das sobrancelhas), para funcionar mesmo com o robô desligado.
+
+### Onde o dado mora
+
+`criancas.rosto_robo` (jsonb). O robô lê do perfil local, que já é hidratado do Supabase pelo caminho normal — **não há sincronismo novo a construir**. O servidor manda o rosto pro robô em dois momentos: quando ele conecta (o firmware não guarda geometria entre reinícios) e quando **troca o perfil ativo** — o que é o que faz a ideia valer numa casa com mais de um filho.
+
+---
+
 ## 🪜 Fases de execução (ordem de menor risco)
 
 | Fase | O que | Risco no robô |
@@ -242,6 +288,33 @@ Cada função: **eu (backend) → atualizo o contrato → Claude do site (tela) 
 - **Ciência do Companion no prompt:** ✅ **feito.** `secaoCompanion()` em `brain/prompt.js`: a Cogni **sabe** o que é o app dos pais (acompanham conversas/tempo/tópicos, criam planos, recebem resumo semanal + dicas, pareiam por código) e responde dúvidas da criança com **honestidade e leveza** (acompanham pra apoiar, não pra vigiar). Só pro estudante.
 - **Boot/shutdown:** `server/index.js` (boot vira async com `await inicializar()` antes do `listen`; `flushSync` no shutdown).
 - **Flag/config:** `server/config.js` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_HABILITADO`).
+
+---
+
+## 🔍 Auditoria técnica (ago/2026) — o que o site precisa saber
+
+> [!info] Esta seção é **ciência, não tarefa**
+> Nenhum dos itens abaixo pede alteração no site. Não há schema novo, endpoint novo, campo novo nem migração. O Companion continua funcionando exatamente como está — isto aqui existe só para o lado do site **saber** o que mudou por baixo. Se algum item parecer uma ação, ela é do lado do **servidor** (o `.env` do Nicolas), nunca do front.
+
+Uma auditoria completa passou pelos três lados do projeto (firmware, servidor, interface). Três pontos tocam o Companion e ficam registrados aqui:
+
+### 1. `TRUST_PROXY` — só importa **se um dia** houver túnel no caminho (hoje não há)
+
+O servidor **deixou de confiar** no cabeçalho `X-Forwarded-For` por padrão. Era uma falha real: com `trust proxy` ligado sem proxy nenhum na frente, qualquer um na rede local podia forjar o próprio IP, furar o rate limit e — pior — passar pelo gate "só localhost" do `GET /api/esp/token`, que entrega o token do WebSocket do robô.
+
+**Situação hoje: nada a fazer.** O site chama `SERVIDOR_URL = "http://127.0.0.1:3000"` (loopback direto, sem proxy no meio), então o padrão desligado já é o correto e o mais seguro.
+
+**Só relevante num cenário futuro:** se um dia o site passar a falar com o servidor através de um túnel (ngrok, Cloudflare Tunnel, nginx), aí o Nicolas define `TRUST_PROXY=1` no `.env` **do servidor** — não há nada a mudar no front. Sem isso, todas as chamadas chegariam com o IP do túnel e dividiriam a mesma cota do rate limit global (120/min). Os endpoints do Companion (`/api/dica`, `/api/resumo-semanal`, `/api/pareamento/*`) já têm limite próprio por criança, então só o global pesaria, e só com muitos acessos simultâneos.
+
+### 2. O Diário passa a receber respostas inteiras
+
+A limpeza de citações do servidor tinha um falso-positivo grave: a regra que apagava rótulos de fonte casava a **palavra** "fonte" e engolia todo o resto da frase. Uma resposta de ciências como *"as **fontes** de energia são o sol e o vento"* era gravada em `conversas.texto_resposta` como **"as "**.
+
+Ou seja: o Diário e o Resumo Semanal vinham lendo respostas mutiladas em qualquer conversa que usasse a palavra "fonte" ou "referência". Corrigido (agora só o rótulo `Fonte:` com dois-pontos é removido). **Nada a fazer no site** — os registros novos já nascem completos; os antigos permanecem como estão no banco.
+
+### 3. Nenhuma migração pendente
+
+O contrato de dados, as tabelas, a RLS e todos os endpoints seguem exatamente como documentados acima. As correções foram internas ao servidor, ao firmware e à interface local.
 
 ---
 
