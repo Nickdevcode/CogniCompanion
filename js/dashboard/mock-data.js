@@ -426,6 +426,149 @@ const resumoSemanal = {
   criado_em: "2026-05-27T08:15:00-03:00",
 };
 
+/**
+ * Sessões de atenção — espelham a tabela `sessoes_atencao` (o Mapa de Compreensão
+ * da Aula). Uma linha por AULA, não por turno: o servidor cruza, no eixo do tempo,
+ * o assunto de cada turno com os sinais lidos pela câmera e os vereditos de
+ * exercício, e grava tudo quando a sessão acaba. O site só lê (read-only).
+ *
+ * Dois detalhes que o mock reproduz de propósito, porque a tela tem que aguentar:
+ *   - `momentos[].emMs` é offset DESDE O INÍCIO da sessão (não timestamp);
+ *   - os `rotulo` vêm SEM acento, como o repo do robô os escreve — quem acentua
+ *     pra tela é o `mapa-api.js` (ver ROTULOS_ACENTUADOS lá).
+ *
+ * A terceira sessão não tem nenhum momento marcado: é o caso "correu tranquila",
+ * que precisa parecer uma aula boa e não uma tela quebrada.
+ */
+const sessoesAtencao = [
+  {
+    id: 3103,
+    crianca_id: crianca.id,
+    iniciada_em: "2026-05-27T16:00:00-03:00",
+    duracao_ms: 17 * 60000,
+    turnos: 9,
+    materias: ["ciencias", "portugues"],
+    topicos: ["dinossauros", "redação"],
+    contadores: { travada: 1, confusa: 1, engajada: 2, acertos: 2, tropecos: 1 },
+    momentos: [
+      {
+        emMs: 2 * 60000 + 40000,
+        tipo: "afeto",
+        sinal: "engajada",
+        rotulo: "estava embalada",
+        materia: "ciencias",
+        topico: "dinossauros",
+      },
+      {
+        emMs: 6 * 60000 + 15000,
+        tipo: "pratica",
+        resultado: "aprendeu",
+        rotulo: "resolveu sozinha",
+        materia: "ciencias",
+        topico: "dinossauros",
+      },
+      {
+        emMs: 9 * 60000 + 30000,
+        tipo: "afeto",
+        sinal: "confusa",
+        rotulo: "ficou em duvida",
+        materia: "portugues",
+        topico: "redação",
+      },
+      {
+        emMs: 11 * 60000 + 12000,
+        tipo: "afeto",
+        sinal: "travada",
+        rotulo: "precisou de mais ajuda",
+        materia: "portugues",
+        topico: "redação",
+      },
+      {
+        emMs: 12 * 60000 + 50000,
+        tipo: "pratica",
+        resultado: "travou",
+        rotulo: "tropecou no exercicio",
+        materia: "portugues",
+        topico: "redação",
+      },
+      {
+        emMs: 15 * 60000 + 5000,
+        tipo: "pratica",
+        resultado: "aprendeu",
+        rotulo: "resolveu sozinha",
+        materia: "portugues",
+        topico: "redação",
+      },
+      {
+        emMs: 16 * 60000 + 20000,
+        tipo: "afeto",
+        sinal: "engajada",
+        rotulo: "estava embalada",
+        materia: "portugues",
+        topico: "redação",
+      },
+    ],
+    criado_em: "2026-05-27T16:17:00-03:00",
+  },
+  {
+    id: 3102,
+    crianca_id: crianca.id,
+    iniciada_em: "2026-05-26T20:30:00-03:00",
+    duracao_ms: 15 * 60000,
+    turnos: 7,
+    materias: ["matematica"],
+    topicos: ["tabuada do 7"],
+    contadores: { travada: 2, confusa: 0, engajada: 0, acertos: 0, tropecos: 2 },
+    momentos: [
+      {
+        emMs: 4 * 60000 + 12000,
+        tipo: "afeto",
+        sinal: "travada",
+        rotulo: "precisou de mais ajuda",
+        materia: "matematica",
+        topico: "tabuada do 7",
+      },
+      {
+        emMs: 5 * 60000 + 48000,
+        tipo: "pratica",
+        resultado: "travou",
+        rotulo: "tropecou no exercicio",
+        materia: "matematica",
+        topico: "tabuada do 7",
+      },
+      {
+        emMs: 10 * 60000 + 3000,
+        tipo: "afeto",
+        sinal: "travada",
+        rotulo: "precisou de mais ajuda",
+        materia: "matematica",
+        topico: "tabuada do 7",
+      },
+      {
+        emMs: 13 * 60000 + 40000,
+        tipo: "pratica",
+        resultado: "travou",
+        rotulo: "tropecou no exercicio",
+        materia: "matematica",
+        topico: "tabuada do 7",
+      },
+    ],
+    criado_em: "2026-05-26T20:45:00-03:00",
+  },
+  {
+    id: 3101,
+    crianca_id: crianca.id,
+    iniciada_em: "2026-05-24T16:20:00-03:00",
+    duracao_ms: 14 * 60000,
+    turnos: 6,
+    materias: ["ciencias"],
+    topicos: ["sistema solar"],
+    contadores: { travada: 0, confusa: 0, engajada: 0, acertos: 0, tropecos: 0 },
+    momentos: [], // aula sem atrito → a tela mostra "correu tranquila"
+    criado_em: "2026-05-24T16:34:00-03:00",
+  },
+];
+
 /* ==========================================================================
    "Agora" do mock — fixa a data de referência pra os rótulos relativos
    ("Hoje"/"Ontem") baterem com os dados de exemplo acima.
@@ -487,6 +630,15 @@ async function _mockDicaAtual() {
     .slice()
     .sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
   return ordenadas.length ? { ...ordenadas[0] } : null;
+}
+
+async function _mockSessoesAtencao(limite) {
+  await delay();
+  return sessoesAtencao
+    .slice()
+    .sort((a, b) => new Date(b.iniciada_em) - new Date(a.iniciada_em))
+    .slice(0, Math.min(Math.max(1, Number(limite) || 10), 50))
+    .map((s) => ({ ...s }));
 }
 
 /* --- API pública de leitura (roteia mock ↔ Supabase pela flag) ------------ */
@@ -554,6 +706,21 @@ export async function getResumoSemanal() {
  */
 export async function getDicaAtual() {
   return USAR_SUPABASE ? supa.getDicaAtual() : _mockDicaAtual();
+}
+
+/**
+ * @param {number} [limite=10]
+ * @returns {Promise<Array<object>>} sessões de atenção da criança (histórico do
+ * Mapa da Aula), mais recentes primeiro — equivalente a:
+ *   from('sessoes_atencao').select('*').eq('crianca_id', id)
+ *     .order('iniciada_em', { ascending: false }).limit(n)
+ * Fonte ESTÁVEL do Mapa (vale com o robô offline). A sessão AO VIVO não vem daqui:
+ * ela só existe em RAM no servidor, no endpoint /api/mapa-aula — ver mapa-api.js.
+ */
+export async function getSessoesAtencao(limite = 10) {
+  return USAR_SUPABASE
+    ? supa.getSessoesAtencao(limite)
+    : _mockSessoesAtencao(limite);
 }
 
 /* ==========================================================================

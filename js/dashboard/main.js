@@ -20,6 +20,7 @@ import { iniciarOnboarding } from "./onboarding.js";
 import { renderInicio } from "./sections/inicio.js";
 import { renderConversas } from "./sections/conversas.js";
 import { renderAprendizado } from "./sections/aprendizado.js";
+import { renderMapa } from "./sections/mapa.js";
 import { renderPlanos } from "./sections/planos.js";
 import { renderRosto } from "./sections/rosto.js";
 import { renderConfig } from "./sections/config.js";
@@ -199,6 +200,7 @@ async function init() {
   router.register("inicio", renderInicio);
   router.register("conversas", renderConversas);
   router.register("aprendizado", renderAprendizado);
+  router.register("mapa", renderMapa);
   router.register("planos", renderPlanos);
   router.register("rosto", renderRosto);
   router.register("config", renderConfig);

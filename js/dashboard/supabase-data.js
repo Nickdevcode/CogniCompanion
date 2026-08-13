@@ -225,6 +225,33 @@ export async function getDicaAtual() {
   return data || null;
 }
 
+/**
+ * Sessões de atenção da criança pareada — o histórico do Mapa de Compreensão da
+ * Aula, mais recentes primeiro. READ-ONLY: quem grava é o servidor (service_role),
+ * ao encerrar cada aula. Equivale a:
+ *   from('sessoes_atencao').select('*').eq('crianca_id', id)
+ *     .order('iniciada_em', { ascending: false }).limit(n)
+ *
+ * Fonte ESTÁVEL do Mapa: as aulas anteriores aparecem mesmo com o robô desligado,
+ * e continuam na tela durante uma aula ao vivo (nessa hora o endpoint do servidor
+ * devolve `historico: []`, porque prioriza a sessão em RAM).
+ *
+ * @param {number} [limite=10]
+ * @returns {Promise<Array<object>>} (vazio se não há criança pareada)
+ */
+export async function getSessoesAtencao(limite = 10) {
+  const crianca = await getCrianca();
+  if (!crianca) return [];
+  const { data, error } = await client()
+    .from("sessoes_atencao")
+    .select("*")
+    .eq("crianca_id", crianca.id)
+    .order("iniciada_em", { ascending: false })
+    .limit(Math.min(Math.max(1, Number(limite) || 10), 50));
+  if (error) throw error;
+  return data || [];
+}
+
 /* ==========================================================================
    Escrita — Planos (CRUD) e perfil da criança. Conversas NÃO entram (RLS).
    ========================================================================== */

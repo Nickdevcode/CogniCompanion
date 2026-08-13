@@ -54,7 +54,9 @@ A regra de ouro: **as duas pontas programam contra o contrato de dados deste doc
 ## 🗂️ Escopo do MVP (o que entra de verdade)
 
 ### Telas do dashboard
-Sidebar: **Início · Conversas · Aprendizado · Planos · Configurações** (a "Família" foi fundida em Configurações: o item da sidebar chama "Configurações", o título da tela continua "Configurações da família"). Entrada: badge de logado → dropdown → **Dashboard**.
+Sidebar: **Início · Conversas · Aprendizado · Mapa da aula · Planos · Rosto da Cogni · Configurações** (a "Família" foi fundida em Configurações: o item da sidebar chama "Configurações", o título da tela continua "Configurações da família"). Entrada: badge de logado → dropdown → **Dashboard**.
+
+> Os dois últimos itens nasceram depois do Figma e ficaram **fora** de Configurações de propósito: **Rosto da Cogni** (jul/2026) e **Mapa da aula** (ago/2026) são as duas contribuições que a banca precisa ver, e enterrá-las num submenu as esconderia. A tab bar do mobile aguenta os 7 itens até em 320px (verificado).
 
 > **Vínculo 1:1 (single-child).** No Companion, **um responsável acompanha UMA criança** — a que estiver com o **código de pareamento ativo**. Não há seletor de criança nem lista de filhos. (O robô continua multi-perfil para teste/dev, mas só o perfil pareado aparece no Companion. Despareou/pareou outro → o Companion reflete o outro.)
 
@@ -173,6 +175,41 @@ Um dado, três coelhos. 🎯
 
 Índice: `(crianca_id, criado_em desc)`. RLS: pai só **lê** (SELECT) as dicas dos próprios filhos; **só o servidor grava** (service_role), igual `conversas`.
 
+### `sessoes_atencao` — o Mapa de Compreensão da Aula ⭐ NOVO (ago/2026)
+> Uma linha por **aula** (sessão de estudo), não por turno. O `conversas` conta **o que** foi conversado; esta conta **como foi** — em que minuto o assunto virou dificuldade, e sobre o quê. É a resposta à pergunta que nenhum sistema escolar responde.
+
+| Coluna | Tipo | Notas |
+| --- | --- | --- |
+| `id` | bigint identity PK | |
+| `crianca_id` | text | FK → criancas(id), on delete cascade |
+| `iniciada_em` | timestamptz | quando a sessão começou |
+| `duracao_ms` | int | duração total da sessão |
+| `turnos` | int | quantas trocas de conversa aconteceram |
+| `materias` | text[] | matérias tocadas na sessão |
+| `topicos` | text[] | tópicos finos tocados na sessão |
+| `contadores` | jsonb | `{ travada, confusa, engajada, acertos, tropecos }` |
+| `momentos` | jsonb | **o coração**: a linha do tempo já cruzada (ver formato abaixo) |
+| `criado_em` | timestamptz | default now() |
+
+Índice: `(crianca_id, iniciada_em desc)`. RLS: pai só **lê**; só o servidor grava (igual `conversas`).
+
+**Formato de `momentos`** (array, cada item é um instante que importa):
+```json
+[
+  { "emMs": 252000, "tipo": "afeto", "sinal": "travada",
+    "rotulo": "precisou de mais ajuda",
+    "materia": "matematica", "topico": "fracoes equivalentes" },
+  { "emMs": 300000, "tipo": "pratica", "resultado": "aprendeu",
+    "rotulo": "resolveu sozinha",
+    "materia": "matematica", "topico": "fracoes equivalentes" }
+]
+```
+
+`emMs` é o **offset desde o início da sessão** (não timestamp absoluto) — é o que permite desenhar a linha do tempo direto, sem conta nenhuma no front. O `topico` de cada momento é o assunto que estava valendo **naquele segundo** (o servidor já cruzou); o site não precisa correlacionar nada.
+
+> [!warning] Vocabulário: `travada` NUNCA aparece cru na tela
+> Vale a mesma regra da trilha de aprendizado. O `sinal` é dado interno; o que se mostra ao pai é o `rotulo`, que já vem pronto e escrito em linguagem de apoio ("precisou de mais ajuda", "estava embalada"). Não invente rótulo no front, e não traduza `sinal` por conta própria.
+
 ### ~~`pareamentos`~~ — DESCARTADA
 > A tabela `pareamentos` do plano original **não é usada** (foi dropada). Em vez de um código temporário numa tabela à parte, o código vive **no próprio perfil** (`criancas.codigo_pareamento`): é fixo, nasce com o perfil e não expira. Mais simples e bate com o modelo single-child. Ver o fluxo de pareamento no contrato de dados abaixo.
 
@@ -190,6 +227,7 @@ Todas as tabelas com RLS **habilitado** e default-deny. O `service_role` (servid
 - **criancas**: pai só vê/edita as crianças onde `responsavel_id = auth.uid()`.
 - **conversas**: pai só **lê** (SELECT) as conversas dos próprios filhos; **não escreve** (só o servidor grava).
 - **dicas**: pai só **lê** (SELECT) as dicas dos próprios filhos; **não escreve** (só o servidor grava). Mesma policy de `conversas`.
+- **sessoes_atencao**: pai só **lê** (SELECT) as sessões dos próprios filhos; **não escreve** (só o servidor grava). Mesma policy de `conversas`.
 - **planos_estudo**: pai vê/cria/edita planos dos próprios filhos.
 - **pareamento**: não há tabela exposta. O código mora em `criancas.codigo_pareamento` e o vínculo (setar `responsavel_id`) é feito **só pelo servidor** (service_role, via `POST /api/pareamento/vincular`) — o site nunca escreve esse campo direto.
 
@@ -209,7 +247,9 @@ O site lê/escreve via `@supabase/supabase-js` (anon key, já carregado nos HTML
 - **Resumo Semanal:** **não** é Supabase — é um endpoint do servidor (a chave da OpenAI vive só lá). O site faz `GET {SERVIDOR}/api/resumo-semanal?criancaId=<id>` e recebe `{ resumo, periodoDias, totalConversas, materias, topicos, vazio }`. O servidor lê as conversas dos últimos 7 dias e gera o bilhete com IA, sob demanda (quando o pai abre a tela). `vazio: true` = sem conversas na semana (o `resumo` já vem com uma mensagem amigável). `{SERVIDOR}` = a URL do servidor local da Cogni (ex: `http://localhost:3000`).
 - **Dica do Cogni (tela Início):** endpoint do servidor (IA + chave da OpenAI). O site faz `GET {SERVIDOR}/api/dica?criancaId=<id>` e recebe `{ dica, deCache, vazio }`. A IA gera **uma** dica curta e acionável pros pais, com base nas memórias + tópicos recentes da criança. **Cache curto de 1h** no servidor (reflete a conversa recente sem gerar a cada reload — antes era 1 dia, dava "delay"). `deCache: true` = veio do cache; `vazio: true` = perfil sem dados ainda (dica genérica amigável). `?forcar=1` ignora o cache. Cada dica gerada é **guardada na tabela `dicas`** (só se diferente da última).
 - **Histórico de dicas (tela "Dicas da Cogni", em Aprendizado):** o site **lê direto do Supabase** (RLS), igual conversas: `from('dicas').select('*').eq('crianca_id', id).order('criado_em', { ascending: false })`. A dica **atual** (destaque) vem do `GET /api/dica`; o **histórico** (lista) vem desse select. Essa tela é a antiga "Curiosidades da criança", renomeada pra **"Dicas da Cogni"**.
-- **Escrita de conversa:** o site **nunca** insere em `conversas` (RLS bloqueia) — quem grava é o servidor.
+- **Mapa de Compreensão (tela nova):** o site faz `GET {SERVIDOR}/api/mapa-aula?criancaId=<id>` e recebe `{ emAndamento, sessao, historico[] }`. **Se há uma sessão acontecendo agora** (a criança está conversando com o robô neste momento), `emAndamento: true` e `sessao` é a linha do tempo **ao vivo** — a tela pode dar poll a cada ~10s e ver os momentos aparecendo. Sem ninguém conversando, `emAndamento: false` e vem o histórico (do Supabase, mesma forma). Alternativa: ler direto do Supabase (`from('sessoes_atencao')...`) — mas aí você perde o ao vivo, que é justamente a parte que impressiona.
+- **Resumo do mapa em texto:** `GET {SERVIDOR}/api/mapa-aula/resumo?criancaId=<id>` → `{ texto, emAndamento }`. Duas ou três frases geradas por IA sobre a última sessão (ou a atual), já no vocabulário de apoio. `texto: null` + `motivo: 'sem_sessao'` = ainda não houve aula registrada. Chamar quando o pai **abre** a tela, não a cada render (passa pelo mesmo rate limit dos outros endpoints de IA).
+- **Escrita de conversa:** o site **nunca** insere em `conversas` nem em `sessoes_atencao` (RLS bloqueia) — quem grava é o servidor.
 - **Pareamento (onboarding do site):** quando o pai loga e **não tem criança vinculada** (o `select` de `criancas` por `responsavel_id` vem vazio), o site mostra o onboarding pedindo o **código de pareamento** (6 caracteres, o pai pega no robô — na tela do painel ou pedindo pra Cogni falar). O site faz `POST {SERVIDOR}/api/pareamento/vincular` com `{ codigo, responsavelId }` (o `responsavelId` = `auth.uid()` do pai logado). Respostas: `200 { ok:true, jaPareado?, criancaId, nome }` (pareou ou já era dele) · `404` código inválido · `409` criança já vinculada a outro responsável · `400` dados faltando. Depois de pareado, o site lê a criança normalmente por `responsavel_id` (RLS) e tudo (conversas/planos/aprendizado) vem junto. O **vínculo é permanente** (não expira); só some se despareado. `{SERVIDOR}` = a URL do servidor local da Cogni.
 - **Despareamento:** `POST {SERVIDOR}/api/pareamento/desvincular` com `{ criancaId, responsavelId }`. Zera o `responsavel_id` da criança (**só** se quem pede for o dono — um pai não desvincula filho de outro). Respostas: `200 { ok:true, jaDesvinculado? }` (`jaDesvinculado:true` quando já não estava vinculada a ele — idempotente) · `404` criança não encontrada · `400` dados faltando. O `codigo_pareamento` **não muda**, então dá pra reparear depois com o mesmo código. Uso no site (etapa "status de vínculo"): mostrar "Conectado ao perfil de [nome]" + botão "Desvincular" (recomenda-se confirmar antes — apagar o vínculo tira o acesso às conversas daquele filho).
 
@@ -389,6 +429,8 @@ Decisões que valem registro:
 - Máximo de **5 itens por coluna** (recorte acionável, não histórico), ordenados por urgência (quem precisa de reforço primeiro) e por consolidação (mais acertos primeiro).
 - A seção **relê o perfil** (`getCrianca()`) ao abrir, em vez de usar o `ctx.crianca` do boot do painel: a trilha muda a cada conversa do robô. Se essa releitura falhar, o bloco cai no perfil do boot — o resto da tela não quebra.
 - Cada item passa por um **saneamento** (o jsonb é livre): conceito vazio, status desconhecido, matéria fora da lista canônica ou data inválida são descartados/normalizados.
+- **Opcional, com o campo `nivel` novo:** um item que sobe de nível (1 → 2 → 3) no mesmo conceito é a evidência mais direta de progresso real — a criança está resolvendo exercícios mais duros do mesmo assunto. Daria um selo discreto em "Praticando agora" (algo como *"subiu de nível"*), sem virar nota nem placar. Não é obrigatório: o bloco já funciona sem ler esse campo.
+
 - **Selo "subiu de nível" (feito — ago/2026), lendo o campo `nivel`:** um selo discreto (contorno, sem cor de estado) ao lado do selo de status em "Praticando agora". É a evidência mais direta de progresso real — a criança está resolvendo exercícios mais duros do mesmo assunto, e o nível só sobe quando ela acerta **de primeira, sem pista**. A regra de exibição é mais estreita do que "nível > 1", e de propósito:
 
 | Onde | Aparece? | Por quê |
@@ -403,12 +445,59 @@ Decisões que valem registro:
 
 ---
 
+## 🗺️ Mapa de Compreensão da Aula (ago/2026) — a tela nova
+
+> [!important] Tabela nova + 2 endpoints novos — **servidor e tela prontos** (ago/2026)
+> O que o site construiu, e as 4 decisões que o backend precisa conhecer, está no fim desta seção ("Como o site construiu").
+
+### Por que esta tela existe (o contexto competitivo)
+
+O concorrente mais forte do TCC é um **CRM para professores**, e a feature mais elogiada é a **chamada automática**. Chamada responde *"quem estava na sala?"* — a métrica mais fácil de coletar e a que menos diz sobre aprendizado. Ela para exatamente onde a educação começa.
+
+O Cogni responde o que acontece **depois** que o aluno já está presente. A frase que resume a tela inteira:
+
+> *"aos 4min12, quando entrou 'frações equivalentes', ela travou por 40s."*
+
+**Um CRM registra o que aconteceu. O Cogni intervém enquanto acontece** — e o mapa é a prova visual disso, porque o mesmo sinal que virou linha no gráfico já tinha mudado a explicação da Cogni naquele segundo.
+
+### O que o servidor já faz (nada disso é do site)
+
+Durante a conversa, o servidor grava marcos numa sessão em RAM (`server/modules/atencao.js`): cada turno com **matéria + tópico**, cada sinal afetivo **forte** lido pela câmera, e cada **veredito de exercício** do ciclo de prática. Ao encerrar (reset, troca de perfil, 15min de silêncio ou shutdown), cruza tudo no eixo do tempo e grava uma linha em `sessoes_atencao`. Custo de API: **zero** — todos esses dados já passavam pelo servidor; a novidade é guardar *quando*.
+
+### O que o site precisa construir
+
+1. **Linha do tempo da sessão** — eixo horizontal = `emMs` (0 até `duracao_ms`), marcadores nos `momentos`. Cor por `sinal`/`resultado`, texto = `rotulo` + `topico`.
+2. **Resumo em texto** no topo (`GET /api/mapa-aula/resumo`), que é o que o pai lê primeiro.
+3. **Modo ao vivo**: quando `emAndamento: true`, poll a cada ~10s e um selo "acontecendo agora". **É a parte que impressiona** — dá pra abrir o Companion no celular e ver a aula se desenhando.
+4. **Histórico**: lista das sessões anteriores (o `historico[]` já vem no mesmo GET).
+
+### Regras de produto (inegociáveis)
+
+- **Nunca** mostrar `sinal` cru (`travada`/`confusa`). Use o `rotulo`, que já vem pronto.
+- **Não é placar.** Nada de "% de acerto", nota, ranking ou comparação com outras crianças.
+- Sessão sem nenhum momento = **"correu tranquila"**, não uma tela vazia com cara de erro.
+- A tela é de **apoio**, não de vigilância: o texto sempre sugere o que fazer junto, nunca aponta defeito.
+
+### ✅ Como o site construiu (ago/2026 — feito)
+
+Seção **"Mapa da aula"** (`#/mapa`, 7º item da sidebar e da tab bar), em `js/dashboard/sections/mapa.js` + `mapa-api.js` (dados) + `mapa-timeline.js` (o desenho) + `css/dashboard-mapa.css`. Quatro decisões que o backend precisa conhecer:
+
+1. **Duas fontes, como no Resumo Semanal e na Dica.** O endpoint é a única fonte da sessão ao vivo, mas quando ela existe o `historico[]` volta **vazio** (a rota prioriza a sessão em RAM). Então o site lê o histórico **direto de `sessoes_atencao`** (RLS, `getSessoesAtencao()`), e as aulas anteriores continuam na tela durante o ao vivo — e com o robô desligado. Endpoint = fresco; tabela = estável.
+2. **`pontoDeAtrito` é recalculado no front quando não vem.** Ele só viaja na sessão **ao vivo**: o `historico[]` da rota (e a tabela) trazem os `momentos` sem esse campo derivado. O site aplica exatamente a mesma regra do servidor (primeiro `sinal: 'travada'`, senão o primeiro `resultado: 'travou'`) — nenhuma correlação nova, só o mesmo critério sobre os momentos já cruzados. **Se um dia o campo passar a ser persistido, o site usa o do servidor** (ele tem prioridade).
+3. **Os `rotulo` chegam sem acento** (o repo do robô é escrito sem acentuação): `ficou em duvida`, `tropecou no exercicio`. O site tem uma tabela que restaura os diacríticos da **mesma frase**, palavra por palavra (não traduz, não inventa rótulo) — o pai não pode ler "duvida" no painel. Se o servidor passar a mandar acentuado, nada quebra. **Rótulo desconhecido passa como veio**; rótulo igual ao `sinal`/`resultado` do próprio momento vira um neutro ("um momento da aula"), porque `ROTULO_SINAL[sinal] || sinal` faria um sinal novo (um `dispersa` de amanhã) vazar cru pra tela.
+4. **Os `contadores` não viram números na tela.** Ficam disponíveis no payload, mas exibir "2 acertos × 1 tropeço" é boletim com outro nome — e o que o pai precisa (onde ajudar) a linha do tempo já diz. O cabeçalho da aula mostra só duração e trocas de conversa.
+
+Acessibilidade: cada marcador é um `<button>` com o momento inteiro no `aria-label`; o tipo do momento vira **forma** (círculo = câmera, losango = exercício) além da cor; e a linha do tempo tem sempre a lista **"Momento a momento"** em texto embaixo. No modo ao vivo, um `aria-live` discreto anuncia só o momento novo, e o poll pausa com a aba em segundo plano e morre quando o pai troca de seção.
+
+---
+
 ## ✅ Como testar (ponta a ponta)
 
 - **Servidor sem credenciais** → robô/voz idênticos a hoje (fallback JSON).
 - **Servidor com credenciais** → perfis hidratam do Supabase; conversas aparecem na tabela; plano editado no site entra no próximo turno do robô.
 - **Internet cai com servidor no ar** → robô continua conversando (cache RAM).
 - **Site** → logar → badge → Dashboard → dados da criança vinculada aparecem; criança de outra família **não** aparece (RLS).
+- **Mapa de Compreensão** → conversar com o robô por >1min tocando 2 assuntos, com a câmera ligada → `GET /api/mapa-aula` retorna `emAndamento: true` com os momentos; após reset (ou 15min parado) a linha aparece em `sessoes_atencao`.
 - **Pareamento** → código no robô → digita no site → criança vincula.
 - Ferramentas: Playwright (já em uso no site) pras telas; scripts pra checar persistência.
 
