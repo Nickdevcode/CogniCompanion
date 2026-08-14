@@ -108,14 +108,7 @@
   width: 40px;
   height: 40px;
 }
-/* cor da matéria no disco */
-.pl-card__disc[data-materia="portugues"] { --mat-color: var(--mat-portugues); --mat-soft: var(--mat-portugues-soft); }
-.pl-card__disc[data-materia="matematica"] { --mat-color: var(--mat-matematica); --mat-soft: var(--mat-matematica-soft); }
-.pl-card__disc[data-materia="ciencias"] { --mat-color: var(--mat-ciencias); --mat-soft: var(--mat-ciencias-soft); }
-.pl-card__disc[data-materia="historia"] { --mat-color: var(--mat-historia); --mat-soft: var(--mat-historia-soft); }
-.pl-card__disc[data-materia="geografia"] { --mat-color: var(--mat-geografia); --mat-soft: var(--mat-geografia-soft); }
-.pl-card__disc[data-materia="idiomas"] { --mat-color: var(--mat-idiomas); --mat-soft: var(--mat-idiomas-soft); }
-.pl-card__disc[data-materia="outros"] { --mat-color: var(--mat-outros); --mat-soft: var(--mat-outros-soft); }
+/* A cor da matéria no disco vem do mapeamento único em dashboard.css. */
 
 .pl-card__main {
   flex: 1;

@@ -16,7 +16,7 @@
 import { el, sectionRoot, pageHead } from "./_shared.js";
 import { ICON, materiaIcon } from "../icons.js";
 import { openModal } from "../modal.js";
-import { MATERIAS, materiaLabel, idadeLabel } from "../format.js";
+import { materiasAgrupadas, idadeLabel } from "../format.js";
 
 /**
  * Busca o código de pareamento do perfil no servidor local (não-Supabase).
@@ -219,10 +219,14 @@ function formularioPerfil(crianca, { onSubmit, close }) {
   const mkSelect = (id, valor) => {
     const sel = el("select", { class: "cfg-input cfg-select", attrs: { id } });
     sel.appendChild(el("option", { attrs: { value: "" }, text: "— não definido —" }));
-    MATERIAS.forEach((m) => {
-      const o = el("option", { attrs: { value: m }, text: materiaLabel(m) });
-      if (valor === m) o.selected = true;
-      sel.appendChild(o);
+    materiasAgrupadas().forEach((grupo) => {
+      const og = el("optgroup", { attrs: { label: grupo.label } });
+      grupo.materias.forEach((m) => {
+        const o = el("option", { attrs: { value: m.valor }, text: m.label });
+        if (valor === m.valor) o.selected = true;
+        og.appendChild(o);
+      });
+      sel.appendChild(og);
     });
     return sel;
   };

@@ -237,35 +237,8 @@
   width: 15px;
   height: 15px;
 }
-/* Cores por matéria (mesmos tokens de Conversas/Aprendizado). */
-.mp-assunto[data-materia="portugues"] {
-  --mat-color: var(--mat-portugues);
-  --mat-soft: var(--mat-portugues-soft);
-}
-.mp-assunto[data-materia="matematica"] {
-  --mat-color: var(--mat-matematica);
-  --mat-soft: var(--mat-matematica-soft);
-}
-.mp-assunto[data-materia="ciencias"] {
-  --mat-color: var(--mat-ciencias);
-  --mat-soft: var(--mat-ciencias-soft);
-}
-.mp-assunto[data-materia="historia"] {
-  --mat-color: var(--mat-historia);
-  --mat-soft: var(--mat-historia-soft);
-}
-.mp-assunto[data-materia="geografia"] {
-  --mat-color: var(--mat-geografia);
-  --mat-soft: var(--mat-geografia-soft);
-}
-.mp-assunto[data-materia="idiomas"] {
-  --mat-color: var(--mat-idiomas);
-  --mat-soft: var(--mat-idiomas-soft);
-}
-.mp-assunto[data-materia="outros"] {
-  --mat-color: var(--mat-outros);
-  --mat-soft: var(--mat-outros-soft);
-}
+/* Cores por matéria: vêm do mapeamento único em dashboard.css (mesmos tokens
+   de Conversas/Aprendizado/Planos). */
 
 /* --- O momento que mais importa (destaque) --- */
 /* O destaque se separa do card por SUPERFÍCIE (fundo no tom, borda de 1px na
@@ -327,6 +300,21 @@
   font-size: clamp(1.02rem, 2.2vw, 1.18rem);
   line-height: 1.35;
   color: var(--dash-text);
+}
+/* O assunto a rever é a única palavra que o pai precisa levar da tela — ela
+   ganha o tom do apoio pra sobreviver a uma leitura de três segundos. */
+.mp-atrito__topico {
+  font-weight: var(--fw-black);
+  color: var(--mp-apoio);
+}
+/* Linha de ancoragem no tempo ("a primeira vez foi aos 4min12"): existe abaixo
+   da frase principal porque é contexto, não a resposta. */
+.mp-atrito__ancora {
+  margin-top: 0.3rem;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--dash-text-muted);
 }
 .mp-atrito__acao,
 .mp-tranquila__texto {
@@ -413,10 +401,21 @@
   transition: transform 0.18s ease;
 }
 /* Forma = origem do dado: losango é exercício conferido (veredito objetivo),
-   círculo é leitura da câmera (impressão). A distinção não depende de cor. */
+   círculo é leitura da câmera (impressão), anel vazado é leitura da conversa.
+   A distinção não depende de cor. */
 .mp-tl__mark[data-tipo="pratica"] .mp-tl__dot {
   border-radius: 3px;
   transform: rotate(45deg);
+}
+/* Compreensão: menor e VAZADO. É a fonte mais abundante da linha (desde
+   ago/2026 é o que mais aparece) e a de leitura mais macia — preenchido do mesmo
+   tamanho, ele apagaria visualmente o exercício conferido, que é o dado duro. */
+.mp-tl__mark[data-tipo="compreensao"] .mp-tl__dot {
+  width: 12px;
+  height: 12px;
+  background-color: var(--dash-surface);
+  border: 2.5px solid var(--tom, var(--mp-neutro));
+  box-shadow: 0 0 0 3px var(--dash-surface), 0 0 0 4px var(--tom-soft, var(--mp-neutro-soft));
 }
 .mp-tl__mark:hover .mp-tl__dot,
 .mp-tl__mark:focus-visible .mp-tl__dot {
@@ -572,6 +571,10 @@
   border-radius: 2px;
   transform: rotate(45deg);
 }
+.mp-tl__key-dot[data-tipo="compreensao"] {
+  background-color: transparent;
+  border: 2px solid var(--tom, var(--mp-neutro));
+}
 
 /* --------------------------------------------------------------------------
    Lista "momento a momento" (a alternativa em texto da linha do tempo)
@@ -619,6 +622,10 @@
 .mp-momento[data-tipo="pratica"] .mp-momento__dot {
   border-radius: 2px;
   transform: rotate(45deg);
+}
+.mp-momento[data-tipo="compreensao"] .mp-momento__dot {
+  background-color: transparent;
+  border: 2px solid var(--tom, var(--mp-neutro));
 }
 .mp-momento__body {
   display: flex;

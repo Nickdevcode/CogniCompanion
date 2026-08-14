@@ -67,7 +67,24 @@ export const ICON = {
 const MATERIA_ICONS = {
   portugues: stroke('<path d="M4 19.5V6a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 1.5Z"/><path d="M9 8h6M9 12h6"/>'),
   matematica: stroke('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h2M14 12h2M8 16h2M14 16h2"/>'),
+  // Erlenmeyer: continua sendo o guarda-chuva "Ciências" do fundamental — as três
+  // matérias do médio abaixo ganham cada uma o SEU símbolo, senão a separação que
+  // o servidor passou a fazer não chegaria aos olhos do pai.
   ciencias: stroke('<path d="M9 3h6M10 3v6l-5 8.5A2 2 0 0 0 6.7 21h10.6a2 2 0 0 0 1.7-3.5L14 9V3"/>'),
+  // Átomo: núcleo + duas órbitas cruzadas.
+  fisica: stroke('<circle cx="12" cy="12" r="2"/><ellipse cx="12" cy="12" rx="9.5" ry="4" transform="rotate(-30 12 12)"/><ellipse cx="12" cy="12" rx="9.5" ry="4" transform="rotate(30 12 12)"/>', "1.7"),
+  // Molécula: três átomos ligados (e não outro frasco, que se confundiria com
+  // o erlenmeyer de Ciências a 15px).
+  quimica: stroke('<circle cx="6" cy="17.5" r="2.8"/><circle cx="17.5" cy="16" r="2.6"/><circle cx="12" cy="6" r="2.8"/><path d="m8.2 15.5 2.4-6.9M13.9 8.1l2.6 5.6"/>', "1.7"),
+  // Dupla hélice do DNA.
+  biologia: stroke('<path d="M7 3c0 4.5 10 5.5 10 9s-10 4.5-10 9"/><path d="M17 3c0 4.5-10 5.5-10 9s10 4.5 10 9"/><path d="M8.6 7h6.8M8.6 17h6.8M7.6 10h8.8"/>', "1.7"),
+  // Balão de pensamento (não de fala): o ícone `chat` já é a conversa.
+  filosofia: stroke('<path d="M6.5 16a4 4 0 0 1-.8-7.9A4.5 4.5 0 0 1 14 6.2 3.8 3.8 0 0 1 18 12a3.8 3.8 0 0 1-3.5 4Z"/><circle cx="7.5" cy="19" r="1.4"/><circle cx="4" cy="21.2" r="0.9"/>', "1.7"),
+  // Pessoas conectadas: a matéria é sobre o laço entre elas, não sobre uma delas.
+  sociologia: stroke('<circle cx="12" cy="5" r="2.6"/><circle cx="5" cy="17" r="2.6"/><circle cx="19" cy="17" r="2.6"/><path d="M10.4 7.3 6.6 14.6M13.6 7.3l3.8 7.3M7.6 17h8.8"/>', "1.7"),
+  // Paleta de tinta.
+  artes: stroke('<path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-.9 2-1.8 0-1.4-1.2-1.8-1.2-3 0-.9.8-1.7 1.9-1.7H17a4 4 0 0 0 4-4c0-4.1-4-7.5-9-7.5Z"/><circle cx="8" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="7" r="1.1" fill="currentColor" stroke="none"/><circle cx="7" cy="13.5" r="1.1" fill="currentColor" stroke="none"/>', "1.7"),
+  educacao_fisica: stroke('<path d="M3 9v6M6 7v10M18 7v10M21 9v6M6 12h12"/>'),
   historia: stroke('<path d="M4 8h16M5 8 12 4l7 4M6 8v9M10 8v9M14 8v9M18 8v9M4 21h16"/>'),
   geografia: stroke('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 4 6 4 9s-1.5 6.5-4 9c-2.5-2.5-4-6-4-9s1.5-6.5 4-9Z"/>'),
   idiomas: stroke('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 4 6 4 9s-1.5 6.5-4 9M12 3c-2.5 2.5-4 6-4 9s1.5 6.5 4 9"/>'),

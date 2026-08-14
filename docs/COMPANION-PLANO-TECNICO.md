@@ -68,7 +68,7 @@ Sidebar: **Início · Conversas · Aprendizado · Mapa da aula · Planos · Rost
 | 🗣️ **Conversas** | Timeline por dia; cada conversa com **matéria** + **horário**; balões criança/Cogni; filtro de **tópicos sensíveis**; busca + filtro por matéria | Gravado a cada turno (ver Diário). Sensível = a **IA** marca (bullying, tristeza, medo… mesmo sem palavra-chave) + `verificarEntrada()` do `safety.js` como rede de segurança |
 | 📚 **Aprendizado** | Tempo por matéria, **Trilha de aprendizado** (praticando × já domina), tópicos explorados, gráfico de evolução (min/dia), **Dicas da Cogni** (era "Curiosidades da criança"), contadores (**sem conquistas**) | Tempo por matéria/gráfico = soma das durações por matéria. Trilha = `criancas.progresso` (ver seção própria; read-only pro site). Tópicos = extraídos das conversas. **Dicas da Cogni** = dica atual (`/api/dica`) + histórico (tabela `dicas`). As "curiosidades da criança" (frases tipo "perguntou 4× sobre X") foram **aposentadas** (jun/2026) — a seção virou Dicas da Cogni |
 | ✏️ **Planos** | Lista (Ativos/Todos/Concluídos) + criar/editar. Campos: título, conteúdo, foco, duração (dias), status | O **pai digita**. O plano ativo é injetado no system prompt da Cogni |
-| ⚙️ **Configurações** (inclui "Família") | Perfil da criança pareada → detalhe (ver/editar infos + prompt personalizado); conta; tema; status da conexão do robô | Edição bidirecional do perfil (pai edita no site, robô capta por voz — os dois mexem no mesmo registro). O pai pode preencher infos antes mesmo do robô captar. **Editar o perfil no site já conta como onboarding feito**: a Cogni não refaz as perguntas de apresentação (ver instrumentação) |
+| ⚙️ **Configurações** (inclui "Família") | Perfil da criança pareada → detalhe (ver/editar infos + prompt personalizado); conta; tema; status da conexão do robô | Edição bidirecional do perfil (pai edita no site, robô capta por voz — os dois mexem no mesmo registro). O pai pode preencher infos antes mesmo do robô captar. **Editar o perfil no site já conta como onboarding feito**: a Cogni não refaz as perguntas de apresentação (ver instrumentação). Desde ago/2026 bastam **idade e série** pra isso — os demais campos a Cogni aprende conversando, sem perguntar |
 | 📬 **Resumo Semanal** | Bilhete carinhoso por IA | IA resume as conversas da semana (depende do Diário; feito por último) |
 
 ### ❌ Anulado (decisão explícita — NÃO construir)
@@ -139,7 +139,7 @@ Um dado, três coelhos. 🎯
 | `crianca_id` | text | FK → criancas(id), on delete cascade |
 | `texto_usuario` | text | fala da criança |
 | `texto_resposta` | text | resposta da Cogni |
-| `materia` | text | uma de: portugues, matematica, ciencias, historia, geografia, idiomas, outros. Classificada pela **IA** que já roda no servidor (mais precisa); o regex local é só fallback se a IA não classificar |
+| `materia` | text | uma das **14** da lista canônica (ver "Matérias" abaixo). Classificada pela **IA** que já roda no servidor (mais precisa); o regex local é só fallback se a IA não classificar. O servidor **normaliza** o que a IA devolve: rótulo fora da lista é recusado, e a granularidade é ajustada pela série da criança |
 | `topico` | text | **novo** — assunto fino da troca (ex: "sistema solar", "tabuada do 7"); nullable (papo/turno sem assunto = NULL). Extraído pela IA que já roda no servidor (custo zero) |
 | `sensivel` | boolean | true se a conversa tocou algo emocionalmente delicado pros pais (bullying, tristeza, medo, etc.) — detectado pela **IA** (entende nuance, não precisa de palavra-chave literal) **OU** pelo filtro de segurança como rede de proteção. default false. Marca pro pai ver; **não** bloqueia a conversa (bullying a Cogni acolhe) |
 | `duracao_ms` | int | duração do turno (pra somar tempo de uso/matéria). **Voz (robô):** tempo real de fala medido pelo VAD do mic. **Texto/voz-navegador:** tempo de geração da resposta da IA. Preenchido pelo servidor nos dois fluxos (antes vinha `null` em conversa por texto) |
@@ -156,7 +156,7 @@ Um dado, três coelhos. 🎯
 | `responsavel_id` | uuid | FK → responsaveis(id) — **NOT NULL** no banco (o site deve sempre enviar o `auth.uid()` ao criar um plano) |
 | `titulo` | text | |
 | `conteudo` | text | texto livre injetado no system prompt |
-| `foco` | text | matéria (mesma lista de `conversas.materia`) |
+| `foco` | text | matéria (mesma lista de `conversas.materia` — agora **14** valores) |
 | `duracao_dias` | int | |
 | `status` | text | `ativo` \| `em_andamento` \| `pausado` \| `concluido`. A Cogni **segue** (injeta no prompt) só os planos `ativo` **ou** `em_andamento`; `pausado`/`concluido` ela ignora |
 | `criado_em` / `atualizado_em` | timestamptz | `criado_em` define a expiração: um plano vence quando `criado_em + duracao_dias` já passou (1 dia dura 1 dia). Plano vencido a Cogni para de cobrar, mesmo que o status ainda esteja `ativo`. `duracao_dias` null/0 = sem prazo |
@@ -187,7 +187,7 @@ Um dado, três coelhos. 🎯
 | `turnos` | int | quantas trocas de conversa aconteceram |
 | `materias` | text[] | matérias tocadas na sessão |
 | `topicos` | text[] | tópicos finos tocados na sessão |
-| `contadores` | jsonb | `{ travada, confusa, engajada, acertos, tropecos }` |
+| `contadores` | jsonb | `{ travada, confusa, engajada, acertos, tropecos, entendeu, precisouAjuda }`. Os dois últimos (ago/2026) vêm do marco de **compreensão** e são contados **à parte** de `acertos`/`tropecos` de propósito: um é veredito conferido, o outro é leitura da conversa. Somar tudo num placar só daria ao pai um número que nenhuma das fontes sustenta sozinha |
 | `momentos` | jsonb | **o coração**: a linha do tempo já cruzada (ver formato abaixo) |
 | `criado_em` | timestamptz | default now() |
 
@@ -201,9 +201,21 @@ Um dado, três coelhos. 🎯
     "materia": "matematica", "topico": "fracoes equivalentes" },
   { "emMs": 300000, "tipo": "pratica", "resultado": "aprendeu",
     "rotulo": "resolveu sozinha",
-    "materia": "matematica", "topico": "fracoes equivalentes" }
+    "materia": "matematica", "topico": "fracoes equivalentes" },
+  { "emMs": 340000, "tipo": "compreensao", "resultado": "travou",
+    "rotulo": "pediu uma mão aqui",
+    "materia": "matematica", "topico": "mmc" }
 ]
 ```
+
+> [!important] ⭐ `tipo: "compreensao"` é NOVO (ago/2026) — e é a razão de o mapa deixar de viver vazio
+> Antes existiam só dois tipos, e os dois exigiam uma condição rara: `afeto` só marca com **webcam ligada + MediaPipe baixado + rosto enquadrado + evidência forte**, e `pratica` só marca quando o ciclo de exercícios **propôs e conferiu** uma questão. Uma aula inteira de explicação e dúvida produzia **zero momentos** — e o resumo, honestamente, dizia "correu tranquila".
+>
+> O terceiro tipo vem da própria **conversa**: a mesma IA que já lê cada turno já dizia como a criança se saiu; só faltava carimbar a hora. Custo de API: **zero**.
+>
+> **O que o site precisa fazer:** tratar `compreensao` como um terceiro tipo no `switch` de forma/cor/ícone da timeline (hoje: círculo = câmera, losango = exercício). Ele tem os mesmos campos de `pratica` (`resultado: 'travou' | 'aprendeu'`), então o caminho já existe. **Um `default` que ignore o tipo desconhecido fará os momentos mais frequentes sumirem da tela em silêncio.**
+>
+> As três fontes **não valem o mesmo**, e isso pode aparecer visualmente: exercício conferido é **fato**, câmera é **impressão**, conversa é **leitura**. Sugestão (não obrigatória): a compreensão com um marcador mais discreto que os outros dois.
 
 `emMs` é o **offset desde o início da sessão** (não timestamp absoluto) — é o que permite desenhar a linha do tempo direto, sem conta nenhuma no front. O `topico` de cada momento é o assunto que estava valendo **naquele segundo** (o servidor já cruzou); o site não precisa correlacionar nada.
 
@@ -213,9 +225,26 @@ Um dado, três coelhos. 🎯
 ### ~~`pareamentos`~~ — DESCARTADA
 > A tabela `pareamentos` do plano original **não é usada** (foi dropada). Em vez de um código temporário numa tabela à parte, o código vive **no próprio perfil** (`criancas.codigo_pareamento`): é fixo, nasce com o perfil e não expira. Mais simples e bate com o modelo single-child. Ver o fluxo de pareamento no contrato de dados abaixo.
 
-### Matérias (lista fixa — categorização da conversa)
-`portugues · matematica · ciencias · historia · geografia · idiomas · outros`
+### Matérias (lista fixa — categorização da conversa) ⭐ ATUALIZADA (ago/2026)
+
+```
+portugues · matematica · ciencias · fisica · quimica · biologia
+historia · geografia · filosofia · sociologia
+idiomas · artes · educacao_fisica · outros
+```
+
 (o "outros" cobre papo/conversa que não é matéria escolar.)
+
+**Eram 7, agora são 14.** A lista antiga era do fundamental: um único `ciencias` cobria física, química e biologia, e filosofia, sociologia, artes e educação física caíam em `outros`, junto do papo furado. Pro aluno do ensino médio isso escondia a informação inteira — ele tem três professores de ciências, e o Painel dizia "Ciências: 40min" sem contar se foi Estequiometria ou Genética.
+
+> [!important] O rótulo depende da SÉRIE — e quem resolve isso é o servidor
+> Chamar de "Biologia" a aula de fotossíntese de uma criança do 4º ano descolaria o Painel do boletim que ela leva pra casa. Então o classificador olha o **termo** e a **etapa escolar** decide o nome: no fundamental (1º–9º ano), `fisica`/`quimica`/`biologia` são gravadas como `ciencias`; no médio, ficam separadas.
+>
+> **O site não precisa fazer nada disso** — o valor que chega em `conversas.materia` já está ajustado. O que o site precisa é só **conhecer os 14 valores** (filtro, labels, cores, ícones). Não tente reverter nem reagrupar o rótulo no front: uma segunda cópia da regra divergiria em silêncio.
+
+**Compatibilidade:** as 7 antigas continuam válidas e não mudam de nome — nenhuma linha existente precisa ser reescrita. As 7 novas simplesmente passam a aparecer.
+
+`artes` e `educacao_fisica` são deliberadamente **conservadoras** no classificador: só entram pelo conteúdo da matéria (teoria das cores, regras do vôlei), nunca por hobby ("gosto de desenhar", "joguei bola"). Se você vir pouca coisa nelas, é por desenho, não por bug.
 
 ---
 
@@ -484,10 +513,30 @@ Seção **"Mapa da aula"** (`#/mapa`, 7º item da sidebar e da tab bar), em `js/
 
 1. **Duas fontes, como no Resumo Semanal e na Dica.** O endpoint é a única fonte da sessão ao vivo, mas quando ela existe o `historico[]` volta **vazio** (a rota prioriza a sessão em RAM). Então o site lê o histórico **direto de `sessoes_atencao`** (RLS, `getSessoesAtencao()`), e as aulas anteriores continuam na tela durante o ao vivo — e com o robô desligado. Endpoint = fresco; tabela = estável.
 2. **`pontoDeAtrito` é recalculado no front quando não vem.** Ele só viaja na sessão **ao vivo**: o `historico[]` da rota (e a tabela) trazem os `momentos` sem esse campo derivado. O site aplica exatamente a mesma regra do servidor (primeiro `sinal: 'travada'`, senão o primeiro `resultado: 'travou'`) — nenhuma correlação nova, só o mesmo critério sobre os momentos já cruzados. **Se um dia o campo passar a ser persistido, o site usa o do servidor** (ele tem prioridade).
+
+   > ⚠️ **ago/2026 — a regra mudou e a cópia do site precisa acompanhar.** O critério ganhou um **terceiro** nível, depois dos dois atuais: `compreensao` com `resultado: 'travou'`. Ele vem por último de propósito (é o sinal mais abundante e o menos duro; na frente, afogaria os outros dois em toda sessão). Sem esse terceiro nível, o front vai calcular `null` justamente nas sessões que antes vinham vazias — que são a maioria.
+   >
+   > **Boa notícia:** o servidor agora manda `pontoDeAtrito` **também no `historico[]`** do endpoint, já calculado. Prefira sempre o do servidor; o cálculo local vira só o fallback pra tabela lida direto do Supabase.
 3. **Os `rotulo` chegam sem acento** (o repo do robô é escrito sem acentuação): `ficou em duvida`, `tropecou no exercicio`. O site tem uma tabela que restaura os diacríticos da **mesma frase**, palavra por palavra (não traduz, não inventa rótulo) — o pai não pode ler "duvida" no painel. Se o servidor passar a mandar acentuado, nada quebra. **Rótulo desconhecido passa como veio**; rótulo igual ao `sinal`/`resultado` do próprio momento vira um neutro ("um momento da aula"), porque `ROTULO_SINAL[sinal] || sinal` faria um sinal novo (um `dispersa` de amanhã) vazar cru pra tela.
 4. **Os `contadores` não viram números na tela.** Ficam disponíveis no payload, mas exibir "2 acertos × 1 tropeço" é boletim com outro nome — e o que o pai precisa (onde ajudar) a linha do tempo já diz. O cabeçalho da aula mostra só duração e trocas de conversa.
 
 Acessibilidade: cada marcador é um `<button>` com o momento inteiro no `aria-label`; o tipo do momento vira **forma** (círculo = câmera, losango = exercício) além da cor; e a linha do tempo tem sempre a lista **"Momento a momento"** em texto embaixo. No modo ao vivo, um `aria-live` discreto anuncia só o momento novo, e o poll pausa com a aba em segundo plano e morre quando o pai troca de seção.
+
+### 🆕 `assuntoMaisDificil` — "o que rever amanhã" (ago/2026)
+
+O `pontoDeAtrito` responde **"quando foi"**; ele ancora a linha do tempo (*"aos 4min12, em frações"*). Mas ele é o **primeiro** sinal da sessão, e o primeiro nem sempre é o que mais importou: uma travada isolada às 2min em "frações" pesa menos do que quatro tropeços espalhados em "mmc" ao longo da aula — e só o segundo merece os cinco minutos do pai amanhã.
+
+Por isso existe um segundo campo derivado, que responde **"o que rever"**:
+
+```json
+"assuntoMaisDificil": { "topico": "mmc", "materia": "matematica", "peso": 6, "ocorrencias": 3 }
+```
+
+- Soma **todos** os sinais de atrito por tópico na sessão, com peso por confiança da fonte: `pratica` = 3 (fato conferido), `afeto` = 2 (observação), `compreensao` = 1 (leitura). É a mesma hierarquia do ponto de atrito, só que somável.
+- `null` quando não houve atrito nenhum — e isso também é informação.
+- Vem **calculado pelo servidor** na sessão ao vivo **e** em cada item do `historico[]`. Diferente do `pontoDeAtrito`, ele **não** tem cópia no front: não replique a regra, use o que vem.
+
+**Sugestão de uso:** é o melhor candidato a virar o destaque do cabeçalho da aula (*"O ponto que mais pediu ajuda hoje: **mmc**"*), acima da timeline. `peso` é interno — não mostre o número. `ocorrencias` pode virar texto, com cuidado pra não soar placar.
 
 ---
 
@@ -606,6 +655,50 @@ POST {SERVIDOR}/api/planos/refrescar
 - `{SERVIDOR}` = o mesmo `SERVIDOR_URL` que as telas de Rosto e Pareamento já usam.
 
 **Recomendado (não obrigatório):** mandar `atualizado_em: new Date().toISOString()` no `atualizarPlano`. O servidor desempata planos vigentes por `atualizado_em`, e hoje o site não escreve essa coluna — se não houver trigger `moddatetime` no banco, ela fica parada e o desempate cai nos critérios de reserva (`criado_em`, depois `id`). Com o vínculo 1:1 e um plano ativo por criança isso quase nunca aparece, mas é barato de acertar.
+
+---
+
+## 🆕 Rodada de ago/2026 (14/ago) — o que mudou e o que o site precisa fazer
+
+> [!important] Quatro frentes; **duas** exigem trabalho no site, **duas** são só do robô.
+> Nada aqui quebra o que já existe: as 7 matérias antigas continuam com o mesmo nome, e o formato de `momentos` só **ganhou** um tipo.
+
+### 1. Matérias: 7 → 14 🔴 **exige trabalho no site**
+
+Ver a seção "Matérias (lista fixa)" acima. O que precisa mudar:
+
+| Onde | O quê |
+| --- | --- |
+| `js/dashboard/format.js` | `MATERIAS` (as 7 novas) + `MATERIA_LABELS` (com acento e maiúscula: "Física", "Educação Física"…) |
+| `js/dashboard/icons.js` | `MATERIA_ICONS` — 7 SVGs novos |
+| `css/dashboard.css` | Tokens `--mat-*` e `--mat-*-soft` nos **dois** temas (claro e escuro) |
+| `dashboard-conversas.css` · `dashboard-aprendizado.css` · `dashboard-mapa.css` · `dashboard-planos.css` | Os mapeamentos `[data-materia="…"]` |
+| `sections/conversas.js` | O dropdown de filtro é populado por `MATERIAS` — deve funcionar sozinho, mas **14 opções numa lista** pede uma olhada no layout |
+| `sections/planos.js` · `sections/config.js` | Os `<select>` de `foco` e de matéria favorita/difícil idem |
+| `sections/aprendizado.js:175` | O saneamento `MATERIAS.includes(item.materia) ? … : "outros"` passa a aceitar as novas — **sem isso, a trilha do ensino médio inteira vira "Outros" em silêncio** |
+
+**Sugestão de agrupamento visual** (opcional, mas ajuda com 14 itens): Linguagens (`portugues`, `idiomas`, `artes`) · Matemática · Natureza (`ciencias`, `fisica`, `quimica`, `biologia`) · Humanas (`historia`, `geografia`, `filosofia`, `sociologia`) · Corpo (`educacao_fisica`) · Outros. Só não invente um agrupamento **no dado** — é apresentação.
+
+### 2. Mapa da aula: novo tipo de momento + `assuntoMaisDificil` 🔴 **exige trabalho no site**
+
+Ver as duas caixas na seção do Mapa. Resumo: tratar `tipo: "compreensao"` na timeline (senão os momentos mais frequentes somem da tela em silêncio), preferir o `pontoDeAtrito` que agora vem no `historico[]`, e considerar exibir o `assuntoMaisDificil` no cabeçalho da aula.
+
+### 3. Onboarding conversacional 🟢 **nada a fazer no site**
+
+O onboarding **por voz** do robô deixou de ser um formulário falado. Duas consequências que o site percebe, ambas boas:
+
+- **Os campos "essenciais" agora são só `idade` e `serie`.** A regra "editar o perfil no site já conta como onboarding feito" continua valendo — e agora dispara mais cedo: basta o pai preencher esses dois pra Cogni nunca fazer a apresentação de perguntas.
+- **`hobbies`, `como_aprende`, `materia_favorita` e `materia_dificil` continuam editáveis no site** e continuam sendo preenchidos sozinhos pela IA ao longo das conversas. O que mudou é que a Cogni **não pergunta** por eles de frente.
+
+O onboarding **do site** (pareamento por código) é outra coisa e **não mudou em nada**.
+
+### 4. Hibernação do robô 🟢 **nada a fazer no site**
+
+Depois de 15 min parado (ou segurando o botão de reset por 2,5 s), o robô desliga Wi-Fi/tela/áudio e entra em *light sleep* (<1 mA). Acorda em qualquer botão físico.
+
+O único reflexo observável no Companion é **bom**: ao hibernar, o robô avisa o servidor, que **fecha a sessão do Mapa da Aula na hora**. Antes, um robô que parava de ser usado deixava a sessão pendurada como "em andamento" por até 15 min — o pai que abrisse o Companion logo depois via uma aula ao vivo de uma criança que já tinha ido embora. Agora a linha vai pro `sessoes_atencao` no mesmo instante.
+
+> Efeito colateral pro modo ao vivo: `emAndamento: true` some mais rápido do que antes. Isso é a correção de um bug, não uma regressão — mas se o poll do site assumia que a sessão dura o silêncio inteiro, vale reconferir a transição ao-vivo → histórico.
 
 ---
 

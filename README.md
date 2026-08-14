@@ -142,6 +142,46 @@ O código é validado **pelo servidor** (que seta o vínculo com a `service_role
 o `responsavel_id` direto. Em **Configurações** dá pra ver o código do perfil e **desvincular** (com
 confirmação). O vínculo é **permanente**: só some se você desvincular.
 
+### 📚 As 14 matérias (e por que quem decide é o servidor)
+
+A lista de matérias era do **ensino fundamental**: um único `ciencias` cobria física, química e biologia, e
+filosofia, sociologia, artes e educação física caíam em `outros` — junto do papo furado. Pro aluno do
+**médio** isso apagava a informação inteira: ele tem três professores de ciências, e o Painel dizia
+*"Ciências: 40min"* sem contar se foi Estequiometria ou Genética. Agora são 14:
+
+| Área | Matérias |
+| --- | --- |
+| 🗣️ **Linguagens** | `portugues` · `idiomas` · `artes` |
+| 🔢 **Matemática** | `matematica` |
+| 🔬 **Ciências da Natureza** | `ciencias` · `fisica` · `quimica` · `biologia` |
+| 🏛️ **Ciências Humanas** | `historia` · `geografia` · `filosofia` · `sociologia` |
+| 🤸 **Corpo e movimento** | `educacao_fisica` |
+| 💬 **Outros** | `outros` (papo que não é matéria escolar) |
+
+> ⚠️ **A granularidade é decisão do servidor, e o site não a replica.** O classificador olha o termo, e a
+> **etapa escolar** decide o nome: no fundamental, física/química/biologia são gravadas como `ciencias`; no
+> médio, ficam separadas (chamar de "Biologia" a aula de fotossíntese de uma criança do 4º ano descolaria o
+> Painel do boletim que ela leva pra casa). O valor que chega em `conversas.materia` **já vem ajustado** — o
+> site só precisa *conhecer* os 14 valores. Uma segunda cópia dessa regra aqui divergiria em silêncio.
+
+Do lado do site, três coisas que isso exigiu:
+
+- 🎨 **Uma cor por matéria, organizada por área.** Com 14 itens a cor não identifica mais a matéria sozinha
+  (o nome e o ícone estão sempre do lado) — ela comunica a **área**: as ciências da natureza na família do
+  verde, as humanas na do roxo, as linguagens no quente. As 7 cores originais **não mudaram**. A paleta foi
+  conferida por contraste (WCAG) e por distância perceptual (CIEDE2000) nos dois temas.
+- 🧭 **Listas agrupadas.** O filtro do Diário e os `<select>` de Planos e Ajustes separam as opções por área
+  (`materiasAgrupadas()` em `format.js`). O agrupamento é **só apresentação**: o dado e o filtro continuam
+  usando a matéria fina. E os grupos derivam de `MATERIAS`, então uma matéria futura que ninguém agrupar
+  cai no último grupo em vez de sumir da tela.
+- 🎯 **Um lugar só pro CSS.** `[data-materia="…"]` → `--mat-color`/`--mat-soft` mora em `dashboard.css`, e
+  os componentes só leem as variáveis. Antes a lista era repetida nos 4 CSS de seção; com 14 matérias
+  seriam ~250 linhas iguais em 4 arquivos.
+
+> 🎭 `artes` e `educacao_fisica` são **conservadoras** no classificador: só entram por conteúdo real da
+> matéria (teoria das cores, regras do vôlei), nunca por hobby ("gosto de desenhar", "joguei bola"). Pouca
+> coisa nelas é desenho, não bug.
+
 ### 📈 Trilha de aprendizado (no Painel de Aprendizado)
 
 O cérebro da Cogni tem um *student model*: a cada conversa ele anota **o assunto estudado, como a criança
@@ -184,10 +224,15 @@ vereditos dos exercícios**, e grava a aula fechada em `sessoes_atencao`. O site
 | Parte | O que é |
 | --- | --- |
 | 💬 **O resumo em texto** | 2–3 frases por IA (`/api/mapa-aula/resumo`) — é o que o pai lê primeiro |
-| 📍 **O momento que mais importa** | O ponto de atrito da aula, escrito como frase: *"Aos 4min12, em frações equivalentes — precisou de mais ajuda"*, com uma sugestão do que fazer junto |
-| 📊 **A linha do tempo** | Faixa de 0 até a duração, um marcador por momento. **Forma** = origem (● câmera · ◆ exercício conferido), **cor** = tom. Abaixo, a mesma linha em lista de texto |
+| 📍 **O que vale rever** | O destaque da tela, e ele responde **duas** perguntas: *o quê* (`assuntoMaisDificil` — o tópico que somou mais atrito na aula inteira) e *quando* (`pontoDeAtrito` — o minuto em que começou). Quando os dois apontam pro mesmo assunto, a segunda linha vira só a hora; quando não, aparece o *"o primeiro tropeço veio antes, aos 4min12, em frações"* |
+| 📊 **A linha do tempo** | Faixa de 0 até a duração, um marcador por momento. **Forma** = origem (● câmera · ◆ exercício conferido · ○ lido na conversa), **cor** = tom. Abaixo, a mesma linha em lista de texto |
 | 🔴 **Modo ao vivo** | Com o robô conversando, a aula **se desenha na tela**: poll de 10s e selo "acontecendo agora" pulsando. Dá pra abrir no celular e acompanhar |
 | 🕘 **Aulas registradas** | O histórico; clicar troca a aula em destaque |
+
+> 🧩 **As três origens não valem o mesmo, e a forma diz isso.** Exercício conferido é **fato** (◆), câmera é
+> **impressão** (●), e o que a Cogni leu da própria conversa é **leitura** (○ — anel vazado, de propósito o
+> mais discreto). Esse terceiro tipo é o mais frequente da linha: antes dele, uma aula inteira de explicação
+> e dúvida produzia **zero momentos**, e o mapa dizia "correu tranquila" em quase toda sessão.
 
 Quatro cuidados que sustentam a tela:
 
@@ -195,7 +240,9 @@ Quatro cuidados que sustentam a tela:
   ("precisou de mais ajuda", "estava embalada"). E se um rótulo vier **igual** ao sinal — o que acontece
   quando o robô ganha um sinal novo e esquece de nomeá-lo —, o site troca por um neutro em vez de vazar.
 - 🚫 **Não é placar.** Os `contadores` chegam no payload e **de propósito não viram números**: "2 acertos ×
-  1 tropeço" é boletim com outro nome. O cabeçalho mostra só duração e trocas de conversa.
+  1 tropeço" é boletim com outro nome. O cabeçalho mostra só duração e trocas de conversa. Pelo mesmo
+  motivo, o `peso` do assunto mais difícil é descartado (é ranking interno) e as `ocorrencias` viram frase
+  — *"esse ponto voltou algumas vezes"* —, nunca contagem.
 - 😌 **Aula sem nenhum momento é boa notícia**, não tela vazia: aparece como *"a aula correu tranquila"*.
 - ♿ **Não depende de cor nem de posição.** Cada marcador é um `<button>` com o momento inteiro no
   `aria-label`, a lista repete tudo em texto, e tocar um marcador destaca a linha correspondente (no

@@ -16,7 +16,7 @@
 import { el, sectionRoot, pageHead } from "./_shared.js";
 import { ICON, materiaIcon } from "../icons.js";
 import { openModal } from "../modal.js";
-import { MATERIAS, materiaLabel, statusLabel } from "../format.js";
+import { materiasAgrupadas, materiaLabel, statusLabel } from "../format.js";
 
 /** Status possíveis (planos_estudo.status). */
 const STATUS = ["ativo", "em_andamento", "pausado", "concluido"];
@@ -181,12 +181,17 @@ function formularioPlano(plano, { onSubmit, onDelete, close }) {
   });
   const fTitulo = field("Título do plano", inTitulo);
 
-  // Foco (matéria)
+  // Foco (matéria) — agrupado por área: 14 opções soltas num <select> nativo
+  // viram uma lista longa demais pra achar "Sociologia" de primeira.
   const selFoco = el("select", { class: "pl-input pl-select", attrs: { id: "pl-foco" } });
-  MATERIAS.forEach((m) => {
-    const opt = el("option", { attrs: { value: m }, text: materiaLabel(m) });
-    if (editando && plano.foco === m) opt.selected = true;
-    selFoco.appendChild(opt);
+  materiasAgrupadas().forEach((grupo) => {
+    const og = el("optgroup", { attrs: { label: grupo.label } });
+    grupo.materias.forEach((m) => {
+      const opt = el("option", { attrs: { value: m.valor }, text: m.label });
+      if (editando && plano.foco === m.valor) opt.selected = true;
+      og.appendChild(opt);
+    });
+    selFoco.appendChild(og);
   });
   const fFoco = field("Foco (matéria)", selFoco);
 

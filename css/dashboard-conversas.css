@@ -154,9 +154,12 @@
   top: calc(100% + 0.4rem);
   left: 0;
   z-index: 60;
-  min-width: 220px;
-  max-height: 320px;
+  min-width: 232px;
+  /* 14 matérias + 6 títulos de área não cabem em 320px: o menu cresce até onde a
+     janela deixa e rola o resto, em vez de rolar quase tudo. */
+  max-height: min(58vh, 430px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0.4rem;
   background-color: var(--dash-surface);
   border: 1px solid var(--dash-border);
@@ -177,6 +180,36 @@
 }
 .cv-filter__opt:hover {
   background-color: var(--dash-nav-hover-bg);
+}
+/* A matéria em vigor fica marcada: com 14 opções atrás de um botão que mostra
+   só o rótulo escolhido, reabrir o menu sem saber onde você está é fácil. */
+.cv-filter__opt[aria-checked="true"] {
+  background-color: var(--dash-accent-soft);
+  color: var(--dash-text);
+  font-weight: var(--fw-semibold);
+}
+
+/* Título da área (Linguagens, Natureza…): separa sem virar mais um item
+   clicável. Gruda no topo enquanto a lista rola, senão o contexto do grupo se
+   perde no meio da rolagem. */
+.cv-filter__group + .cv-filter__group {
+  margin-top: 0.15rem;
+  border-top: 1px solid var(--dash-border);
+  padding-top: 0.15rem;
+}
+.cv-filter__group-title {
+  position: sticky;
+  top: -0.4rem; /* compensa o padding do menu, pra não sobrar fresta */
+  z-index: 1;
+  display: block;
+  padding: 0.5rem 0.75rem 0.25rem;
+  background-color: var(--dash-surface);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dash-text-faint);
 }
 
 /* --------------------------------------------------------------------------
@@ -286,27 +319,8 @@
   width: 18px;
   height: 18px;
 }
-.cv-materia[data-materia="portugues"] {
-  --mat-color: var(--mat-portugues);
-}
-.cv-materia[data-materia="matematica"] {
-  --mat-color: var(--mat-matematica);
-}
-.cv-materia[data-materia="ciencias"] {
-  --mat-color: var(--mat-ciencias);
-}
-.cv-materia[data-materia="historia"] {
-  --mat-color: var(--mat-historia);
-}
-.cv-materia[data-materia="geografia"] {
-  --mat-color: var(--mat-geografia);
-}
-.cv-materia[data-materia="idiomas"] {
-  --mat-color: var(--mat-idiomas);
-}
-.cv-materia[data-materia="outros"] {
-  --mat-color: var(--mat-outros);
-}
+/* O par de cores da matéria vem do mapeamento único em dashboard.css
+   (`[data-materia="…"]` → `--mat-color`/`--mat-soft`). */
 
 /* Flag de tópico sensível */
 .cv-flag {

@@ -10,14 +10,34 @@
  * o backend ligar, estas funções continuam valendo sobre os dados do Supabase.
  */
 
-/** Lista fixa de matérias do contrato (conversas.materia / planos.foco). */
+/**
+ * Lista fixa de matérias do contrato (conversas.materia / planos.foco).
+ *
+ * Eram 7 (lista do ensino fundamental) e viraram 14 em ago/2026: um único
+ * `ciencias` escondia física, química e biologia, e filosofia/sociologia/artes/
+ * educação física caíam em `outros` junto do papo furado — pro aluno do médio
+ * isso apagava a informação inteira.
+ *
+ * ⚠️ Quem decide a granularidade é o SERVIDOR, não o site: no fundamental ele
+ * grava `ciencias`, no médio grava `fisica`/`quimica`/`biologia`. O valor que
+ * chega em `conversas.materia` já vem ajustado pela série. Aqui só precisamos
+ * CONHECER os 14 valores — replicar a regra criaria uma segunda cópia que
+ * divergiria em silêncio.
+ */
 export const MATERIAS = [
   "portugues",
   "matematica",
   "ciencias",
+  "fisica",
+  "quimica",
+  "biologia",
   "historia",
   "geografia",
+  "filosofia",
+  "sociologia",
   "idiomas",
+  "artes",
+  "educacao_fisica",
   "outros",
 ];
 
@@ -26,11 +46,60 @@ const MATERIA_LABELS = {
   portugues: "Português",
   matematica: "Matemática",
   ciencias: "Ciências",
+  fisica: "Física",
+  quimica: "Química",
+  biologia: "Biologia",
   historia: "História",
   geografia: "Geografia",
+  filosofia: "Filosofia",
+  sociologia: "Sociologia",
   idiomas: "Idiomas",
+  artes: "Artes",
+  educacao_fisica: "Educação Física",
   outros: "Outros",
 };
+
+/**
+ * Grupos por área do conhecimento — APRESENTAÇÃO, e só isso.
+ *
+ * Serve pra 14 opções numa lista não virarem uma parede de texto (filtro do
+ * Diário, selects de Planos e Ajustes). O dado nunca é agrupado: `conversas.materia`
+ * continua guardando a matéria fina, o filtro continua filtrando por ela, e
+ * nenhuma soma do painel passa por aqui.
+ */
+const MATERIA_GRUPOS = [
+  { label: "Linguagens", materias: ["portugues", "idiomas", "artes"] },
+  { label: "Matemática", materias: ["matematica"] },
+  { label: "Ciências da Natureza", materias: ["ciencias", "fisica", "quimica", "biologia"] },
+  { label: "Ciências Humanas", materias: ["historia", "geografia", "filosofia", "sociologia"] },
+  { label: "Corpo e movimento", materias: ["educacao_fisica"] },
+  { label: "Outros assuntos", materias: ["outros"] },
+];
+
+/**
+ * As matérias organizadas em grupos, prontas pra montar um menu ou `<optgroup>`.
+ *
+ * Deriva de `MATERIAS`, e não de uma segunda lista: uma matéria nova que ninguém
+ * lembrou de agrupar cai no último grupo em vez de sumir do filtro em silêncio —
+ * que é justamente o modo de falhar que essa rodada veio consertar.
+ *
+ * @returns {Array<{ label: string, materias: Array<{ valor: string, label: string }> }>}
+ */
+export function materiasAgrupadas() {
+  const agrupadas = new Set(MATERIA_GRUPOS.flatMap((g) => g.materias));
+  const orfas = MATERIAS.filter((m) => !agrupadas.has(m));
+
+  return MATERIA_GRUPOS.map((grupo, i) => {
+    const chaves = grupo.materias.filter((m) => MATERIAS.includes(m));
+    // As órfãs entram no último grupo ("Outros assuntos"), que é onde elas
+    // pertenceriam de qualquer jeito enquanto ninguém as classifica.
+    const comOrfas = i === MATERIA_GRUPOS.length - 1 ? [...chaves, ...orfas] : chaves;
+    return {
+      label: grupo.label,
+      materias: comOrfas.map((valor) => ({ valor, label: materiaLabel(valor) })),
+    };
+  }).filter((g) => g.materias.length);
+}
 
 /** Status de plano (planos_estudo.status) → rótulo legível. */
 const STATUS_LABELS = {

@@ -94,49 +94,9 @@
   color: var(--dash-text-faint);
 }
 
-/* Cores por matéria (mapeadas pros tokens de dashboard.css) */
-.ap-mat[data-materia="portugues"],
-.ap-topic[data-materia="portugues"],
-.ap-titem[data-materia="portugues"] {
-  --mat-color: var(--mat-portugues);
-  --mat-soft: var(--mat-portugues-soft);
-}
-.ap-mat[data-materia="matematica"],
-.ap-topic[data-materia="matematica"],
-.ap-titem[data-materia="matematica"] {
-  --mat-color: var(--mat-matematica);
-  --mat-soft: var(--mat-matematica-soft);
-}
-.ap-mat[data-materia="ciencias"],
-.ap-topic[data-materia="ciencias"],
-.ap-titem[data-materia="ciencias"] {
-  --mat-color: var(--mat-ciencias);
-  --mat-soft: var(--mat-ciencias-soft);
-}
-.ap-mat[data-materia="historia"],
-.ap-topic[data-materia="historia"],
-.ap-titem[data-materia="historia"] {
-  --mat-color: var(--mat-historia);
-  --mat-soft: var(--mat-historia-soft);
-}
-.ap-mat[data-materia="geografia"],
-.ap-topic[data-materia="geografia"],
-.ap-titem[data-materia="geografia"] {
-  --mat-color: var(--mat-geografia);
-  --mat-soft: var(--mat-geografia-soft);
-}
-.ap-mat[data-materia="idiomas"],
-.ap-topic[data-materia="idiomas"],
-.ap-titem[data-materia="idiomas"] {
-  --mat-color: var(--mat-idiomas);
-  --mat-soft: var(--mat-idiomas-soft);
-}
-.ap-mat[data-materia="outros"],
-.ap-topic[data-materia="outros"],
-.ap-titem[data-materia="outros"] {
-  --mat-color: var(--mat-outros);
-  --mat-soft: var(--mat-outros-soft);
-}
+/* Cores por matéria: `.ap-mat`, `.ap-topic` e `.ap-titem` recebem `--mat-color`
+   e `--mat-soft` do mapeamento único em dashboard.css, pelo `data-materia` que
+   cada um já escreve. */
 
 /* --------------------------------------------------------------------------
    Blocos genéricos (cabeçalho de seção + tópicos)

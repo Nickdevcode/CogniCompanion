@@ -44,20 +44,42 @@
   --dash-card-header-bg: var(--brand-navy);
   --dash-card-header-text: #ffffff;
 
-  /* Cores por matéria (usadas em Conversas e Aprendizado). Tom forte (texto/
-     ícone) + tom suave (fundo da badge), seguindo a paleta do Figma. */
+  /* Cores por matéria (usadas em Conversas, Aprendizado, Mapa e Planos). Tom
+     forte (texto/ícone) + tom suave (fundo da badge), seguindo a paleta do Figma.
+
+     São 14 desde ago/2026, e a paleta é organizada por ÁREA: as ciências da
+     natureza moram na família do verde de `ciencias`, as humanas na família do
+     roxo de `historia`, as linguagens no quente. Com 14 itens, a cor não tenta
+     mais identificar a matéria sozinha (o nome e o ícone estão sempre do lado) —
+     ela comunica a ÁREA, que é a leitura que sobrevive de relance.
+
+     As 7 cores originais não mudaram: nenhuma tela existente muda de cara. */
   --mat-portugues: #e8730f;
   --mat-portugues-soft: rgba(232, 115, 15, 0.12);
   --mat-matematica: #2563eb;
   --mat-matematica-soft: rgba(37, 99, 235, 0.12);
   --mat-ciencias: #18a058;
   --mat-ciencias-soft: rgba(24, 160, 88, 0.12);
+  --mat-fisica: #839414;
+  --mat-fisica-soft: rgba(131, 148, 20, 0.12);
+  --mat-quimica: #188b74;
+  --mat-quimica-soft: rgba(24, 139, 116, 0.12);
+  --mat-biologia: #3d8226;
+  --mat-biologia-soft: rgba(61, 130, 38, 0.12);
   --mat-historia: #8b5cf6;
   --mat-historia-soft: rgba(139, 92, 246, 0.12);
   --mat-geografia: #0ea5b7;
   --mat-geografia-soft: rgba(14, 165, 183, 0.12);
+  --mat-filosofia: #4532bd;
+  --mat-filosofia-soft: rgba(69, 50, 189, 0.12);
+  --mat-sociologia: #9f36ab;
+  --mat-sociologia-soft: rgba(159, 54, 171, 0.12);
   --mat-idiomas: #d6409f;
   --mat-idiomas-soft: rgba(214, 64, 159, 0.12);
+  --mat-artes: #b6164b;
+  --mat-artes-soft: rgba(182, 22, 75, 0.12);
+  --mat-educacao-fisica: #c1451f;
+  --mat-educacao-fisica-soft: rgba(193, 69, 31, 0.12);
   --mat-outros: #64748b;
   --mat-outros-soft: rgba(100, 116, 139, 0.12);
 
@@ -102,19 +124,35 @@
   --dash-card-header-text: #ffffff;
 
   /* Matérias no dark: cores um pouco mais claras + fundos mais presentes
-     pra contrastar com a superfície escura. */
+     pra contrastar com a superfície escura. Mesmas famílias por área do tema
+     claro — o que muda é só a luminosidade, pra todas passarem em contraste
+     sobre a superfície escura. */
   --mat-portugues: #f59e4b;
   --mat-portugues-soft: rgba(245, 158, 75, 0.18);
   --mat-matematica: #6ea0ff;
   --mat-matematica-soft: rgba(110, 160, 255, 0.18);
   --mat-ciencias: #4ed699;
   --mat-ciencias-soft: rgba(78, 214, 153, 0.18);
+  --mat-fisica: #c3d454;
+  --mat-fisica-soft: rgba(195, 212, 84, 0.18);
+  --mat-quimica: #1fc1b1;
+  --mat-quimica-soft: rgba(31, 193, 177, 0.18);
+  --mat-biologia: #82d666;
+  --mat-biologia-soft: rgba(130, 214, 102, 0.18);
   --mat-historia: #b794ff;
   --mat-historia-soft: rgba(183, 148, 255, 0.18);
   --mat-geografia: #4ad6e6;
   --mat-geografia-soft: rgba(74, 214, 230, 0.18);
+  --mat-filosofia: #8a7bea;
+  --mat-filosofia-soft: rgba(138, 123, 234, 0.18);
+  --mat-sociologia: #c262da;
+  --mat-sociologia-soft: rgba(194, 98, 218, 0.18);
   --mat-idiomas: #f06fc4;
   --mat-idiomas-soft: rgba(240, 111, 196, 0.18);
+  --mat-artes: #e86490;
+  --mat-artes-soft: rgba(232, 100, 144, 0.18);
+  --mat-educacao-fisica: #ef8261;
+  --mat-educacao-fisica-soft: rgba(239, 130, 97, 0.18);
   --mat-outros: #94a3b8;
   --mat-outros-soft: rgba(148, 163, 184, 0.18);
 
@@ -127,6 +165,76 @@
   --st-pausado-soft: rgba(245, 158, 75, 0.18);
   --st-concluido: #94a3b8;
   --st-concluido-soft: rgba(148, 163, 184, 0.18);
+}
+
+/* --------------------------------------------------------------------------
+   Matéria → par de cores, em UM lugar só.
+
+   Todo componente que pinta por matéria (a badge do Diário, os cards e chips do
+   Aprendizado, os assuntos do Mapa, o disco dos Planos) lê `--mat-color` e
+   `--mat-soft` e não conhece nome de matéria nenhum: quem escreve `data-materia`
+   no elemento herda o par por cascata.
+
+   É o mesmo desenho que a seção do Mapa já usava pro `data-tom`, e existe porque
+   a alternativa não escala — com 14 matérias, repetir a lista em cada CSS de
+   seção daria ~250 linhas iguais em 4 arquivos, e a 15ª matéria teria 4 chances
+   de ser esquecida em um deles.
+   -------------------------------------------------------------------------- */
+[data-materia="portugues"] {
+  --mat-color: var(--mat-portugues);
+  --mat-soft: var(--mat-portugues-soft);
+}
+[data-materia="matematica"] {
+  --mat-color: var(--mat-matematica);
+  --mat-soft: var(--mat-matematica-soft);
+}
+[data-materia="ciencias"] {
+  --mat-color: var(--mat-ciencias);
+  --mat-soft: var(--mat-ciencias-soft);
+}
+[data-materia="fisica"] {
+  --mat-color: var(--mat-fisica);
+  --mat-soft: var(--mat-fisica-soft);
+}
+[data-materia="quimica"] {
+  --mat-color: var(--mat-quimica);
+  --mat-soft: var(--mat-quimica-soft);
+}
+[data-materia="biologia"] {
+  --mat-color: var(--mat-biologia);
+  --mat-soft: var(--mat-biologia-soft);
+}
+[data-materia="historia"] {
+  --mat-color: var(--mat-historia);
+  --mat-soft: var(--mat-historia-soft);
+}
+[data-materia="geografia"] {
+  --mat-color: var(--mat-geografia);
+  --mat-soft: var(--mat-geografia-soft);
+}
+[data-materia="filosofia"] {
+  --mat-color: var(--mat-filosofia);
+  --mat-soft: var(--mat-filosofia-soft);
+}
+[data-materia="sociologia"] {
+  --mat-color: var(--mat-sociologia);
+  --mat-soft: var(--mat-sociologia-soft);
+}
+[data-materia="idiomas"] {
+  --mat-color: var(--mat-idiomas);
+  --mat-soft: var(--mat-idiomas-soft);
+}
+[data-materia="artes"] {
+  --mat-color: var(--mat-artes);
+  --mat-soft: var(--mat-artes-soft);
+}
+[data-materia="educacao_fisica"] {
+  --mat-color: var(--mat-educacao-fisica);
+  --mat-soft: var(--mat-educacao-fisica-soft);
+}
+[data-materia="outros"] {
+  --mat-color: var(--mat-outros);
+  --mat-soft: var(--mat-outros-soft);
 }
 
 /* --------------------------------------------------------------------------

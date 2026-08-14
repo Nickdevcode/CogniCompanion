@@ -43,6 +43,13 @@ const ROTULOS_ACENTUADOS = {
   "estava embalada": "estava embalada",
   "resolveu sozinha": "resolveu sozinha",
   "tropecou no exercicio": "tropeçou no exercício",
+  // Os dois rótulos do marco de compreensão (ago/2026) já nascem acentuados no
+  // servidor — entram aqui só como rede: se um deles chegar sem acento (robô
+  // antigo, sessão gravada antes), o pai continua não lendo "mao" no painel.
+  // Rótulo que já vem acentuado não casa com estas chaves e passa intacto.
+  "pediu uma mao": "pediu uma mão",
+  "pediu uma mao aqui": "pediu uma mão aqui",
+  "explicou com as proprias palavras": "explicou com as próprias palavras",
 };
 
 /**
@@ -62,7 +69,23 @@ const VOCABULARIO_INTERNO = new Set([
 const ROTULO_NEUTRO = {
   afeto: "um momento da aula",
   pratica: "um exercício",
+  compreensao: "um momento da conversa",
 };
+
+/**
+ * Os três tipos de momento, em ordem de CONFIANÇA na fonte — e a ordem importa
+ * duas vezes: ela é o critério de desempate do ponto de atrito e é o que a
+ * timeline traduz em forma.
+ *
+ *   `pratica`     exercício que o servidor propôs e conferiu → FATO
+ *   `afeto`       leitura da câmera (MediaPipe, evidência forte) → IMPRESSÃO
+ *   `compreensao` como a criança se saiu no turno, lido da conversa → LEITURA
+ *
+ * `compreensao` é de ago/2026 e é o motivo de o mapa ter deixado de viver vazio:
+ * os outros dois exigem condição rara (webcam enquadrada, ciclo de exercício),
+ * e uma aula inteira de explicação e dúvida produzia ZERO momentos.
+ */
+const TIPOS_MOMENTO = new Set(["afeto", "pratica", "compreensao"]);
 
 /**
  * Tom do momento — o que define a COR do marcador. Não é nota nem valência moral:
@@ -74,13 +97,20 @@ const TOM_POR_RESULTADO = { travou: "apoio", aprendeu: "bom" };
 /**
  * @typedef {object} Momento
  * @property {number} emMs — offset desde o início da sessão (não é timestamp)
- * @property {'afeto'|'pratica'} tipo
+ * @property {'afeto'|'pratica'|'compreensao'} tipo
  * @property {string} rotulo — texto PRONTO pra tela (linguagem de apoio)
  * @property {'apoio'|'duvida'|'bom'|'neutro'} tom — só pra cor do marcador
  * @property {string|null} materia
  * @property {string|null} topico — o assunto que estava valendo naquele segundo
  * @property {string|null} sinal — INTERNO: nunca renderizar
  * @property {string|null} resultado — INTERNO: nunca renderizar
+ */
+
+/**
+ * @typedef {object} AssuntoDificil
+ * @property {string} topico — o assunto a rever (ou a matéria, se não houve tópico)
+ * @property {string|null} materia
+ * @property {number} ocorrencias — quantos momentos de atrito caíram nele
  */
 
 /**
@@ -92,7 +122,8 @@ const TOM_POR_RESULTADO = { travou: "apoio", aprendeu: "bom" };
  * @property {string[]} materias
  * @property {string[]} topicos
  * @property {Momento[]} momentos — ordenados por `emMs`
- * @property {Momento|null} pontoDeAtrito — o momento que mais importa (ou null)
+ * @property {Momento|null} pontoDeAtrito — QUANDO foi (ancora a linha do tempo)
+ * @property {AssuntoDificil|null} assuntoMaisDificil — O QUE REVER (ou null)
  * @property {boolean} emAndamento — true só na sessão ao vivo
  */
 
@@ -149,7 +180,10 @@ function rotuloParaTela(bruto, tipo, internos = []) {
  */
 function normalizarMomento(item) {
   if (!item || typeof item !== "object") return null;
-  const tipo = item.tipo === "pratica" ? "pratica" : "afeto";
+  // Tipo desconhecido cai em `afeto` (o mais genérico) em vez de sumir: perder um
+  // momento em silêncio é pior do que desenhá-lo com a forma errada. Um tipo novo
+  // no robô aparece na tela e cobra o ajuste aqui, em vez de esvaziar o mapa.
+  const tipo = TIPOS_MOMENTO.has(item.tipo) ? item.tipo : "afeto";
   const sinal = texto(item.sinal);
   const resultado = texto(item.resultado);
   const tom =
@@ -172,11 +206,17 @@ function normalizarMomento(item) {
 /**
  * O momento que mais importa pro pai: onde ela precisou de mais ajuda.
  *
- * Espelha a regra do servidor (`montarMapa` em `modules/atencao.js`): primeiro
- * sinal `travada`, senão o primeiro exercício em que ela travou. Precisamos dela
- * aqui porque o `pontoDeAtrito` só viaja na sessão AO VIVO — o histórico (tanto
- * do endpoint quanto da tabela) traz os momentos sem esse campo derivado. Não é
- * inventar leitura: é aplicar a mesma regra sobre os mesmos momentos já cruzados.
+ * Espelha a regra do servidor (`acharPontoDeAtrito` em `modules/atencao.js`), nos
+ * três níveis e nesta ordem: sinal `travada` da câmera, exercício em que ela
+ * travou, e — desde ago/2026 — a compreensão travada lida da conversa. O terceiro
+ * vem por último de propósito: é o sinal mais abundante e o menos duro, e na
+ * frente afogaria os outros dois em toda sessão.
+ *
+ * ⚠️ Isto é FALLBACK, não a fonte. O servidor manda `pontoDeAtrito` pronto tanto
+ * na sessão ao vivo quanto em cada item do histórico, e o dele sempre ganha (ver
+ * `montarSessao`). O cálculo local só cobre a tabela lida direto do Supabase, que
+ * guarda os `momentos` e não o derivado. Sem o terceiro nível aqui, o fallback
+ * devolveria `null` justamente nas sessões que antes vinham vazias — a maioria.
  *
  * @param {Momento[]} momentos
  * @returns {Momento|null} null quando a aula correu sem atrito — e isso também é
@@ -186,8 +226,36 @@ function acharPontoDeAtrito(momentos) {
   return (
     momentos.find((m) => m.sinal === "travada") ||
     momentos.find((m) => m.tipo === "pratica" && m.resultado === "travou") ||
+    momentos.find((m) => m.tipo === "compreensao" && m.resultado === "travou") ||
     null
   );
+}
+
+/**
+ * Saneia o `assuntoMaisDificil` que o servidor manda pronto — "o que rever
+ * amanhã", enquanto o ponto de atrito responde "quando foi".
+ *
+ * A regra (somar o atrito por tópico, com peso por confiança da fonte) é do
+ * SERVIDOR e não tem cópia aqui: uma travada isolada em frações pesa menos que
+ * quatro tropeços espalhados em mmc, e é o servidor que já fez essa conta em
+ * cima dos momentos que ele mesmo cruzou.
+ *
+ * O `peso` vem no payload e é deliberadamente descartado: é número interno de
+ * ranking, não tem unidade que signifique nada pro pai e viraria placar na tela.
+ *
+ * @returns {AssuntoDificil|null} null quando não houve atrito (o que também é
+ *   informação) ou quando o item não identifica assunto nenhum.
+ */
+function normalizarAssuntoDificil(item) {
+  if (!item || typeof item !== "object") return null;
+  const topico = texto(item.topico);
+  const materia = texto(item.materia);
+  if (!topico && !materia) return null;
+  return {
+    topico: topico || materia,
+    materia,
+    ocorrencias: numero(item.ocorrencias),
+  };
 }
 
 /**
@@ -204,7 +272,17 @@ function chaveDaSessao(inicioEm) {
 }
 
 /** Monta a sessão normalizada a partir dos campos já extraídos de cada fonte. */
-function montarSessao({ inicioEm, duracaoMs, turnos, materias, topicos, momentos, pontoDeAtrito, emAndamento }) {
+function montarSessao({
+  inicioEm,
+  duracaoMs,
+  turnos,
+  materias,
+  topicos,
+  momentos,
+  pontoDeAtrito,
+  assuntoMaisDificil,
+  emAndamento,
+}) {
   const lista = (Array.isArray(momentos) ? momentos : [])
     .map(normalizarMomento)
     .filter(Boolean)
@@ -218,7 +296,13 @@ function montarSessao({ inicioEm, duracaoMs, turnos, materias, topicos, momentos
     materias: listaDeTextos(materias),
     topicos: listaDeTextos(topicos),
     momentos: lista,
+    // O do servidor tem prioridade: o critério mora lá, e assim o dia em que ele
+    // mudar a tela acompanha sozinha. O recálculo local é só pra tabela.
     pontoDeAtrito: normalizarMomento(pontoDeAtrito) || acharPontoDeAtrito(lista),
+    // Este NÃO tem fallback local, de propósito: a regra de peso é do servidor e
+    // uma segunda cópia divergiria em silêncio. Sem o campo, a tela mostra só o
+    // ponto de atrito (é o caso da tabela lida direto do Supabase).
+    assuntoMaisDificil: normalizarAssuntoDificil(assuntoMaisDificil),
     emAndamento: !!emAndamento,
   };
 }
@@ -234,6 +318,7 @@ function normalizarDoEndpoint(sessao, emAndamento = false) {
     topicos: sessao.topicos,
     momentos: sessao.momentos,
     pontoDeAtrito: sessao.pontoDeAtrito,
+    assuntoMaisDificil: sessao.assuntoMaisDificil,
     emAndamento: emAndamento || sessao.emAndamento,
   });
 }
@@ -248,7 +333,11 @@ function normalizarDaTabela(linha) {
     materias: linha.materias,
     topicos: linha.topicos,
     momentos: linha.momentos,
-    pontoDeAtrito: null, // a tabela não guarda o derivado — recalculamos
+    // A tabela guarda os `momentos` e nenhum dos dois derivados: o ponto de
+    // atrito nós recalculamos (mesma regra), o assunto mais difícil não — ele
+    // aparece quando esta aula vier pelo endpoint.
+    pontoDeAtrito: null,
+    assuntoMaisDificil: null,
     emAndamento: false, // o que está no banco, por definição, já terminou
   });
 }

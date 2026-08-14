@@ -13,9 +13,10 @@
  *
  * O que a tela mostra, em ordem de importância pro pai:
  *   1. O resumo em texto (IA), que é o que ele lê primeiro;
- *   2. A linha do tempo da aula, com o momento que mais importa em destaque;
- *   3. A mesma linha em lista de texto (não dá pra depender de cor e posição);
- *   4. O histórico das aulas anteriores.
+ *   2. O assunto que mais pediu ajuda + o minuto em que isso começou (destaque);
+ *   3. A linha do tempo da aula;
+ *   4. A mesma linha em lista de texto (não dá pra depender de cor e posição);
+ *   5. O histórico das aulas anteriores.
  *
  * ⚠️ Regras de tom, inegociáveis (as mesmas da Trilha de aprendizado):
  *   - `sinal`/`resultado` (`travada`, `travou`) são internos e NUNCA aparecem: o
@@ -143,25 +144,83 @@ function chipsDeAssunto(sessao) {
 }
 
 /**
- * O destaque da tela: o momento que mais importa, escrito como uma frase.
+ * O destaque da tela — e ele responde DUAS perguntas que não são a mesma:
  *
- * A frase é construída SEM pronome e SEM o nome da criança de propósito — os
+ *   `assuntoMaisDificil` → O QUE REVER. Soma todo o atrito da aula por tópico
+ *      (com peso por confiança da fonte, conta feita no servidor). É o que merece
+ *      os cinco minutos do pai amanhã.
+ *   `pontoDeAtrito` → QUANDO FOI. Ancora a linha do tempo, mas é o PRIMEIRO sinal
+ *      da sessão, e o primeiro nem sempre é o que mais importou: uma travada
+ *      isolada às 2min em frações pesa menos que quatro tropeços em mmc.
+ *
+ * Quando os dois apontam pro mesmo assunto (o caso comum), a segunda linha vira
+ * só a hora — repetir o tópico dois parágrafos seguidos soaria a formulário.
+ * Sem o assunto (histórico lido direto da tabela, que não guarda o derivado), o
+ * bloco continua sendo o que sempre foi: o momento que mais importa.
+ *
+ * As frases são construídas SEM pronome e SEM o nome da criança de propósito — os
  * rótulos do servidor vêm no feminino genérico ("estava embalada", "resolveu
  * sozinha"), e colar um nome neles produziria concordância errada na cara do pai.
- * A construção "Aos 4min12, em tabuada do 7 — precisou de mais ajuda." funciona
- * pra qualquer criança e mantém a frase que a tela existe pra dizer.
  */
 function destaqueDoAtrito(sessao) {
   const momento = sessao.pontoDeAtrito;
-  if (!momento) return faixaTranquila(sessao);
+  const assunto = sessao.assuntoMaisDificil;
+  if (!momento && !assunto) return faixaTranquila(sessao);
 
-  const onde = momento.topico || (momento.materia ? materiaLabel(momento.materia) : null);
-  const frase = onde
-    ? `Aos ${formatTempoNaAula(momento.emMs)}, em ${onde} — ${momento.rotulo}.`
-    : `Aos ${formatTempoNaAula(momento.emMs)} — ${momento.rotulo}.`;
+  const ondeMomento =
+    momento && (momento.topico || (momento.materia ? materiaLabel(momento.materia) : null));
+  // O assunto a rever manda; sem ele, quem nomeia o alvo é o ponto de atrito.
+  const alvo = (assunto && assunto.topico) || ondeMomento;
 
-  const sugestao = onde
-    ? `Um bom assunto pra retomarem juntos hoje: cinco minutinhos sobre ${onde} já ajudam bastante.`
+  const linhas = [];
+
+  if (assunto) {
+    linhas.push(
+      el("p", {
+        class: "mp-atrito__frase",
+        children: [
+          el("span", { text: "O que mais pediu ajuda nesta aula: " }),
+          el("strong", { class: "mp-atrito__topico", text: assunto.topico }),
+          el("span", { text: "." }),
+        ],
+      })
+    );
+  }
+
+  if (momento) {
+    const quando = formatTempoNaAula(momento.emMs);
+    // Mesmo assunto nas duas leituras: a segunda linha só situa no tempo.
+    const mesmoAssunto =
+      assunto && ondeMomento && ondeMomento.toLowerCase() === assunto.topico.toLowerCase();
+    let texto;
+    if (!assunto) {
+      texto = ondeMomento
+        ? `Aos ${quando}, em ${ondeMomento} — ${momento.rotulo}.`
+        : `Aos ${quando} — ${momento.rotulo}.`;
+    } else if (mesmoAssunto) {
+      texto = `A primeira vez foi aos ${quando}: ${momento.rotulo}.`;
+    } else {
+      texto = ondeMomento
+        ? `O primeiro tropeço veio antes, aos ${quando}, em ${ondeMomento}: ${momento.rotulo}.`
+        : `O primeiro tropeço veio aos ${quando}: ${momento.rotulo}.`;
+    }
+    linhas.push(el("p", { class: "mp-atrito__ancora", text: texto }));
+  }
+
+  // `ocorrencias` vira texto, nunca número: "voltou algumas vezes" diz o que o
+  // pai precisa saber; "3 ocorrências" é placar com outro nome. E o `peso` do
+  // payload não chega aqui — ele é ranking interno do servidor.
+  if (assunto && assunto.ocorrencias >= 2) {
+    linhas.push(
+      el("p", {
+        class: "mp-atrito__ancora",
+        text: "Esse ponto voltou algumas vezes ao longo da conversa.",
+      })
+    );
+  }
+
+  const sugestao = alvo
+    ? `Um bom assunto pra retomarem juntos hoje: cinco minutinhos sobre ${alvo} já ajudam bastante.`
     : "Vale puxar esse assunto de novo com calma numa próxima conversa.";
 
   return el("div", {
@@ -171,8 +230,11 @@ function destaqueDoAtrito(sessao) {
       el("div", {
         class: "mp-atrito__body",
         children: [
-          el("span", { class: "mp-atrito__label", text: "O momento que mais importa" }),
-          el("p", { class: "mp-atrito__frase", text: frase }),
+          el("span", {
+            class: "mp-atrito__label",
+            text: assunto ? "O que vale rever" : "O momento que mais importa",
+          }),
+          ...linhas,
           el("p", { class: "mp-atrito__acao", text: sugestao }),
         ],
       }),

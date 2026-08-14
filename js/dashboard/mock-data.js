@@ -432,13 +432,23 @@ const resumoSemanal = {
  * o assunto de cada turno com os sinais lidos pela câmera e os vereditos de
  * exercício, e grava tudo quando a sessão acaba. O site só lê (read-only).
  *
- * Dois detalhes que o mock reproduz de propósito, porque a tela tem que aguentar:
+ * Três detalhes que o mock reproduz de propósito, porque a tela tem que aguentar:
  *   - `momentos[].emMs` é offset DESDE O INÍCIO da sessão (não timestamp);
- *   - os `rotulo` vêm SEM acento, como o repo do robô os escreve — quem acentua
- *     pra tela é o `mapa-api.js` (ver ROTULOS_ACENTUADOS lá).
+ *   - os `rotulo` de `afeto`/`pratica` vêm SEM acento, como o robô os escrevia —
+ *     quem acentua pra tela é o `mapa-api.js` (ver ROTULOS_ACENTUADOS lá). Os de
+ *     `compreensao` já nascem acentuados no servidor (ago/2026), e estão aqui
+ *     assim de propósito: a tabela de acentos não pode CORROMPER o que já veio
+ *     certo. As duas convivem porque as aulas antigas continuam no jsonb como
+ *     foram gravadas;
+ *   - `tipo: "compreensao"` (ago/2026) é hoje a fonte mais frequente da linha do
+ *     tempo — é o que a Cogni leu da própria conversa, e não da câmera nem do
+ *     ciclo de exercícios.
  *
  * A terceira sessão não tem nenhum momento marcado: é o caso "correu tranquila",
  * que precisa parecer uma aula boa e não uma tela quebrada.
+ *
+ * Não há `assuntoMaisDificil` aqui, e isso está certo: a coluna guarda os
+ * `momentos`, e o campo é derivado pelo servidor na leitura do endpoint.
  */
 const sessoesAtencao = [
   {
@@ -449,13 +459,31 @@ const sessoesAtencao = [
     turnos: 9,
     materias: ["ciencias", "portugues"],
     topicos: ["dinossauros", "redação"],
-    contadores: { travada: 1, confusa: 1, engajada: 2, acertos: 2, tropecos: 1 },
+    contadores: {
+      travada: 1,
+      confusa: 1,
+      engajada: 2,
+      acertos: 2,
+      tropecos: 1,
+      // Contados à parte de acertos/tropecos de propósito: um é veredito
+      // conferido, o outro é leitura da conversa (ver o plano técnico).
+      entendeu: 1,
+      precisouAjuda: 1,
+    },
     momentos: [
       {
         emMs: 2 * 60000 + 40000,
         tipo: "afeto",
         sinal: "engajada",
         rotulo: "estava embalada",
+        materia: "ciencias",
+        topico: "dinossauros",
+      },
+      {
+        emMs: 4 * 60000 + 30000,
+        tipo: "compreensao",
+        resultado: "aprendeu",
+        rotulo: "explicou com as próprias palavras",
         materia: "ciencias",
         topico: "dinossauros",
       },
@@ -472,6 +500,14 @@ const sessoesAtencao = [
         tipo: "afeto",
         sinal: "confusa",
         rotulo: "ficou em duvida",
+        materia: "portugues",
+        topico: "redação",
+      },
+      {
+        emMs: 10 * 60000 + 5000,
+        tipo: "compreensao",
+        resultado: "travou",
+        rotulo: "pediu uma mão",
         materia: "portugues",
         topico: "redação",
       },
@@ -518,13 +554,37 @@ const sessoesAtencao = [
     turnos: 7,
     materias: ["matematica"],
     topicos: ["tabuada do 7"],
-    contadores: { travada: 2, confusa: 0, engajada: 0, acertos: 0, tropecos: 2 },
+    contadores: {
+      travada: 2,
+      confusa: 0,
+      engajada: 0,
+      acertos: 0,
+      tropecos: 2,
+      entendeu: 0,
+      precisouAjuda: 2,
+    },
     momentos: [
+      {
+        emMs: 2 * 60000 + 20000,
+        tipo: "compreensao",
+        resultado: "travou",
+        rotulo: "pediu uma mão",
+        materia: "matematica",
+        topico: "tabuada do 7",
+      },
       {
         emMs: 4 * 60000 + 12000,
         tipo: "afeto",
         sinal: "travada",
         rotulo: "precisou de mais ajuda",
+        materia: "matematica",
+        topico: "tabuada do 7",
+      },
+      {
+        emMs: 8 * 60000 + 55000,
+        tipo: "compreensao",
+        resultado: "travou",
+        rotulo: "pediu uma mão",
         materia: "matematica",
         topico: "tabuada do 7",
       },

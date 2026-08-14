@@ -14,7 +14,7 @@
 import { el, sectionRoot, pageHead } from "./_shared.js";
 import { ICON, materiaIcon, chevronDown } from "../icons.js";
 import {
-  MATERIAS,
+  materiasAgrupadas,
   materiaLabel,
   formatHora,
   formatDiaRelativo,
@@ -190,13 +190,22 @@ function filtroMateria(state, onChange) {
   const mkOpt = (valor, texto) => {
     const opt = el("button", {
       class: "cv-filter__opt",
-      attrs: { type: "button", role: "menuitemradio" },
+      attrs: {
+        type: "button",
+        role: "menuitemradio",
+        "aria-checked": state.materia === valor ? "true" : "false",
+      },
       text: texto,
     });
     opt.addEventListener("click", () => {
       state.materia = valor;
       label.textContent = valor ? texto : "Matéria";
       btn.classList.toggle("is-active", !!valor);
+      // O estado marcado vive no menu inteiro, não só no item clicado: um
+      // `menuitemradio` sem `aria-checked` correto mente pro leitor de tela.
+      menu.querySelectorAll(".cv-filter__opt").forEach((o) =>
+        o.setAttribute("aria-checked", o === opt ? "true" : "false")
+      );
       close();
       onChange();
     });
@@ -204,7 +213,28 @@ function filtroMateria(state, onChange) {
   };
 
   menu.appendChild(mkOpt("", "Todas as matérias"));
-  MATERIAS.forEach((m) => menu.appendChild(mkOpt(m, materiaLabel(m))));
+
+  // Com 14 matérias, uma lista corrida vira parede de texto: os itens entram
+  // separados por área do conhecimento. É só APRESENTAÇÃO — cada opção continua
+  // filtrando pela matéria fina, e nenhum grupo existe no dado.
+  materiasAgrupadas().forEach((grupo) => {
+    menu.appendChild(
+      el("div", {
+        class: "cv-filter__group",
+        // `role="group"` dentro do menu é o que amarra o rótulo da área aos itens
+        // dela na árvore de acessibilidade (o título visual é decorativo).
+        attrs: { role: "group", "aria-label": grupo.label },
+        children: [
+          el("span", {
+            class: "cv-filter__group-title",
+            attrs: { "aria-hidden": "true" },
+            text: grupo.label,
+          }),
+          ...grupo.materias.map((m) => mkOpt(m.valor, m.label)),
+        ],
+      })
+    );
+  });
 
   function open() {
     menu.hidden = false;

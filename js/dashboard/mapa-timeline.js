@@ -11,9 +11,14 @@
  *     foco por teclado, anuncia o momento inteiro no leitor de tela e responde a
  *     toque. Num SVG isso tudo daria trabalho e sairia pior.
  *   - **Cor E forma.** O tipo do momento vira FORMA (círculo = leitura da câmera,
- *     losango = exercício conferido) e o tom vira COR. Quem não distingue cores
- *     continua lendo a linha — e, de todo jeito, a lista "momento a momento" da
- *     seção repete tudo em texto.
+ *     losango = exercício conferido, anel = leitura da conversa) e o tom vira COR.
+ *     Quem não distingue cores continua lendo a linha — e, de todo jeito, a lista
+ *     "momento a momento" da seção repete tudo em texto.
+ *   - **A forma diz o PESO da fonte.** As três não valem o mesmo: exercício
+ *     conferido é fato, câmera é impressão, conversa é leitura. Por isso o
+ *     `compreensao` (o mais abundante desde ago/2026) é um anel vazado, mais
+ *     discreto que os dois preenchidos — ele não pode dominar a linha só por ser
+ *     o que mais aparece.
  *   - **Nada de `sinal` cru na tela.** O que aparece é sempre o `rotulo`, já
  *     saneado em `mapa-api.js`.
  */
@@ -167,11 +172,16 @@ function legenda() {
   );
 
   // A forma diz a ORIGEM do momento, e isso muda o peso da informação: círculo é
-  // impressão da câmera; losango é exercício conferido pelo servidor (objetivo).
+  // impressão da câmera; losango é exercício conferido pelo servidor (objetivo);
+  // anel é o que a Cogni entendeu do que a criança disse.
   itens.push(
     el("li", {
       class: "mp-tl__key-item",
       children: [amostra("bom", "pratica"), el("span", { text: "exercício conferido" })],
+    }),
+    el("li", {
+      class: "mp-tl__key-item",
+      children: [amostra("apoio", "compreensao"), el("span", { text: "lido na conversa" })],
     })
   );
 
