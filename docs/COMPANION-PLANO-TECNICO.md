@@ -491,6 +491,41 @@ Acessibilidade: cada marcador é um `<button>` com o momento inteiro no `aria-la
 
 ---
 
+## 📝 Correção Visual do Caderno (ago/2026) — **não é tarefa pro site**
+
+> [!note] Registrado aqui só pra ninguém construir por engano
+> A criança mostra a lição pra câmera e a Cogni devolve o veredito **por questão**, com a caixa daquela questão desenhada em cima do frame congelado. Feature **100% do robô + painel local**: não tem tabela nova, não tem endpoint pro Companion, não tem tela pra fazer. **Nenhuma ação do lado do site.**
+
+O que muda de observável pro Companion — e é só isto:
+
+- O turno de correção entra no **Diário** (`conversas`) e no **Mapa da Aula** como qualquer outro turno, porque corrigir lição *é* estudar. A matéria/tópico saem da mesma classificação por IA de sempre.
+- Quando a correção é pedida pelo **botão** do painel (e não por voz), o `texto_usuario` gravado é a frase sintética **"Corrige minha licao, por favor."**. É o preço de fazer os dois gatilhos passarem pelo mesmo `conversar()` — o que garante que a correção entre no histórico e no Diário. Se um dia isso incomodar na timeline do pai, a solução é do **robô** (marcar a origem), não do site.
+
+Se um dia virar tela no Companion (**não está planejado**), o que faria sentido é o pai ver *"a lição de terça: 3 de 5 questões conferidas"*. Exigiria tabela nova + persistência — nada disso existe hoje.
+
+---
+
+## 🧾 Dívidas do BACKEND reveladas pela tela do Mapa (ago/2026)
+
+> Três coisas que o site contornou **corretamente** do lado dele, mas cuja origem é do robô. Estão listadas aqui pra não virarem workaround permanente. **O site não precisa fazer nada** — quando o backend resolver, os contornos podem sair (e nenhum deles quebra se sair).
+
+| # | Dívida | Onde nasce | O que o site fez | Status |
+| --- | --- | --- | --- | --- |
+| 1 | **Rótulos vão sem acento** (`ficou em duvida`, `tropecou no exercicio`) | `ROTULO_SINAL` em `server/modules/atencao.js` — a convenção de escrever o repo sem acentuação vazou de comentário pra **string de UI** | Tabela que restaura os diacríticos da mesma frase, palavra por palavra | ✅ **CORRIGIDO no robô** (ago/2026) |
+| 2 | **`pontoDeAtrito` não é persistido** — só viaja na sessão ao vivo | `registrarSessaoAtencao` não grava o campo derivado, e o endpoint não o recalcula ao ler o histórico | Recalcula no front com a mesma regra; usa a do servidor se ela passar a vir | ⏳ aberta |
+| 3 | **`historico[]` volta vazio durante o ao vivo** | `GET /api/mapa-aula` prioriza a sessão em RAM e devolve `historico: []` | Lê o histórico direto de `sessoes_atencao` via RLS | ⏳ aberta |
+
+### ✅ Dívida nº 1 resolvida — o que muda pro site
+
+O servidor agora manda os rótulos **acentuados**: `ficou em dúvida` e `tropeçou no exercício` (os outros três — `precisou de mais ajuda`, `estava embalada`, `resolveu sozinha` — nunca tiveram acento pra restaurar). Há um teste no robô que falha se um rótulo voltar a sair sem acento, então **isto não regride em silêncio**.
+
+> [!note] O contorno do site pode sair — mas não precisa ter pressa
+> A tabela de restauração de diacríticos **continua funcionando como está**: rótulo já acentuado não casa com as entradas dela e passa como veio. Removê-la é limpeza, não urgência. Se removerem, vale manter a regra de que **rótulo desconhecido passa como veio** — essa parte protege contra um `sinal` novo vazar cru pra tela e não tem nada a ver com acento.
+>
+> ⚠️ **Sessões antigas gravadas em `sessoes_atencao` antes desta correção ainda têm os `momentos` com o rótulo sem acento no jsonb** — o campo é histórico, não é recalculado na leitura. Enquanto houver aulas velhas no histórico do pai, a tabela de restauração ainda tem o que fazer.
+
+---
+
 ## ✅ Como testar (ponta a ponta)
 
 - **Servidor sem credenciais** → robô/voz idênticos a hoje (fallback JSON).
