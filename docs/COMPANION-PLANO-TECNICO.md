@@ -322,7 +322,7 @@ Cada função: **eu (backend) → atualizo o contrato → Claude do site (tela) 
 - **Marcar sensível:** ✅ **feito.** A **IA** pós-resposta (`brain/memoria-ai.js`, a mesma chamada que extrai memória/tópico) devolve `sensivel` (entende nuance: bullying, tristeza, medo, sem precisar de palavra-chave). O `pipelinePosResposta` grava `sensivel = IA || verificarEntrada()` (regex do `safety.js` como rede de segurança). Sensível **marca pro pai**, não bloqueia (o bloqueio é só pro conteúdo realmente impróprio).
 - **Classificar matéria:** ✅ **feito.** A **IA** pós-resposta também classifica a `materia` (mais precisa que regex). O `brain/materia.js` (regex) é só fallback quando a IA não classifica. Grava no insert (regex) e a IA enriquece via UPDATE (`atualizarConversaPosIA` em `supabase.js`).
 - **Onboarding inteligente:** ✅ **feito.** `brain/memoria-ai.js` → `camposEssenciaisFaltantes(usuario)`/`temEssenciais(usuario)` (idade, série, hobbies, comoAprende). Se o pai preencheu tudo no site, o `verificarOnboarding` fecha a flag na hora e o `blocoOnboarding` (prompt.js) vira no-op — a Cogni **não refaz** as perguntas nem sobrescreve. Se faltam campos, ela pergunta **só os que faltam**.
-- **Injetar plano no prompt:** ✅ **feito.** `server/modules/planos.js` (novo) faz cache RAM do plano ativo por criança — `obterPlanoAtivo(id)` é leitura **síncrona** (robô não trava), `refrescarPlanoAtivo(id)` atualiza em segundo plano (plano novo entra no turno seguinte), `hidratarPlanos()` pré-carrega no boot. O `blocoPlanoEstudo(usuario, plano)` em `prompt.js` injeta título+foco+conteúdo (tom roteiro-não-prisão, **proativo**: a Cogni puxa/retoma o assunto do plano) via `extras.plano`, só pro estudante. Conta `status` `ativo` **ou** `em_andamento`; **expira** por `criado_em + duracao_dias` (1 dia dura 1 dia → para de cobrar). **1 plano vigente por criança** (single-child); se houver vários, vale o mais recente por `atualizado_em`.
+- **Injetar plano no prompt:** ✅ **feito.** `server/modules/planos.js` faz cache RAM do plano ativo por criança — `obterPlanoAtivo(id)` é leitura **síncrona** (robô não trava), `hidratarPlanos()` pré-carrega no boot. O `blocoPlanoEstudo(usuario, plano, gancho)` em `prompt.js` injeta título+foco+conteúdo (tom roteiro-não-prisão) via `extras.plano`, só pro estudante. Conta `status` `ativo` **ou** `em_andamento`; **expira** por `criado_em + duracao_dias` (1 dia dura 1 dia → para de cobrar). **1 plano vigente por criança** (single-child); se houver vários, vale o mais recente por `atualizado_em`. **Propagação e proatividade foram refeitas em ago/2026 — ver a seção própria abaixo.**
 - **Dica do Cogni:** ✅ **feito.** `server/modules/brain/dica.js` (novo) → `gerarDicaDoCogni({openai, modelo}, criancaId)`, exposto em `GET /api/dica?criancaId=`. IA gera uma dica curta e acionável pros pais com base em memórias + tópicos recentes. **Cache RAM curto de 1h** por criança (antes era 1 dia, dava "delay" — agora reflete a conversa recente sem regerar a cada reload); `?forcar=1` ignora o cache. Cada dica gerada é guardada na tabela `dicas` (só se diferente da última).
 - **Camada de dados:** `server/modules/memoria.js` (cache + fila por usuário `filasPorUsuario` + `atualizarUsuario` async já existem — reaproveitar pro merge robô↔pai).
 - **Sync de volta (Supabase → robô):** ✅ **feito.** Antes a hidratação só rodava no **boot** — o que o pai editava no site nunca voltava pro cache do robô (ele refazia o onboarding por cima). Agora há 3 caminhos, com **degradação graciosa** (se um falha, o outro cobre): (a) `refrescarUsuario(id)` fire-and-forget no início de cada conversa (`brain.js`), traz a edição do pai pro turno seguinte; (b) `carregarUsuarioFresco(id)` **awaited** — só quando o perfil do cache parece incompleto (perfil novo / sem essenciais), garante que o **1º turno** já use o que o pai configurou, sem refazer onboarding; (c) **Realtime** do Supabase na tabela `criancas` (`iniciarRealtimeUsuarios` no boot) atualiza o cache **na hora** que o pai salva. Além disso, `GET /api/usuarios` chama `refrescarTodosUsuarios()` (puxa a lista fresca) pra um perfil **criado no site** aparecer na interface localhost sem reiniciar. **Regra de merge:** os campos que o pai edita (perfil, prompt, vínculo, `onboarding_completo`) vêm do Supabase; `memorias`/`idiomas_estudando`/`estilo` que o robô aprende são **preservados** (não sobrescritos). ⚠️ O Realtime exige habilitar a tabela `criancas` em *Database → Replication* no painel do Supabase — sem isso, só os caminhos (a)/(b) funcionam (suficientes, só não instantâneos).
@@ -499,7 +499,8 @@ Acessibilidade: cada marcador é um `<button>` com o momento inteiro no `aria-la
 O que muda de observável pro Companion — e é só isto:
 
 - O turno de correção entra no **Diário** (`conversas`) e no **Mapa da Aula** como qualquer outro turno, porque corrigir lição *é* estudar. A matéria/tópico saem da mesma classificação por IA de sempre.
-- Quando a correção é pedida pelo **botão** do painel (e não por voz), o `texto_usuario` gravado é a frase sintética **"Corrige minha licao, por favor."**. É o preço de fazer os dois gatilhos passarem pelo mesmo `conversar()` — o que garante que a correção entre no histórico e no Diário. Se um dia isso incomodar na timeline do pai, a solução é do **robô** (marcar a origem), não do site.
+- Quando a correção é pedida pelo **botão** do painel (e não por voz), o `texto_usuario` gravado é a frase sintética **"Corrige minha lição, por favor."** (acentuada — é balão que o pai lê no Diário; ver a dívida nº 1 abaixo, que é o mesmo princípio). É o preço de fazer os dois gatilhos passarem pelo mesmo `conversar()` — o que garante que a correção entre no histórico e no Diário. Se um dia isso incomodar na timeline do pai, a solução é do **robô** (marcar a origem), não do site.
+- A rota `POST /api/caderno/corrigir` tem **rate limit próprio** (6/min **por criança**), e não o `limiteResumo`. Dois motivos: o `keyGenerator` do `limiteResumo` lê `req.query.criancaId`, que não existe num POST com o id no *body* — toda correção cairia no balde do **IP**, misturando as crianças; e é a rota mais cara do projeto (visão com `detail: 'high'`), a única disparável em rajada por clique. **Ela não divide cota com o Resumo Semanal nem com a Dica.**
 
 Se um dia virar tela no Companion (**não está planejado**), o que faria sentido é o pai ver *"a lição de terça: 3 de 5 questões conferidas"*. Exigiria tabela nova + persistência — nada disso existe hoje.
 
@@ -512,7 +513,7 @@ Se um dia virar tela no Companion (**não está planejado**), o que faria sentid
 | # | Dívida | Onde nasce | O que o site fez | Status |
 | --- | --- | --- | --- | --- |
 | 1 | **Rótulos vão sem acento** (`ficou em duvida`, `tropecou no exercicio`) | `ROTULO_SINAL` em `server/modules/atencao.js` — a convenção de escrever o repo sem acentuação vazou de comentário pra **string de UI** | Tabela que restaura os diacríticos da mesma frase, palavra por palavra | ✅ **CORRIGIDO no robô** (ago/2026) |
-| 2 | **`pontoDeAtrito` não é persistido** — só viaja na sessão ao vivo | `registrarSessaoAtencao` não grava o campo derivado, e o endpoint não o recalcula ao ler o histórico | Recalcula no front com a mesma regra; usa a do servidor se ela passar a vir | ⏳ aberta |
+| 2 | **`pontoDeAtrito` não vinha no histórico** — só viajava na sessão ao vivo | `registrarSessaoAtencao` não grava o campo derivado, e o endpoint não o recalculava ao ler o histórico | Recalcula no front com a mesma regra; usa a do servidor se ela passar a vir | ✅ **RESOLVIDO no robô** (ago/2026) |
 | 3 | **`historico[]` volta vazio durante o ao vivo** | `GET /api/mapa-aula` prioriza a sessão em RAM e devolve `historico: []` | Lê o histórico direto de `sessoes_atencao` via RLS | ⏳ aberta |
 
 ### ✅ Dívida nº 1 resolvida — o que muda pro site
@@ -524,12 +525,96 @@ O servidor agora manda os rótulos **acentuados**: `ficou em dúvida` e `tropeç
 >
 > ⚠️ **Sessões antigas gravadas em `sessoes_atencao` antes desta correção ainda têm os `momentos` com o rótulo sem acento no jsonb** — o campo é histórico, não é recalculado na leitura. Enquanto houver aulas velhas no histórico do pai, a tabela de restauração ainda tem o que fazer.
 
+### ✅ Dívida nº 2 resolvida — `pontoDeAtrito` agora vem no histórico
+
+`GET /api/mapa-aula` passou a **recalcular** o campo ao servir cada linha do histórico (e o `/mapa-aula/resumo` faz o mesmo com a última sessão). Continua **derivado, não persistido** — a coluna guarda os `momentos`, e o ponto de atrito sai deles na leitura. Para o site, o efeito prático é que **`historico[i].pontoDeAtrito` agora existe**, com exatamente o mesmo formato do que já vinha na sessão ao vivo.
+
+O critério virou a função `acharPontoDeAtrito` (`server/modules/atencao.js`), usada tanto pelo `montarMapa` quanto pelo endpoint — regra única, um lugar só. Há teste que reprova se as duas divergirem.
+
+> [!tip] O recálculo do front pode sair — e agora sem o risco que você apontou
+> Era essa a preocupação certa: o contorno não ia quebrar, ia **divergir calado**. Agora não há segunda cópia da regra pra divergir. Se preferirem manter o recálculo como fallback, mantenham a prioridade que vocês já documentaram (**o campo do servidor ganha**) — aí o dia em que o critério mudar aqui, a tela acompanha sozinha.
+
+### 🤝 Acordos entre as duas pontas (contrato que não está em código)
+
+Coisas que **um lado assume** sobre o outro e que não dá pra descobrir lendo o payload. Mudou aqui, avisa lá — nesta lista, o silêncio é que quebra.
+
+| O que é assumido | Quem depende | Regra |
+| --- | --- | --- |
+| ~~**O critério do `pontoDeAtrito`**~~ | ~~O site, que replica a regra no front~~ | ✅ **Resolvido na origem** — o servidor agora manda o campo no histórico, então não há segunda cópia da regra pra divergir. Continua valendo o aviso se o critério mudar, mas agora o silêncio não custa nada: a tela acompanha sozinha |
+| **O piso da sessão**: menos de **60s** (`MINIMO_PARA_GRAVAR_MS`) **ou** zero turnos não vira linha em `sessoes_atencao` | O **site**, que escreve o estado vazio como *"quando ela conversar alguns minutinhos com a Cogni, o mapa aparece aqui"* | Confirmado ✅. Se o piso mudar, o robô avisa — o texto do estado vazio muda junto, senão o site promete ao pai algo que não acontece |
+| **`RATE_LIMIT_WINDOW_MS` = 10s** com limite 10 no `limiteResumo`, compartilhado por 5 rotas | O **site**, onde um 429 é silencioso (o card do resumo some de cena) | Se a janela crescer (10 min, p.ex.), Mapa e Resumo Semanal passam a brigar pela mesma cota. O robô avisa antes de mexer na janela; a rota do caderno já saiu desse balde |
+
+---
+
+## ⚡ Planos em tempo real + a Cogni puxando o gancho (ago/2026)
+
+> [!important] Esta seção **tem uma tarefa pro site** — uma só, e pequena (ver "O que o site precisa fazer"). O resto é backend, já feito.
+
+### O problema (relato do Nicolas, e ele estava certo)
+
+> *"Quando a gente cria um plano de estudo no site, às vezes eu tenho que esperar um tempo pra ele reconhecer, ou sair do perfil e entrar de novo, ou reiniciar a conversa. E às vezes eu tinha que perguntar 'tem algum plano pra gente?' — eu quero que ele puxe o gancho."*
+
+Eram **dois** problemas somados, e a auditoria achou **três** causas:
+
+| # | Causa | Por que doía |
+| --- | --- | --- |
+| 1 | O turno lia o cache **antes** de mandar atualizá-lo, e o refresh era fire-and-forget | Piso garantido de **1 turno de atraso**, sempre. E se o cache nunca tinha sido populado pra aquela criança (perfil que entrou depois do boot), o 1º turno vinha vazio — daí a impressão de que era preciso "reiniciar a conversa" |
+| 2 | **Não havia Realtime em `planos_estudo`** (só em `criancas`) | Nada empurrava a mudança do site pro robô. Sair do perfil e voltar "funcionava" por acidente de tempo: dava tempo do refresh anterior aterrissar |
+| 3 | A proatividade era **só texto** no system prompt ("seja proativa") | Sem estado nenhum, o modelo não sabia se já tinha puxado, se era hora, nem se o plano era novo. Instrução genérica no meio de um prompt grande se dilui — na prática ela só falava do plano quando perguntavam |
+
+### O que mudou no backend
+
+**Propagação — agora são quatro caminhos, em degradação graciosa** (se um falha, o de baixo cobre):
+
+1. **Realtime do Supabase** em `planos_estudo` (`iniciarRealtimePlanos()` em `planos.js`, espelhando o de `criancas`). O pai salva no site → o cache do robô muda **na hora**. Escuta `*` (INSERT/UPDATE/DELETE). ✅ **Já verificado no ar** — o canal sobe `SUBSCRIBED`, então a tabela já está habilitada em *Database → Replication*.
+2. **`garantirPlanoFresco(id)`** — awaited **com teto de 900ms** no **1º turno** de cada conversa. É o que faz um plano criado agora valer *nesta* conversa, e não na próxima. Estourou o tempo, segue com o cache (o princípio "o robô nunca fica refém da nuvem" continua valendo).
+3. **`refrescarPlanoAtivo(id)`** fire-and-forget nos demais turnos, e também na **troca de perfil** (`definirUsuarioAtivo`) e no **reset** (`limparConversa`).
+4. **`hidratarPlanos()`** no boot, como antes.
+
+> Em vez de aplicar a linha que chega pelo Realtime, o servidor **reconsulta** o plano vigente daquela criança. É o único jeito de respeitar a regra inteira: pausar o plano vigente tem que fazer o cache cair pro próximo vigente (ou pra `null`), e a linha do evento sozinha não sabe disso.
+
+**Proatividade — o "gancho" (`server/modules/brain/plano-gancho.js`, novo):** um motor puro que decide, **a cada turno**, uma de três ações:
+
+| Ação | Quando | O que o prompt manda |
+| --- | --- | --- |
+| `nenhum` | 1º turno da conversa; ou o assunto do plano já está rolando; ou acabou de puxar; ou já insistiu 3× | Não force nada, siga a conversa |
+| `puxar` | A partir do 2º turno, se ninguém tocou no tema | *"Depois de responder o que ela disse, VOCÊ entra no tema — sem perguntar 'quer estudar?' — e devolve a bola com uma pergunta sobre ele"* |
+| `retomar` | Já estiveram no assunto e a conversa se afastou por **6 turnos** | *"Traga de volta retomando de onde pararam, nunca do zero e nunca cobrando"* |
+
+Três detalhes que fazem a diferença:
+- A ordem é **repetida no recap final** do prompt (onde o modelo mais obedece), igual já se faz com segurança e afeto.
+- O servidor **confere a resposta**: se o modelo ignorou o pedido, o gancho **continua armado** pro próximo turno em vez de dar por feito.
+- **Plano novo ou editado no assunto rearma tudo** (título/foco/conteúdo). Mexer só em prazo/status **não** rearma — é a mesma aula.
+
+Cobertura: `npm run teste:plano` (17 casos, `node:test`, sem rede).
+
+### O que o site precisa fazer (a única tarefa)
+
+**Chamar um endpoint depois de salvar um plano.** É o **plano B** do Realtime: se um dia a replicação for desabilitada no painel, ou o canal cair, este ping mantém tudo instantâneo. Custa uma linha e é idempotente.
+
+```
+POST {SERVIDOR}/api/planos/refrescar
+  body: { criancaId: "<id da criança>" }
+  → 200 { ok: true, temPlanoAtivo: true|false, titulo: "..." | null }
+  → 400 { erro: "criancaId obrigatorio" }
+  → 503 { ok: false, erro: "Supabase desligado no servidor." }
+```
+
+- Chamar **depois** de `criarPlano`, `atualizarPlano` **e** `removerPlano` (os três mexem no que a Cogni segue).
+- É **awaited de propósito** no servidor: o `200` significa *"já está valendo"*, não *"vai valer"*. Dá pra mostrar a confirmação com segurança.
+- **Best-effort no front:** se o servidor local estiver desligado (o robô nem sempre está ligado quando o pai edita), o `fetch` falha — **engula o erro e siga**. O plano já está salvo no Supabase e o robô o pega no boot/Realtime. Não mostre erro pro pai por causa disso.
+- `{SERVIDOR}` = o mesmo `SERVIDOR_URL` que as telas de Rosto e Pareamento já usam.
+
+**Recomendado (não obrigatório):** mandar `atualizado_em: new Date().toISOString()` no `atualizarPlano`. O servidor desempata planos vigentes por `atualizado_em`, e hoje o site não escreve essa coluna — se não houver trigger `moddatetime` no banco, ela fica parada e o desempate cai nos critérios de reserva (`criado_em`, depois `id`). Com o vínculo 1:1 e um plano ativo por criança isso quase nunca aparece, mas é barato de acertar.
+
 ---
 
 ## ✅ Como testar (ponta a ponta)
 
 - **Servidor sem credenciais** → robô/voz idênticos a hoje (fallback JSON).
-- **Servidor com credenciais** → perfis hidratam do Supabase; conversas aparecem na tabela; plano editado no site entra no próximo turno do robô.
+- **Servidor com credenciais** → perfis hidratam do Supabase; conversas aparecem na tabela.
+- **Plano em tempo real** → com o robô conversando, criar/editar um plano no site → o log do servidor mostra `Realtime de planos ativo` no boot, e a Cogni já usa o plano **no turno seguinte**, sem trocar de perfil nem reiniciar a conversa. Sem esperar o Realtime: `curl -X POST http://127.0.0.1:3000/api/planos/refrescar -H "Content-Type: application/json" -d '{"criancaId":"<id>"}'` → `{ ok: true, temPlanoAtivo: true }`.
+- **O gancho** → com plano ativo, dizer "oi" e depois algo neutro ("nada demais") → no 2º ou 3º turno **ela mesma** puxa o assunto do plano, sem que ninguém pergunte.
 - **Internet cai com servidor no ar** → robô continua conversando (cache RAM).
 - **Site** → logar → badge → Dashboard → dados da criança vinculada aparecem; criança de outra família **não** aparece (RLS).
 - **Mapa de Compreensão** → conversar com o robô por >1min tocando 2 assuntos, com a câmera ligada → `GET /api/mapa-aula` retorna `emAndamento: true` com os momentos; após reset (ou 15min parado) a linha aparece em `sessoes_atencao`.
