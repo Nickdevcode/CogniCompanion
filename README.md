@@ -124,6 +124,12 @@ export const SERVIDOR_URL = "http://127.0.0.1:3000";
 > resolver `localhost` para IPv6 (`::1`) primeiro — o que derruba o `fetch` com `ERR_CONNECTION_RESET`.
 > Forçar `127.0.0.1` (IPv4) evita o problema. Se você subir o servidor noutra máquina/porta, troque aqui.
 
+**Plano criado no site chega na Cogni na hora.** Quem faz isso é o **Realtime do Supabase** (o servidor
+escuta `planos_estudo`); o site ainda dá um `POST /api/planos/refrescar` depois de criar, editar ou excluir
+um plano, como **plano B** caso a replicação esteja desligada ou o canal caia. Esse ping é **best-effort**:
+com o robô desligado ele falha em silêncio — e tudo bem, o plano já está salvo no Supabase e ele o pega no
+boot. Nada de erro na tela do pai por causa disso.
+
 ### 🧩 Onboarding & pareamento
 
 Quando o pai entra e **ainda não tem criança vinculada**, aparece um **onboarding em tela cheia**:

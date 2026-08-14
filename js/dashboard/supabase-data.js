@@ -300,6 +300,9 @@ export async function atualizarPlano(id, patch) {
   if ("duracao_dias" in campos) {
     campos.duracao_dias = Number(campos.duracao_dias) || 0;
   }
+  // O servidor do robô desempata planos vigentes por `atualizado_em`. Sem trigger
+  // `moddatetime` no banco a coluna ficaria parada, então o site a escreve aqui.
+  campos.atualizado_em = new Date().toISOString();
   const { data, error } = await client()
     .from("planos_estudo")
     .update(campos)

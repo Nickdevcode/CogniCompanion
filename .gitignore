@@ -43,6 +43,9 @@ docs/*
 # --- Referências de design (screenshots do Figma p/ consulta local) ---
 .design-refs/
 
+# --- Playwright MCP (snapshots/console de teste, gerados na raiz) ---
+.playwright-mcp/
+
 # --- Logs e temporários ---
 *.log
 npm-debug.log*
