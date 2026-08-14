@@ -93,8 +93,8 @@ O painel lê de **duas fontes**, e ambas já estão integradas:
 
 | Fonte | O quê | Como |
 | --- | --- | --- |
-| 🗄️ **Supabase** | Criança, conversas (Diário), planos de estudo, perfil, **trilha de aprendizado** | `@supabase/supabase-js` (anon key + RLS). Conversas e trilha são **só leitura** pelo site; planos têm CRUD |
-| 🖥️ **Servidor local da Cogni** | Resumo Semanal (IA), pareamento/despareamento, código do perfil | `fetch` nos endpoints `/api/...` (precisa do robô/servidor ligado) |
+| 🗄️ **Supabase** | Criança, conversas (Diário), planos de estudo, perfil, **trilha de aprendizado**, **aulas do Mapa** | `@supabase/supabase-js` (anon key + RLS). Conversas, trilha e aulas são **só leitura** pelo site; planos têm CRUD |
+| 🖥️ **Servidor local da Cogni** | Resumo Semanal (IA), Dica do Cogni (IA), **Mapa da aula ao vivo + seu resumo** (IA), rosto do robô, pareamento/despareamento | `fetch` nos endpoints `/api/...` (precisa do robô/servidor ligado) |
 
 ### 🎛️ A chave que liga tudo: `USAR_SUPABASE`
 
@@ -113,7 +113,8 @@ trocar a flag não muda nenhuma tela).
 
 ### 🌐 Servidor local (`SERVIDOR_URL`)
 
-Duas features dependem do servidor que roda junto do robô. A URL fica no topo de `js/dashboard/main.js`:
+Tudo que depende de IA ou de falar com o robô passa pelo servidor que roda junto dele. A URL fica no topo
+de `js/dashboard/main.js`:
 
 ```js
 export const SERVIDOR_URL = "http://127.0.0.1:3000";
@@ -162,6 +163,43 @@ Três regras que valem a pena não esquecer:
 - 🛡️ **Dado torto não derruba a tela.** Como é jsonb livre, cada item passa por um saneamento (conceito
   vazio, status desconhecido, matéria inventada ou data inválida são descartados/normalizados).
 
+### 🗺️ Mapa da aula — em que minuto ela parou de entender
+
+A Trilha responde *"o que ela está aprendendo"*; o **Mapa da aula** responde a pergunta que nenhum sistema
+escolar responde: **em que minuto** ela travou, e **sobre o quê**. É a resposta do TCC ao concorrente (um
+CRM de professor cuja feature mais elogiada é a chamada automática — que mede quem estava na sala, o dado
+mais fácil de coletar e o que menos diz sobre aprendizado). A frase que resume a tela inteira:
+
+> *"aos 4min12, quando entrou 'frações equivalentes', ela travou por 40s."*
+
+O servidor cruza, durante a conversa, **o assunto de cada turno** com **os sinais que a câmera leu** e **os
+vereditos dos exercícios**, e grava a aula fechada em `sessoes_atencao`. O site só desenha:
+
+| Parte | O que é |
+| --- | --- |
+| 💬 **O resumo em texto** | 2–3 frases por IA (`/api/mapa-aula/resumo`) — é o que o pai lê primeiro |
+| 📍 **O momento que mais importa** | O ponto de atrito da aula, escrito como frase: *"Aos 4min12, em frações equivalentes — precisou de mais ajuda"*, com uma sugestão do que fazer junto |
+| 📊 **A linha do tempo** | Faixa de 0 até a duração, um marcador por momento. **Forma** = origem (● câmera · ◆ exercício conferido), **cor** = tom. Abaixo, a mesma linha em lista de texto |
+| 🔴 **Modo ao vivo** | Com o robô conversando, a aula **se desenha na tela**: poll de 10s e selo "acontecendo agora" pulsando. Dá pra abrir no celular e acompanhar |
+| 🕘 **Aulas registradas** | O histórico; clicar troca a aula em destaque |
+
+Quatro cuidados que sustentam a tela:
+
+- 🗣️ **`travada`/`travou` nunca aparecem.** O que vai pra tela é o `rotulo` que o servidor manda pronto
+  ("precisou de mais ajuda", "estava embalada"). E se um rótulo vier **igual** ao sinal — o que acontece
+  quando o robô ganha um sinal novo e esquece de nomeá-lo —, o site troca por um neutro em vez de vazar.
+- 🚫 **Não é placar.** Os `contadores` chegam no payload e **de propósito não viram números**: "2 acertos ×
+  1 tropeço" é boletim com outro nome. O cabeçalho mostra só duração e trocas de conversa.
+- 😌 **Aula sem nenhum momento é boa notícia**, não tela vazia: aparece como *"a aula correu tranquila"*.
+- ♿ **Não depende de cor nem de posição.** Cada marcador é um `<button>` com o momento inteiro no
+  `aria-label`, a lista repete tudo em texto, e tocar um marcador destaca a linha correspondente (no
+  celular não existe hover).
+
+> 🔌 O histórico é lido **direto do Supabase**, e não só do endpoint, por um motivo específico: quando há
+> aula ao vivo, `/api/mapa-aula` devolve `historico: []` (ele prioriza a sessão que está em RAM). Sem a
+> tabela, as aulas anteriores sumiriam da tela **exatamente durante a demonstração ao vivo** — e o
+> histórico também continua valendo com o robô desligado.
+
 ### 🗃️ Arquivos do painel
 
 | Arquivo | Função |
@@ -175,9 +213,12 @@ Três regras que valem a pena não esquecer:
 | `js/dashboard/router.js` | Roteamento por hash (SPA leve) |
 | `js/dashboard/rosto-preview.js` | Desenho do rosto do robô em SVG (módulo puro, sem rede) |
 | `js/dashboard/rosto-api.js` | Leitura/gravação do rosto: PUT ao vivo no robô + persistência no Supabase |
-| `js/dashboard/sections/*.js` | As 6 seções: Início, Conversas, Aprendizado, Planos, **Rosto da Cogni**, Configurações |
+| `js/dashboard/mapa-api.js` | Dados do Mapa da aula: endpoint (ao vivo) + tabela (histórico) e o saneamento dos momentos |
+| `js/dashboard/mapa-timeline.js` | A linha do tempo da aula (marcadores em HTML/CSS, cada um um `<button>`) |
+| `js/dashboard/sections/*.js` | As 7 seções: Início, Conversas, Aprendizado, **Mapa da aula**, Planos, **Rosto da Cogni**, Configurações |
 | `css/dashboard-onboarding.css` | Estilos do onboarding |
 | `css/dashboard-rosto.css` | Estilos do editor de rosto (estética infantil, escopada em `.dash-rosto`) |
+| `css/dashboard-mapa.css` | Estilos do Mapa da aula (tons dos momentos, faixa do tempo, selo ao vivo) |
 
 > 🧪 Para testar **com o robô ligado**: suba o servidor da Cogni (`http://127.0.0.1:3000`), pegue o código
 > de pareamento (na tela do servidor ou pedindo pra Cogni falar) e digite no onboarding. Para testar **sem
@@ -277,8 +318,10 @@ Cogni Software/
 │   │   ├── onboarding.js   # Boas-vindas + pareamento por código
 │   │   ├── resumo-semanal.js # Bilhete da semana (IA, servidor local)
 │   │   ├── dica.js         # Dica do Cogni (IA, servidor local)
+│   │   ├── mapa-api.js     # Mapa da aula: ao vivo (servidor) + histórico (Supabase)
+│   │   ├── mapa-timeline.js# A linha do tempo da aula (marcadores acessíveis)
 │   │   ├── router.js       # Roteamento por hash
-│   │   └── sections/       # Início, Conversas, Aprendizado, Planos, Rosto, Config
+│   │   └── sections/       # Início, Conversas, Aprendizado, Mapa, Planos, Rosto, Config
 │   └── ...
 │
 └── assets/                 # Mídia
