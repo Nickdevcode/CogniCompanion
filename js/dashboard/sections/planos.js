@@ -10,7 +10,9 @@
  * duracao_dias, status. (Sem tempo_diario_min/horario — removidos do schema.)
  *
  * Toda escrita (criar/editar/excluir) também dá um ping no servidor local pra
- * Cogni pegar o plano na hora — ver `refrescarPlanosNoRobo` abaixo.
+ * Cogni pegar o plano na hora. Isso mora na CAMADA DE DADOS (`supabase-data.js`,
+ * `pingPlanosAtualizados`), não aqui: assim o aviso acompanha a escrita real e o
+ * modo mock não anuncia planos que só existem na memória do navegador.
  */
 
 import { el, sectionRoot, pageHead } from "./_shared.js";
@@ -20,38 +22,6 @@ import { materiasAgrupadas, materiaLabel, statusLabel } from "../format.js";
 
 /** Status possíveis (planos_estudo.status). */
 const STATUS = ["ativo", "em_andamento", "pausado", "concluido"];
-
-/** Teto do ping ao servidor: request pendurado não pode acumular na aba. */
-const TIMEOUT_REFRESCAR_MS = 4000;
-
-/**
- * Avisa o servidor local que os planos desta criança mudaram, pra ele recarregar
- * o plano vigente no cache e a Cogni já usar na conversa em andamento.
- *
- * É o PLANO B do Realtime do Supabase (que o servidor escuta em `planos_estudo`):
- * se a replicação for desabilitada no painel ou o canal cair, este ping mantém a
- * propagação instantânea. Idempotente — chamar duas vezes não custa nada.
- *
- * BEST-EFFORT de propósito, e por isso nada aqui é aguardado nem vira mensagem
- * de tela: o servidor do robô costuma estar DESLIGADO na hora em que o pai mexe
- * no plano, e isso não é erro — o plano já está salvo no Supabase e o robô o pega
- * no boot. Mostrar falha aqui só assustaria o pai à toa.
- *
- * @param {string} servidorUrl — base do servidor local da Cogni
- * @param {string} criancaId
- */
-function refrescarPlanosNoRobo(servidorUrl, criancaId) {
-  if (!servidorUrl || !criancaId) return;
-  fetch(`${servidorUrl}/api/planos/refrescar`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ criancaId }),
-    signal: AbortSignal.timeout(TIMEOUT_REFRESCAR_MS),
-  }).catch(() => {
-    // Servidor off, CORS, timeout: todos são o mesmo recado — "o robô não viu
-    // ainda", que é um estado normal aqui.
-  });
-}
 
 /* --------------------------------------------------------------------------
    Cards e listagem
@@ -344,10 +314,6 @@ function formularioPlano(plano, { onSubmit, onDelete, close }) {
 export async function renderPlanos(ctx) {
   const root = sectionRoot("planos");
   const nome = (ctx.crianca && ctx.crianca.nome) || "a criança";
-  const criancaId = ctx.crianca && ctx.crianca.id;
-
-  /** Ping best-effort pro robô — chamado depois de toda escrita em planos. */
-  const avisarRobo = () => refrescarPlanosNoRobo(ctx.servidorUrl, criancaId);
 
   // Estado local
   const state = { aba: "ativos", planos: [] };
@@ -487,7 +453,6 @@ export async function renderPlanos(ctx) {
           close,
           onSubmit: async (dados) => {
             await ctx.mock.criarPlano(dados);
-            avisarRobo();
             await carregar();
             renderLista();
             close();
@@ -507,7 +472,6 @@ export async function renderPlanos(ctx) {
           close,
           onSubmit: async (dados) => {
             await ctx.mock.atualizarPlano(plano.id, dados);
-            avisarRobo();
             await carregar();
             renderLista();
             close();
@@ -554,7 +518,6 @@ export async function renderPlanos(ctx) {
           erro.textContent = "";
           try {
             await ctx.mock.removerPlano(plano.id);
-            avisarRobo();
             await carregar();
             renderLista();
             close(); // fecha confirmação

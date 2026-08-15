@@ -16,6 +16,7 @@ import { createRouter } from "./router.js";
 import * as mock from "./mock-data.js";
 import { idadeLabel, primeiroNome } from "./format.js";
 import { iniciarOnboarding } from "./onboarding.js";
+import { SERVIDOR_URL } from "./servidor.js";
 
 import { renderInicio } from "./sections/inicio.js";
 import { renderConversas } from "./sections/conversas.js";
@@ -28,16 +29,12 @@ import { renderConfig } from "./sections/config.js";
 const LOGIN_URL = "login.html";
 
 /**
- * URL do servidor local da Cogni (não-Supabase). Duas features passam por ele,
- * pois dependem de IA/`service_role`: o Resumo Semanal e o Pareamento. É o
- * servidor que roda junto do robô (ex.: no notebook da apresentação).
- * Trocar aqui se o servidor subir noutra porta/host.
- *
- * Usamos `127.0.0.1` (não `localhost`) de propósito: o servidor escuta só em
- * IPv4, e navegadores costumam resolver `localhost` para IPv6 (`::1`) primeiro,
- * o que derruba o fetch com ERR_CONNECTION_RESET. Forçar IPv4 evita isso.
+ * A URL do servidor local mudou de casa: agora mora em `servidor.js`, junto dos
+ * pings que o site dá nele. A camada de dados precisa dela e não pode importar
+ * este arquivo (viraria um ciclo com o módulo que roda o `init()` do painel).
+ * Re-exportada aqui pra não quebrar quem já importava daqui.
  */
-export const SERVIDOR_URL = "http://127.0.0.1:3000";
+export { SERVIDOR_URL };
 
 /* ==========================================================================
    Guard de autenticação

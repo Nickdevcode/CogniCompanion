@@ -19,7 +19,14 @@
  * Erros: as funções de leitura lançam em falha real de query (o router do painel
  * já trata exibindo a tela de erro). `getCrianca` devolve `null` quando não há
  * criança pareada — é um estado válido (dispara o onboarding), não um erro.
+ *
+ * Escrita em `planos_estudo` também avisa o servidor local (ver `avisarRobo`
+ * abaixo). Fica AQUI, e não nas seções, porque é a escrita real que precisa ser
+ * anunciada: no modo mock (`USAR_SUPABASE = false`) nada disto roda, e nenhum
+ * ping é disparado por um plano que só existe na memória do navegador.
  */
+
+import { pingPlanosAtualizados } from "./servidor.js";
 
 /** Cliente Supabase compartilhado (criado em js/supabase-config.js). */
 function client() {
@@ -257,6 +264,26 @@ export async function getSessoesAtencao(limite = 10) {
    ========================================================================== */
 
 /**
+ * Avisa o robô que os planos mudaram, sem que a falha do aviso atrapalhe nada:
+ * o plano já está no Supabase e o ping só antecipa a chegada dele à conversa em
+ * andamento. Nunca aguardado, nunca propaga erro (ver `pingPlanosAtualizados`).
+ *
+ * @param {string} [criancaId] — quando já se sabe de quem é o plano. Sem ele,
+ *   resolve pela criança pareada (single-child), que costuma vir do cache.
+ */
+function avisarRobo(criancaId) {
+  if (criancaId) {
+    pingPlanosAtualizados(criancaId);
+    return;
+  }
+  getCrianca()
+    .then((crianca) => crianca && pingPlanosAtualizados(crianca.id))
+    .catch(() => {
+      /* sem criança ou sem rede: o robô pega no boot */
+    });
+}
+
+/**
  * Cria um plano. Só os 5 campos do contrato + as FKs. `responsavel_id` é NOT
  * NULL no banco → sempre o `auth.uid()`. `crianca_id` vem da criança pareada.
  * @param {object} dados — { titulo, conteudo, foco, duracao_dias, status }
@@ -282,6 +309,7 @@ export async function criarPlano(dados) {
     .select()
     .single();
   if (error) throw error;
+  avisarRobo(crianca.id);
   return data;
 }
 
@@ -310,6 +338,8 @@ export async function atualizarPlano(id, patch) {
     .select()
     .maybeSingle();
   if (error) throw error;
+  // Sem linha atualizada não houve mudança pra anunciar (id inexistente ou RLS).
+  if (data) avisarRobo(data.crianca_id);
   return data || null;
 }
 
@@ -324,7 +354,11 @@ export async function removerPlano(id) {
     .delete({ count: "exact" })
     .eq("id", id);
   if (error) throw error;
-  return (count || 0) > 0;
+  const removeu = (count || 0) > 0;
+  // O DELETE não devolve a linha, então o id da criança vem do perfil pareado —
+  // apagar o plano vigente muda o que a Cogni segue tanto quanto criá-lo.
+  if (removeu) avisarRobo();
+  return removeu;
 }
 
 /**
