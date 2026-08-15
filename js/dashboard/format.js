@@ -101,6 +101,47 @@ export function materiasAgrupadas() {
   }).filter((g) => g.materias.length);
 }
 
+/* --------------------------------------------------------------------------
+   Série escolar
+   -------------------------------------------------------------------------- */
+
+/**
+ * Os 12 valores canônicos de `criancas.serie`, no formato do contrato: `"No ano"`
+ * com N de 1 a 12, onde 1–9 é o fundamental e **10, 11 e 12 são as três séries do
+ * ensino médio**.
+ *
+ * A numeração contínua existe porque o servidor calibra a didática pela série, e
+ * a numeração do médio recomeçar do 1 fazia "1º ano do ensino médio" virar a
+ * série 1: aluno de 15 anos recebendo aula de alfabetização. O servidor interpreta
+ * o que o pai escrever e regrava neste formato — o site só precisa CONHECER a
+ * lista, nunca reimplementar a normalização.
+ */
+export const SERIES = Array.from({ length: 12 }, (_, i) => `${i + 1}o ano`);
+
+/** Canônico → o jeito que o pai chama a série na vida real. */
+const SERIE_LABELS = Object.fromEntries(
+  SERIES.map((valor, i) => {
+    const n = i + 1;
+    return [
+      valor,
+      n <= 9 ? `${n}º ano (fundamental)` : `${n - 9}ª série (ensino médio)`,
+    ];
+  })
+);
+
+/**
+ * Rótulo legível de uma série: `"10o ano"` → `"1ª série (ensino médio)"`.
+ *
+ * Valor fora da lista volta **como está**, e isso é de propósito: o servidor
+ * preserva o texto que ele não reconhece em vez de apagá-lo, e a tela faz o mesmo.
+ * @param {string|null|undefined} valor
+ * @returns {string} (vazio quando não há série definida)
+ */
+export function serieLabel(valor) {
+  if (!valor) return "";
+  return SERIE_LABELS[valor] || valor;
+}
+
 /** Status de plano (planos_estudo.status) → rótulo legível. */
 const STATUS_LABELS = {
   ativo: "Ativo",

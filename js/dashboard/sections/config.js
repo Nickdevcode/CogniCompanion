@@ -16,7 +16,7 @@
 import { el, sectionRoot, pageHead } from "./_shared.js";
 import { ICON, materiaIcon } from "../icons.js";
 import { openModal } from "../modal.js";
-import { materiasAgrupadas, idadeLabel } from "../format.js";
+import { materiasAgrupadas, idadeLabel, serieLabel, SERIES } from "../format.js";
 
 /**
  * Busca o código de pareamento do perfil no servidor local (não-Supabase).
@@ -162,7 +162,7 @@ function blocoPerfil(crianca, onAbrirDetalhe) {
           el("span", {
             class: "cfg-child__meta",
             text:
-              [idadeLabel(crianca.idade), crianca.serie]
+              [idadeLabel(crianca.idade), serieLabel(crianca.serie)]
                 .filter(Boolean)
                 .join(" • ") || "Toque para ver os detalhes",
           }),
@@ -207,18 +207,57 @@ function formularioPerfil(crianca, { onSubmit, close }) {
     attrs: {
       id: "cf-idade",
       type: "number",
-      min: "1",
+      // 4–18 é a faixa que o robô valida e que a camada didática sabe calibrar.
+      // Oferecer menos que isso seria propor um valor que o resto do sistema não usa.
+      min: "4",
       max: "18",
       inputmode: "numeric",
       value: crianca.idade != null ? String(crianca.idade) : "",
     },
   });
-  const inSerie = txt("cf-serie", crianca.serie, { maxlength: "30" });
 
-  // Matéria favorita / difícil (selects com as matérias)
-  const mkSelect = (id, valor) => {
+  /**
+   * Se o valor salvo não estiver entre as opções montadas, cria uma option com
+   * ele (rótulo: o próprio texto) e a deixa selecionada.
+   *
+   * Sem isto o `<select>` cai na primeira opção ("— não definido —") e o submit
+   * manda `null` — APAGANDO no banco um valor que o formulário só não sabia
+   * exibir: a matéria que a Cogni aprendeu conversando, uma série legada, um
+   * vocabulário que divergiu entre as pontas. Regra geral do painel: formulário
+   * que não sabe representar um valor não tem o direito de apagá-lo.
+   *
+   * A option entra logo depois da vazia — é o valor atual, pertence ao topo.
+   */
+  const preservarValorSalvo = (sel, valor) => {
+    const atual = (valor || "").trim();
+    if (!atual) return;
+    if (Array.from(sel.options).some((o) => o.value === atual)) return;
+    const extra = el("option", { attrs: { value: atual }, text: atual });
+    extra.selected = true;
+    sel.insertBefore(extra, sel.firstChild.nextSibling);
+  };
+
+  /** `<select>` com a opção vazia no topo (o campo é nullable no contrato). */
+  const mkSelect = (id) => {
     const sel = el("select", { class: "cfg-input cfg-select", attrs: { id } });
     sel.appendChild(el("option", { attrs: { value: "" }, text: "— não definido —" }));
+    return sel;
+  };
+
+  // Série: os 12 valores canônicos, com o rótulo que o pai reconhece. Era texto
+  // livre, e aí o servidor normalizava por trás — o pai digitava "1º ano do
+  // ensino médio" e o campo voltava "10o ano" na leitura seguinte.
+  const selSerie = mkSelect("cf-serie");
+  SERIES.forEach((valor) => {
+    const o = el("option", { attrs: { value: valor }, text: serieLabel(valor) });
+    if (crianca.serie === valor) o.selected = true;
+    selSerie.appendChild(o);
+  });
+  preservarValorSalvo(selSerie, crianca.serie);
+
+  // Matéria favorita / difícil (selects com as matérias, agrupadas por área)
+  const mkSelectMateria = (id, valor) => {
+    const sel = mkSelect(id);
     materiasAgrupadas().forEach((grupo) => {
       const og = el("optgroup", { attrs: { label: grupo.label } });
       grupo.materias.forEach((m) => {
@@ -228,10 +267,11 @@ function formularioPerfil(crianca, { onSubmit, close }) {
       });
       sel.appendChild(og);
     });
+    preservarValorSalvo(sel, valor);
     return sel;
   };
-  const selFav = mkSelect("cf-fav", crianca.materia_favorita);
-  const selDif = mkSelect("cf-dif", crianca.materia_dificil);
+  const selFav = mkSelectMateria("cf-fav", crianca.materia_favorita);
+  const selDif = mkSelectMateria("cf-dif", crianca.materia_dificil);
 
   const inHobbies = txt("cf-hobbies", crianca.hobbies, { maxlength: "120" });
   const inComoAprende = el("textarea", {
@@ -264,7 +304,7 @@ function formularioPerfil(crianca, { onSubmit, close }) {
     children: [
       campo("Nome", inNome, { full: true }),
       campo("Idade", inIdade),
-      campo("Série", inSerie),
+      campo("Série", selSerie),
       campo("Matéria favorita", selFav),
       campo("Matéria difícil", selDif),
       campo("Hobbies", inHobbies, { full: true }),
@@ -341,7 +381,7 @@ function formularioPerfil(crianca, { onSubmit, close }) {
       await onSubmit({
         nome: inNome.value.trim() || crianca.nome,
         idade: Number.isNaN(idadeVal) ? null : idadeVal,
-        serie: inSerie.value.trim(),
+        serie: selSerie.value,
         materia_favorita: selFav.value || null,
         materia_dificil: selDif.value || null,
         hobbies: inHobbies.value.trim(),

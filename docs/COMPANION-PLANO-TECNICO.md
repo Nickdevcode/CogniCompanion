@@ -112,22 +112,23 @@ Um dado, três coelhos. 🎯
 | `id` | **text** PK | mantém o id do robô `usuario_<ts>_<hex>` — **não trocar pra uuid** (usado em sessão/ESP/rate-limit) |
 | `nome` | text | |
 | `role` | text | `estudante` \| `desenvolvedor` |
-| `idade` | int | nullable |
-| `serie` | text | nullable |
-| `materia_favorita` | text | nullable |
-| `materia_dificil` | text | nullable |
-| `como_aprende` | text | nullable |
-| `hobbies` | text | nullable |
-| `estilo_linguagem` | text | nullable |
+| `idade` | int | nullable. **Faixa útil: 4 a 18** (é o que o robô valida quando a própria criança conta a idade, e o que a camada didática sabe calibrar) |
+| `serie` | text | nullable. **Formato canônico: `"No ano"` com N de 1 a 12** — 1–9 = fundamental, **10–12 = as três séries do ensino médio**. O servidor interpreta o que vier (`5º ano`, `quinta série`, `2ª série do médio` → `11o ano`) e regrava normalizado; texto irreconhecível é **preservado** como o pai escreveu. Ver "✍️ A ponte do perfil" abaixo |
+| `materia_favorita` | text | nullable. **Um dos 14 valores canônicos** (mesma lista de `conversas.materia`) |
+| `materia_dificil` | text | nullable. Idem |
+| `como_aprende` | text | nullable. Texto livre |
+| `hobbies` | text | nullable. Texto livre |
+| `estilo_linguagem` | text | nullable. Texto livre (a IA também refina; última escrita vence) |
 | `onboarding_completo` | boolean | default false |
 | `memorias` | jsonb | array de strings, default `[]` |
 | `idioma_nativo` | text | default `pt` |
 | `idiomas_estudando` | jsonb | array de objetos, default `[]` |
-| `prompt_personalizado` | text | **novo** — instruções do pai pra Cogni sobre esse filho |
+| `prompt_personalizado` | text | instruções do pai pra Cogni sobre esse filho. **Desde ago/2026 elas de fato entram no system prompt** (até então o campo era gravado, sincronizado… e nunca lido — ver "✍️ A ponte do perfil"). Limite útil: **600 caracteres** (o servidor trunca no mesmo número que o textarea do site) |
 | `responsavel_id` | uuid | FK → responsaveis(id), nullable até parear |
 | `codigo_pareamento` | text unique | **novo** — código FIXO do perfil (6 chars, sem ambíguos), gerado no nascimento do perfil, permanente. O pai usa pra vincular no Companion |
 | `rosto_robo` | jsonb | **novo** — a geometria dos olhos que a **criança** desenhou (ver "🎨 O editor de rosto"). Nullable: sem valor = rosto de fábrica. Cada criança tem o seu, e trocar de perfil troca a cara do robô na hora |
 | `progresso` | jsonb | **novo (ago/2026)** — a trilha de aprendizado (o *student model*): array de `{conceito, materia, status, acertos, vezes, visto, proxima}`, default `[]`. Quem escreve é **só o servidor**; o site trata como **read-only**. É o que permite a retomada espaçada da Cogni e, no Companion, alimenta o Painel (ver "📈 Trilha de aprendizado" abaixo) |
+| `ultima_sessao` | jsonb | **novo (ago/2026)** — a memória da última conversa: `{resumo, em, falas}`, nullable. Escrita **só pelo servidor** (auto-compact, ver "🧠 Engenharia de contexto" abaixo). É o fio que a Cogni retoma no dia seguinte. ⚠️ **Não exibir no Companion** — é anotação interna da IA, não relatório pros pais (o que os pais leem é o Diário e o Resumo Semanal) |
 | `criado_em` | timestamptz | |
 | `ultimo_acesso` | timestamptz | |
 | `atualizado_em` | timestamptz | |
@@ -174,6 +175,22 @@ Um dado, três coelhos. 🎯
 | `criado_em` | timestamptz | default now() |
 
 Índice: `(crianca_id, criado_em desc)`. RLS: pai só **lê** (SELECT) as dicas dos próprios filhos; **só o servidor grava** (service_role), igual `conversas`.
+
+### `resumos_semanais` — histórico dos bilhetes da semana
+> Mesma ideia da `dicas`, e pelo mesmo motivo: o `GET /api/resumo-semanal` só responde com o **servidor local ligado**, e o card do Início não pode ficar vazio quando o robô está desligado. Cada resumo gerado é guardado aqui, e o site lê a última linha direto do Supabase (fonte **estável**) enquanto o endpoint atualiza (fonte **fresca**). As duas pontas já usam a tabela desde jun/2026 — ela só faltava neste documento.
+
+| Coluna | Tipo | Notas |
+| --- | --- | --- |
+| `id` | bigint identity PK | |
+| `crianca_id` | text | FK → criancas(id), on delete cascade |
+| `texto` | text | o bilhete gerado pela IA |
+| `materias` | text[] | matérias da semana |
+| `topicos` | text[] | tópicos da semana |
+| `total_conversas` | int | quantas conversas o resumo leu |
+| `periodo_dias` | int | janela usada (default 7) |
+| `criado_em` | timestamptz | default now() |
+
+Índice: `(crianca_id, criado_em desc)`. RLS: pai só **lê**; só o servidor grava (igual `conversas` e `dicas`). Diferente da `dicas`, **não** há dedup por texto — cada geração é um retrato daquela semana.
 
 ### `sessoes_atencao` — o Mapa de Compreensão da Aula ⭐ NOVO (ago/2026)
 > Uma linha por **aula** (sessão de estudo), não por turno. O `conversas` conta **o que** foi conversado; esta conta **como foi** — em que minuto o assunto virou dificuldade, e sobre o quê. É a resposta à pergunta que nenhum sistema escolar responde.
@@ -353,6 +370,7 @@ Cada função: **eu (backend) → atualizo o contrato → Claude do site (tela) 
 - **Onboarding inteligente:** ✅ **feito.** `brain/memoria-ai.js` → `camposEssenciaisFaltantes(usuario)`/`temEssenciais(usuario)` (idade, série, hobbies, comoAprende). Se o pai preencheu tudo no site, o `verificarOnboarding` fecha a flag na hora e o `blocoOnboarding` (prompt.js) vira no-op — a Cogni **não refaz** as perguntas nem sobrescreve. Se faltam campos, ela pergunta **só os que faltam**.
 - **Injetar plano no prompt:** ✅ **feito.** `server/modules/planos.js` faz cache RAM do plano ativo por criança — `obterPlanoAtivo(id)` é leitura **síncrona** (robô não trava), `hidratarPlanos()` pré-carrega no boot. O `blocoPlanoEstudo(usuario, plano, gancho)` em `prompt.js` injeta título+foco+conteúdo (tom roteiro-não-prisão) via `extras.plano`, só pro estudante. Conta `status` `ativo` **ou** `em_andamento`; **expira** por `criado_em + duracao_dias` (1 dia dura 1 dia → para de cobrar). **1 plano vigente por criança** (single-child); se houver vários, vale o mais recente por `atualizado_em`. **Propagação e proatividade foram refeitas em ago/2026 — ver a seção própria abaixo.**
 - **Dica do Cogni:** ✅ **feito.** `server/modules/brain/dica.js` (novo) → `gerarDicaDoCogni({openai, modelo}, criancaId)`, exposto em `GET /api/dica?criancaId=`. IA gera uma dica curta e acionável pros pais com base em memórias + tópicos recentes. **Cache RAM curto de 1h** por criança (antes era 1 dia, dava "delay" — agora reflete a conversa recente sem regerar a cada reload); `?forcar=1` ignora o cache. Cada dica gerada é guardada na tabela `dicas` (só se diferente da última).
+- **Personalização do responsável:** ✅ **feito (ago/2026).** `blocoPromptPersonalizado()` em `brain/prompt.js` injeta `prompt_personalizado` no system prompt (bloco delimitado + ponteiro no recap final), e `brain/perfil-campos.js` é o dicionário único de série/matéria entre o site e a IA do robô. Ver "✍️ A ponte do perfil". Antes disto o campo era gravado e **nunca lido**.
 - **Camada de dados:** `server/modules/memoria.js` (cache + fila por usuário `filasPorUsuario` + `atualizarUsuario` async já existem — reaproveitar pro merge robô↔pai).
 - **Sync de volta (Supabase → robô):** ✅ **feito.** Antes a hidratação só rodava no **boot** — o que o pai editava no site nunca voltava pro cache do robô (ele refazia o onboarding por cima). Agora há 3 caminhos, com **degradação graciosa** (se um falha, o outro cobre): (a) `refrescarUsuario(id)` fire-and-forget no início de cada conversa (`brain.js`), traz a edição do pai pro turno seguinte; (b) `carregarUsuarioFresco(id)` **awaited** — só quando o perfil do cache parece incompleto (perfil novo / sem essenciais), garante que o **1º turno** já use o que o pai configurou, sem refazer onboarding; (c) **Realtime** do Supabase na tabela `criancas` (`iniciarRealtimeUsuarios` no boot) atualiza o cache **na hora** que o pai salva. Além disso, `GET /api/usuarios` chama `refrescarTodosUsuarios()` (puxa a lista fresca) pra um perfil **criado no site** aparecer na interface localhost sem reiniciar. **Regra de merge:** os campos que o pai edita (perfil, prompt, vínculo, `onboarding_completo`) vêm do Supabase; `memorias`/`idiomas_estudando`/`estilo` que o robô aprende são **preservados** (não sobrescritos). ⚠️ O Realtime exige habilitar a tabela `criancas` em *Database → Replication* no painel do Supabase — sem isso, só os caminhos (a)/(b) funcionam (suficientes, só não instantâneos).
 - **Ciência do Companion no prompt:** ✅ **feito.** `secaoCompanion()` em `brain/prompt.js`: a Cogni **sabe** o que é o app dos pais (acompanham conversas/tempo/tópicos, criam planos, recebem resumo semanal + dicas, pareiam por código) e responde dúvidas da criança com **honestidade e leveza** (acompanham pra apoiar, não pra vigiar). Só pro estudante.
@@ -382,9 +400,13 @@ A limpeza de citações do servidor tinha um falso-positivo grave: a regra que a
 
 Ou seja: o Diário e o Resumo Semanal vinham lendo respostas mutiladas em qualquer conversa que usasse a palavra "fonte" ou "referência". Corrigido (agora só o rótulo `Fonte:` com dois-pontos é removido). **Nada a fazer no site** — os registros novos já nascem completos; os antigos permanecem como estão no banco.
 
-### 3. Nenhuma migração pendente
+### 3. ⚠️ Migração pendente (ago/2026): `criancas.ultima_sessao`
 
-O contrato de dados, as tabelas, a RLS e todos os endpoints seguem exatamente como documentados acima. As correções foram internas ao servidor, ao firmware e à interface local.
+A engenharia de contexto (ver seção própria abaixo) adicionou **uma** coluna. Enquanto o SQL não roda, o servidor **continua funcionando normalmente**: ele detecta a coluna ausente, avisa no log e sincroniza o resto do perfil sem ela (só a retomada entre sessões fica desligada). **Nada a fazer no site** além de não exibir o campo.
+
+```sql
+alter table criancas add column if not exists ultima_sessao jsonb;
+```
 
 ---
 
@@ -637,9 +659,11 @@ Três detalhes que fazem a diferença:
 
 Cobertura: `npm run teste:plano` (17 casos, `node:test`, sem rede).
 
-### O que o site precisa fazer (a única tarefa)
+### O que o site precisa fazer (a única tarefa) — ✅ **feito (14/ago/2026)**
 
 **Chamar um endpoint depois de salvar um plano.** É o **plano B** do Realtime: se um dia a replicação for desabilitada no painel, ou o canal cair, este ping mantém tudo instantâneo. Custa uma linha e é idempotente.
+
+> **Como ficou:** `pingPlanosAtualizados()` em `js/dashboard/servidor.js` (módulo novo, que também passou a ser a casa do `SERVIDOR_URL`), chamado de dentro de `criarPlano`, `atualizarPlano` e `removerPlano` em `supabase-data.js` — ver a tarefa 1 em "✍️ A ponte do perfil" abaixo.
 
 ```
 POST {SERVIDOR}/api/planos/refrescar
@@ -655,6 +679,45 @@ POST {SERVIDOR}/api/planos/refrescar
 - `{SERVIDOR}` = o mesmo `SERVIDOR_URL` que as telas de Rosto e Pareamento já usam.
 
 **Recomendado (não obrigatório):** mandar `atualizado_em: new Date().toISOString()` no `atualizarPlano`. O servidor desempata planos vigentes por `atualizado_em`, e hoje o site não escreve essa coluna — se não houver trigger `moddatetime` no banco, ela fica parada e o desempate cai nos critérios de reserva (`criado_em`, depois `id`). Com o vínculo 1:1 e um plano ativo por criança isso quase nunca aparece, mas é barato de acertar.
+
+---
+
+## ✍️ A ponte do perfil (14/ago/2026) — auditoria bidirecional de Configurações
+
+> [!important] Três defeitos **corrigidos no robô** + quatro tarefas do site — **as sete resolvidas em 14/ago/2026**
+> A pergunta que gerou esta seção foi: *"tudo que eu edito no Companion realmente chega no robô, e vice-versa?"*. A resposta era **quase**. Os campos viajavam, o merge estava certo, o Realtime funcionava — mas três coisas se perdiam no caminho, e **nenhuma delas dava erro em lugar nenhum**.
+
+### ✅ O que o servidor corrigiu (nada a fazer no site)
+
+| # | O defeito | Por que doía |
+| --- | --- | --- |
+| 1 | **`prompt_personalizado` nunca chegava ao modelo** | O campo em destaque da tela de Configurações ("Instruções suas que a Cogni segue ao conversar com esta criança") era gravado, sincronizado, preservado em todo refresh — e **nenhuma linha do servidor o lia**. O pai escrevia e não acontecia nada. Agora ele entra no system prompt como um bloco próprio, colado no perfil, com um ponteiro no recap final. Entra **delimitado** e com hierarquia explícita: segurança infantil, honestidade e as regras de voz continuam acima; o pedido do pai é preferência, não ordem de sistema |
+| 2 | **Vocabulário divergente em `materia_favorita` / `materia_dificil`** | O site grava o valor canônico (`educacao_fisica`, `idiomas`); a extração por IA gravava o que a criança fala (`educação física`, `inglês`). Nos **dois** sentidos isso quebrava: o `<select>` não reconhecia o valor da IA e mostrava "— não definido —" num campo preenchido, e ao salvar o formulário mandava `null` — **apagando** o que a Cogni tinha aprendido; no sentido inverso, `educacao_fisica` entrava cru no prompt. Agora as duas pontas passam pelo mesmo dicionário (`brain/perfil-campos.js`) e o dado guardado é **sempre canônico** |
+| 3 | **`serie` do site interpretada ao pé da letra** | O campo é texto livre e a numeração do médio recomeça do 1: *"1º ano do ensino médio"* virava a série 1 e a criança de 15 anos recebia didática de **alfabetização** (a `etapaEscolar` calibra a aula inteira). Agora a série é normalizada — `5º ano`, `quinta série`, `2ª série do médio` → `11o ano` — e a etapa também entende "ensino médio" escrito sem número. **Texto irreconhecível é preservado**, nunca apagado |
+
+Bônus do mesmo pacote: os perfis antigos são **corrigidos sozinhos** ao serem carregados (backfill de série/matéria), e o `nome` vindo do site passa a ser sanitizado no servidor — é o único campo do pai que entra no prompt literalmente. Cobertura: `npm run teste:perfil` (20 casos, offline).
+
+### ✅ O que o site fez (14/ago/2026)
+
+| # | Tarefa | Por quê | Como ficou |
+| --- | --- | --- | --- |
+| 1 | **Chamar `POST {SERVIDOR}/api/planos/refrescar`** depois de `criarPlano` / `atualizarPlano` / `removerPlano` | É a tarefa pedida na seção "⚡ Planos em tempo real". Sem ela, se o Realtime cair ou a replicação for desabilitada no painel do Supabase, o plano só chega ao robô no boot seguinte. Best-effort: servidor desligado = `catch` vazio, sem erro pro pai | ✅ `js/dashboard/servidor.js` (módulo novo) exporta `SERVIDOR_URL` e `pingPlanosAtualizados(criancaId)` — `fetch` com `AbortSignal.timeout(4000)`, `.catch()` vazio e **sem retorno**, pra ninguém conseguir esperar por ele. O ping vive na **camada de dados** (`supabase-data.js`), não na tela: assim ele acompanha a escrita real e o modo mock (`USAR_SUPABASE=false`) não anuncia plano que só existe na memória do navegador. `main.js` re-exporta `SERVIDOR_URL` (a constante mudou de casa pra `supabase-data.js` poder importá-la sem ciclo). Em `removerPlano` o id vem de `getCrianca()` (o `DELETE` não devolve a linha) |
+| 2 | **Nunca mandar `null` num `<select>` que não reconheceu o valor atual** | `materia_favorita: selFav.value \|\| null` **apagava** o campo quando o valor salvo não estava nas opções. Com a correção nº 2 do servidor isso deixa de acontecer no caso comum, mas a defesa é barata e vale pra qualquer valor legado. Regra geral: *formulário que não sabe representar um valor não tem o direito de apagá-lo* | ✅ `preservarValorSalvo(sel, valor)` em `config.js`: valor salvo fora das options vira uma `<option>` extra (rótulo = o próprio texto), **logo abaixo da vazia** e já selecionada. Vale pros dois selects de matéria e pro de série |
+| 3 | **Trocar o campo de série por um `<select>`** com os 12 valores canônicos | O `value` é o canônico (`"1o ano"` … `"12o ano"`) e o **label é o que o pai reconhece**. Resolve o problema na origem e evita o efeito colateral de o pai digitar "1º ano do médio" e ver o campo voltar como "10o ano" (o servidor normaliza) | ✅ `SERIES` + `serieLabel()` em `format.js` (labels derivados de uma lista só: 1–9 → "Nº ano (fundamental)", 10–12 → "Nª série (ensino médio)"). Usado no `<select>` do modal **e** no meta do card do perfil, que antes mostrava `serie` cru. Valor irreconhecível volta como está — mesma política do servidor |
+| 4 | **`min="4"` no input de idade** (era `min="1"`) | 4–18 é a faixa que o robô valida e que a camada didática sabe calibrar. É o formulário deixar de oferecer um valor que o resto do sistema não usa | ✅ `min="4"` em `config.js`, com o porquê no comentário |
+
+> As tarefas 2 e 3 são o mesmo princípio visto de dois ângulos: **o formulário do pai não pode destruir dado que ele não entende.** Foi assim que a matéria favorita aprendida pela Cogni sumia — sem erro, sem aviso, no clique de "Salvar perfil" de quem só queria corrigir o nome.
+
+**Como isto foi verificado** (navegador real, painel montado com um `ctx` de mentira): perfil com `materia_favorita: "robotica"` e `serie: "10o ano"` → o card mostra "1ª série (ensino médio)", o select traz `robotica` selecionada no topo, e **salvar sem tocar em nada devolve os dois valores intactos**; série legada ("Jardim II") sobrevive igual, e trocar pra "6º ano (fundamental)" grava `"6o ano"`. Com a porta 3000 fechada, criar/editar/excluir plano retornam normal, sem `unhandledrejection` e sem mensagem pro pai — o único registro é o `ERR_CONNECTION_REFUSED` que o próprio navegador escreve no console.
+
+### 📋 O contrato de quem escreve o quê (referência rápida)
+
+| Campo de `criancas` | Site escreve | Robô escreve | Em conflito |
+| --- | --- | --- | --- |
+| `nome`, `idade`, `serie`, `materia_favorita`, `materia_dificil`, `como_aprende`, `hobbies`, `estilo_linguagem`, `prompt_personalizado`, `rosto_robo` | ✅ | ✅ (menos `prompt_personalizado`, que é só do pai) | **última escrita vence** |
+| `onboarding_completo` | — (o servidor fecha sozinho quando idade+série existem) | ✅ | robô |
+| `memorias`, `idiomas_estudando`, `progresso`, `ultima_sessao` | ❌ **read-only** | ✅ | robô (o merge nunca sobrescreve isto com o que vem do site) |
+| `codigo_pareamento`, `responsavel_id` | ❌ (só via endpoint do servidor) | ✅ | servidor |
 
 ---
 
@@ -702,6 +765,65 @@ O único reflexo observável no Companion é **bom**: ao hibernar, o robô avisa
 
 ---
 
+## 🧠 Engenharia de contexto (ago/2026) — a Cogni deixa de esquecer e para de pagar caro
+
+> **Resumo pro site: praticamente nada muda pra você.** Uma coluna nova (`criancas.ultima_sessao`, **não exibir**) e um endpoint novo de diagnóstico (opcional). Nenhuma tela existente é afetada. Está aqui porque é uma mudança grande do **backend** e o contrato de dados vive neste documento.
+
+### O problema (três, na verdade)
+
+| Sintoma | Causa raiz |
+| --- | --- |
+| 🧟 "A Cogni esqueceu o começo da aula" | O histórico era cortado no grito: passou de 20 mensagens, as antigas **sumiam sem resumo**. Numa aula de 30 min, ia embora justamente o que ela veio estudar, onde travou e o que ficou combinado |
+| 💸 Custo e latência altos por turno | O system prompt tem 3,5k–5,7k tokens e era **reprocessado inteiro** a cada fala. A OpenAI cacheia prefixos ≥1024 tokens (50% mais barato + mais rápido), mas o **primeiro bloco do prompt trazia a data com hora e minuto** — o prefixo mudava a cada minuto e o cache **nunca** acertava |
+| 🌫️ Atenção diluída | As **50 memórias** do perfil entravam **todas, em todo turno** (~700 tokens fixos), competindo com a pedagogia daquele turno. Contexto maior ≠ melhor: a recuperação piora conforme o contexto cresce (*context rot*) |
+
+### As quatro frentes
+
+1. **Auto-compact (`brain/compactacao.js`)** — passou do orçamento, o começo da conversa vira um **resumo estruturado** (assuntos · como ela se saiu · o que ficou em aberto · combinados · clima) e só então sai do contexto. As últimas 8 mensagens ficam **literais** (é onde vivem os pronomes e a resposta do exercício). Roda **pós-resposta**, nunca no caminho da voz. Se a IA falhar, cai no corte de antes — a feature degrada, nunca quebra.
+2. **Memória entre sessões (`criancas.ultima_sessao`)** — no fim da aula o resumo vai pro perfil e volta **no primeiro turno da próxima conversa**: "e aí, como foi aquela prova?". Vale por 14 dias e some depois de 3 falas. A trilha (`progresso`) já guardava os *conceitos*; faltava o **fio da conversa**.
+3. **Memória dinâmica (`brain/memoria-relevante.js`)** — as memórias do perfil passam a ser **recuperadas por relevância** ao assunto do turno (+ as recentes + as de identidade: família, pet, amigos). Busca léxica local com tratamento de plural do português — determinística, sem embeddings, sem rede, custo zero.
+4. **Prompt cache-friendly (`brain/prompt.js`)** — o system prompt foi reordenado em **prefixo estável → sufixo volátil**. A data saiu da primeira linha e foi pro fim (onde o modelo obedece mais, aliás). Some-se `prompt_cache_key` pra rotear as chamadas do mesmo prefixo.
+
+### Números medidos (API real, `gpt-5.4-mini`, ago/2026)
+
+Teste A/B com o mesmo prompt nos dois layouts, lendo `usage.prompt_tokens_details.cached_tokens`:
+
+| Turno | Layout antigo (data na 1ª linha) | Layout novo |
+| --- | --- | --- |
+| 1º (papo) | 0% | 0% (cache sendo escrito) |
+| 2º (papo) | **0%** | **78%** (2.304 / 2.956) |
+| 3º (trocou pra estudo) | **0%** | **40%** (o prefixo estável sobrevive à troca de modo) |
+| 4º (estudo) | **0%** | **85%** (3.840 / 4.505) |
+
+No layout antigo o cache **nunca** acertava — 0% em todos os turnos. Como input cacheado custa metade, o custo de input cai perto de ⅓, e o *time-to-first-token* melhora (o que em voz é a Cogni respondendo antes).
+
+| Outras métricas | Antes | Depois |
+| --- | --- | --- |
+| Memórias no prompt (perfil com 25) | 25 (~179 tok) | **14 (~103 tok)**, escolhidas por relevância |
+| Começo da aula após 20 mensagens | descartado | **resumido** (~250 tok) |
+
+### O endpoint novo (opcional pro site)
+
+```http
+GET /api/contexto/metricas
+```
+
+```jsonc
+{
+  "turnos": 12, "tokensEntrada": 41200, "tokensEntradaCacheados": 22800,
+  "taxaCache": 0.553,            // quanto do input a OpenAI serviu do cache
+  "mediaEntradaPorTurno": 3433,
+  "compactacoes": 2, "tokensPoupadosPorCompactacao": 3100, "memoriasPodadas": 44,
+  "fatorCharsPorToken": 3.58,    // o estimador se calibra com o usage real da API
+  "ultimoTurno": { "entrada": 3200, "cacheados": 2048, "saida": 180 },
+  "orcamento": { "compactarAposMensagens": 16, "historicoMaxTokens": 1600, "manterRecentes": 8, "memoriasNoPrompt": 14 }
+}
+```
+
+Zera a cada restart do servidor (é um medidor ao vivo, não um relatório) e **não expõe conteúdo de conversa** — só contagem de tokens. Fica sob o servidor **local**, então só é alcançável na mesma rede: **não** dá pra consumir do Companion na Vercel. É útil pra debug e pra mostrar a otimização na banca; se um dia virar tela, o dado teria que passar pelo Supabase primeiro.
+
+---
+
 ## ✅ Como testar (ponta a ponta)
 
 - **Servidor sem credenciais** → robô/voz idênticos a hoje (fallback JSON).
@@ -712,6 +834,7 @@ O único reflexo observável no Companion é **bom**: ao hibernar, o robô avisa
 - **Site** → logar → badge → Dashboard → dados da criança vinculada aparecem; criança de outra família **não** aparece (RLS).
 - **Mapa de Compreensão** → conversar com o robô por >1min tocando 2 assuntos, com a câmera ligada → `GET /api/mapa-aula` retorna `emAndamento: true` com os momentos; após reset (ou 15min parado) a linha aparece em `sessoes_atencao`.
 - **Pareamento** → código no robô → digita no site → criança vincula.
+- **Engenharia de contexto** → conversar ~20 turnos → o log mostra `[Contexto] Compactou N msgs (~X tok) em um resumo de ~Y tok`; `GET /api/contexto/metricas` mostra `taxaCache` subindo depois do 2º turno. Sem rede/API: `npm run teste:contexto` (34 casos, roda offline).
 - Ferramentas: Playwright (já em uso no site) pras telas; scripts pra checar persistência.
 
 ---
