@@ -11,6 +11,11 @@
  * Sem "Filtros de segurança", "Limites de tempo/horário", "Adicionar
  * responsável" nem "Preferências de notificação" (anulados no escopo). Edição do
  * perfil é update em `criancas` (RLS protege).
+ *
+ * ⚠️ O perfil tem DUAS pontas escrevendo nele: esta tela e o robô (que desde
+ * 15/ago/2026 ajusta os 9 campos por voz, `prompt_personalizado` incluído). Como
+ * o conflito é resolvido por "última escrita vence", tudo aqui parte de uma
+ * leitura fresca — ao entrar na seção, ao abrir o modal e ao voltar pra aba.
  */
 
 import { el, sectionRoot, pageHead } from "./_shared.js";
@@ -285,18 +290,61 @@ function formularioPerfil(crianca, { onSubmit, close }) {
   });
   inEstilo.value = crianca.estilo_linguagem || "";
 
-  // Prompt personalizado (o destaque — instruções do pai pra Cogni)
+  // Prompt personalizado (o destaque — instruções do pai pra Cogni).
+  //
+  // O campo é multi-linha DE VERDADE: desde 15/ago/2026 o pai também dita
+  // instruções falando com o robô, e cada uma entra como uma linha nova. Por
+  // isso o texto entra e sai por `.value` (que preserva os `\n`) e o submit só
+  // apara as pontas — nada aqui pode colapsar as quebras, senão as instruções
+  // acumuladas viram um parágrafo só, ilegível pra quem quiser revisar.
   const inPrompt = el("textarea", {
     class: "cfg-input cfg-textarea cfg-textarea--prompt",
     attrs: {
       id: "cf-prompt",
       rows: "4",
       maxlength: "600",
+      // `soft` é o padrão, mas aqui é decisão: `hard` gravaria quebras de linha
+      // que o pai não escreveu, inventando instrução onde só houve wrap visual.
+      wrap: "soft",
       placeholder:
         "Ex.: Incentive a curiosidade sobre ciências e use exemplos com dinossauros.",
     },
   });
   inPrompt.value = crianca.prompt_personalizado || "";
+
+  // Altura acompanha o conteúdo: com `rows` fixo, seis instruções ditadas viram
+  // uma janelinha de quatro linhas com scroll — as quebras estão lá, mas o pai
+  // não as vê. Cresce até o teto e devolve o scroll a partir dali.
+  const ALTURA_MAX_PROMPT = 260;
+  // `scrollHeight` mede conteúdo + padding, sem as bordas; com `box-sizing:
+  // border-box` (o padrão do projeto), aplicá-lo cru deixa a última linha 2px
+  // curta e o campo nasce com scroll. Medido uma vez, já no DOM.
+  let bordaVertical = null;
+  const ajustarAlturaPrompt = () => {
+    if (bordaVertical === null) {
+      const estilo = getComputedStyle(inPrompt);
+      bordaVertical =
+        parseFloat(estilo.borderTopWidth) + parseFloat(estilo.borderBottomWidth);
+    }
+    inPrompt.style.height = "auto";
+    inPrompt.style.height =
+      Math.min(inPrompt.scrollHeight + bordaVertical, ALTURA_MAX_PROMPT) + "px";
+  };
+  inPrompt.addEventListener("input", ajustarAlturaPrompt);
+  // Largura nova = quebras de linha diferentes (girar o celular com o modal
+  // aberto). O listener se aposenta quando o formulário sai do DOM — o modal é
+  // descartado a cada abertura, e sem isso sobraria um listener por visita.
+  const aoRedimensionar = () => {
+    if (!inPrompt.isConnected) {
+      window.removeEventListener("resize", aoRedimensionar);
+      return;
+    }
+    ajustarAlturaPrompt();
+  };
+  window.addEventListener("resize", aoRedimensionar);
+  // `scrollHeight` é 0 fora do DOM, e o formulário só entra nele quando o modal
+  // monta — daí o ajuste inicial esperar um frame.
+  requestAnimationFrame(ajustarAlturaPrompt);
 
   // Seção 1: dados básicos (grid)
   const grid = el("div", {
@@ -336,6 +384,24 @@ function formularioPerfil(crianca, { onSubmit, close }) {
         ],
       }),
       campo("Prompt personalizado", inPrompt, { full: true }),
+      // A porta de entrada que a tela não contava que existe: o campo também é
+      // preenchido por voz, e o pai que não sabe disso estranha quando o texto
+      // aparece diferente do que ele digitou.
+      el("p", {
+        class: "cfg-prompt__voz",
+        children: [
+          el("span", {
+            class: "cfg-prompt__voz-ico",
+            svg: ICON.mic,
+            attrs: { "aria-hidden": "true" },
+          }),
+          el("span", {
+            text:
+              "Dá pra ditar isso também: fale com o robô (“não fale sobre morte com ele”) " +
+              "e a Cogni acrescenta a instrução aqui, uma por linha.",
+          }),
+        ],
+      }),
     ],
   });
 
@@ -736,31 +802,90 @@ export async function renderConfig(ctx) {
   );
 
   const [crianca, responsavel] = await Promise.all([
-    ctx.mock.getCrianca(),
+    // Leitura FRESCA (fura o cache curto da camada de dados): o robô escreve nos
+    // mesmos campos que esta tela edita — o perfil por voz, desde 15/ago/2026 —
+    // e o conflito é resolvido por "última escrita vence". Montar o formulário
+    // em cima de uma linha velha apaga o que foi ditado sem ninguém perceber.
+    ctx.mock.getCrianca({ fresco: true }),
     ctx.mock.getResponsavel(),
   ]);
 
-  // Estado local da criança (atualizado ao salvar o perfil).
+  // Estado local da criança (atualizado ao salvar o perfil e a cada releitura).
   let criancaAtual = crianca;
 
   // Host do bloco de perfil (re-renderizado ao salvar).
   const perfilHost = el("div", { class: "cfg-perfil-host" });
 
-  function abrirDetalhe() {
+  // Com o modal aberto, ninguém repinta o card por baixo dele (ver `revalidar`).
+  let modalAberto = false;
+
+  /** Espelha nome/idade no card da sidebar, que é montado no boot do painel. */
+  function sincronizarCardSidebar() {
+    const nameEl = document.querySelector("[data-dash-child-name]");
+    const metaEl = document.querySelector("[data-dash-child-meta]");
+    if (nameEl) nameEl.textContent = (criancaAtual && criancaAtual.nome) || "Criança";
+    if (metaEl) metaEl.textContent = idadeLabel(criancaAtual && criancaAtual.idade);
+  }
+
+  /**
+   * Relê o perfil no banco e repinta o que depende dele.
+   *
+   * Falha de rede mantém o que já estava na tela: perfil velho é melhor do que
+   * tela quebrada, e a leitura será refeita no próximo gancho.
+   * @returns {Promise<object>} a criança em vigor depois da tentativa
+   */
+  async function recarregarPerfil() {
+    try {
+      const nova = await ctx.mock.getCrianca({ fresco: true });
+      // `null` aqui é desvínculo feito por fora (outro dispositivo, servidor).
+      // Quem trata esse estado é o boot do painel; não é papel desta tela
+      // esvaziar o card e deixar o pai sem nada.
+      if (nova) {
+        criancaAtual = nova;
+        renderPerfil();
+        sincronizarCardSidebar();
+      }
+    } catch (e) {
+      console.error("[Companion] Não consegui recarregar o perfil:", e);
+    }
+    return criancaAtual;
+  }
+
+  // Enquanto a releitura da abertura não termina, o card não pode disparar de
+  // novo (o `is-busy` bloqueia o clique, mas não o Enter num botão já focado).
+  let abrindoDetalhe = false;
+
+  async function abrirDetalhe() {
+    if (abrindoDetalhe || modalAberto) return;
+    abrindoDetalhe = true;
+    // Releitura na abertura, e não só no render da seção: entre chegar em
+    // Configurações e clicar no card pode ter passado uma conversa inteira com
+    // o robô. O que o formulário mostrar é exatamente o que "Salvar perfil"
+    // grava — então ele nasce do banco, não de um estado guardado na tela.
+    perfilHost.classList.add("is-busy");
+    perfilHost.setAttribute("aria-busy", "true");
+    try {
+      await recarregarPerfil();
+    } finally {
+      perfilHost.classList.remove("is-busy");
+      perfilHost.removeAttribute("aria-busy");
+      abrindoDetalhe = false;
+    }
+
+    modalAberto = true;
     openModal({
       title: "Detalhes do perfil",
       size: "lg",
+      onClose: () => {
+        modalAberto = false;
+      },
       content: ({ close }) =>
         formularioPerfil(criancaAtual, {
           close,
           onSubmit: async (patch) => {
             criancaAtual = await ctx.mock.atualizarCrianca(patch);
             renderPerfil();
-            // Atualiza o card da sidebar (nome/idade) ao vivo.
-            const nameEl = document.querySelector("[data-dash-child-name]");
-            const metaEl = document.querySelector("[data-dash-child-meta]");
-            if (nameEl) nameEl.textContent = criancaAtual.nome || "Criança";
-            if (metaEl) metaEl.textContent = idadeLabel(criancaAtual.idade);
+            sincronizarCardSidebar();
             close();
             if (window.cognifyToast)
               window.cognifyToast.show("Perfil salvo!", { type: "success" });
@@ -770,9 +895,35 @@ export async function renderConfig(ctx) {
   }
 
   function renderPerfil() {
+    // O card é substituído inteiro a cada releitura. Se o foco estava nele, vai
+    // junto pro novo: sem isso o teclado cai no body no meio da navegação — e o
+    // modal, que devolve o foco a quem o abriu, não teria pra onde devolver.
+    const tinhaFoco = perfilHost.contains(document.activeElement);
     perfilHost.replaceChildren(blocoPerfil(criancaAtual, abrirDetalhe));
+    if (tinhaFoco) {
+      const novoCard = perfilHost.querySelector(".cfg-child");
+      if (novoCard) novoCard.focus({ preventScroll: true });
+    }
   }
   renderPerfil();
+
+  /**
+   * Terceiro gancho de releitura: voltar pra aba. O caso real é o pai deixar o
+   * Companion aberto, ir falar com o robô e voltar — sem isto, a tela seguiria
+   * mostrando (e prestes a regravar) o perfil de antes da conversa.
+   *
+   * O router não avisa quando desmonta uma seção, então o listener se aposenta
+   * sozinho ao ver que a raiz saiu do DOM — mesma prática do observer do tema.
+   */
+  function revalidar() {
+    if (!document.contains(root)) {
+      document.removeEventListener("visibilitychange", revalidar);
+      return;
+    }
+    if (document.visibilityState !== "visible" || modalAberto) return;
+    recarregarPerfil();
+  }
+  document.addEventListener("visibilitychange", revalidar);
 
   // Bloco de vínculo com o robô (pareamento real). Só faz sentido com uma
   // criança vinculada — o que sempre ocorre aqui (sem criança, o painel nem

@@ -142,6 +142,31 @@ O código é validado **pelo servidor** (que seta o vínculo com a `service_role
 o `responsavel_id` direto. Em **Configurações** dá pra ver o código do perfil e **desvincular** (com
 confirmação). O vínculo é **permanente**: só some se você desvincular.
 
+### 🎙️ O perfil tem duas pontas escrevendo nele (site **e** voz)
+
+Desde **15/ago/2026** a tela de Configurações deixou de ser o único caminho pro perfil do filho: o pai
+consegue ajustar os **9 campos** falando com o robô — inclusive o `prompt_personalizado` ("não fale sobre
+morte com ele"). Planos de estudo continuam **exclusivos do site** (plano se monta olhando a semana inteira
+numa tela, não de viva-voz). Não há coluna, endpoint nem contrato novo — o que muda é **quem escreve**.
+
+Como `criancas` resolve conflito por **última escrita vence**, um formulário montado sobre uma linha velha
+apaga o que foi ditado — sem erro, sem aviso. Por isso o perfil é relido em **três momentos**:
+
+| Quando | Por quê |
+| --- | --- |
+| Ao entrar em **Configurações** | `getCrianca({ fresco: true })` fura o cache curto da camada de dados |
+| Ao **abrir o modal** de edição | Entre chegar na tela e clicar no card pode ter passado uma conversa inteira — o formulário nasce do banco |
+| Ao **voltar pra aba** | O caso real: deixar o Companion aberto, ir falar com o robô e voltar. Com o modal aberto essa releitura **não** roda (repintar por baixo do formulário só confundiria) |
+
+Duas coisas menores fecham o ciclo: o textarea do prompt **preserva as quebras de linha** (as instruções
+ditadas entram uma por linha, e ele cresce com o conteúdo até 260px em vez de virar uma janelinha com
+scroll), e uma nota discreta abaixo do campo conta que **dá pra ditar isso falando com o robô** — antes
+nada na tela revelava que essa porta existia.
+
+> ⚠️ **Honestidade sobre o limite:** a releitura fecha a janela comum, não todas. Se o pai ficar com o modal
+> aberto e a criança ditar algo nesse meio-tempo, o "Salvar perfil" ainda grava por cima. Fechar isso de vez
+> pede um patch diferencial (mandar só os campos que o pai realmente mexeu) — decisão pendente.
+
 ### 📚 As 14 matérias (e por que quem decide é o servidor)
 
 A lista de matérias era do **ensino fundamental**: um único `ciencias` cobria física, química e biologia, e

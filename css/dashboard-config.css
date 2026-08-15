@@ -19,6 +19,16 @@
 .cfg-block--status {
   grid-column: 1 / -1;
 }
+/* Enquanto o perfil é relido do banco (antes de abrir o modal de edição). Só
+   sinaliza a espera — é uma query só, costuma durar um piscar. */
+.cfg-perfil-host.is-busy {
+  opacity: 0.65;
+  cursor: progress;
+  transition: opacity 0.15s ease;
+}
+.cfg-perfil-host.is-busy .cfg-child {
+  pointer-events: none;
+}
 
 .cfg-block {
   padding: 1.25rem 1.5rem 1.5rem;
@@ -624,6 +634,38 @@
 }
 .cfg-textarea--prompt {
   background-color: var(--dash-surface);
+  /* A altura é controlada por JS (cresce com o conteúdo até 260px), mas o campo
+     nasce com `rows` — o mínimo aqui evita o pulo entre um e outro. */
+  min-height: 96px;
+}
+
+/* Nota de apoio do campo: conta que o mesmo texto pode ser ditado ao robô.
+   Discreta de propósito — é informação de contexto, não aviso. */
+.cfg-prompt__voz {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  background-color: var(--dash-surface);
+  border: 1px dashed var(--dash-border-strong);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--dash-text-muted);
+}
+.cfg-prompt__voz-ico {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 0.1rem;
+  color: var(--dash-accent);
+}
+.cfg-prompt__voz-ico svg {
+  width: 16px;
+  height: 16px;
 }
 
 .cfg-form__actions {

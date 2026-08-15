@@ -716,7 +716,7 @@ Bônus do mesmo pacote: os perfis antigos são **corrigidos sozinhos** ao serem 
 
 | Campo de `criancas` | Site escreve | Robô escreve | Em conflito |
 | --- | --- | --- | --- |
-| `nome`, `idade`, `serie`, `materia_favorita`, `materia_dificil`, `como_aprende`, `hobbies`, `estilo_linguagem`, `prompt_personalizado`, `rosto_robo` | ✅ | ✅ (menos `prompt_personalizado`, que é só do pai) | **última escrita vence** |
+| `nome`, `idade`, `serie`, `materia_favorita`, `materia_dificil`, `como_aprende`, `hobbies`, `estilo_linguagem`, `prompt_personalizado`, `rosto_robo` | ✅ | ✅ (`prompt_personalizado` também — desde 15/ago; ver "🎙️ O perfil por voz") | **última escrita vence** |
 | `onboarding_completo` | — (o servidor fecha sozinho quando idade+série existem) | ✅ | robô |
 | `memorias`, `idiomas_estudando`, `progresso`, `ultima_sessao` | ❌ **read-only** | ✅ | robô (o merge nunca sobrescreve isto com o que vem do site) |
 | `codigo_pareamento`, `responsavel_id` | ❌ (só via endpoint do servidor) | ✅ | servidor |
@@ -867,6 +867,71 @@ O `titulo` e o `conteudo` do plano são injetados **literalmente** no prompt da 
 
 ---
 
+## 🎙️ O perfil por voz (15/ago/2026) — o Companion deixa de ser o único caminho
+
+> [!important] 🟢 **Trabalho pequeno no site** (1 item, e é de UX — não tem schema novo, coluna nova nem endpoint novo) — **feito em 15/ago/2026**, ver "O que o site precisa fazer" no fim da seção.
+> O pai que não quiser abrir o aplicativo agora consegue ajustar **o perfil inteiro do filho falando com o robô**. Os 9 campos que a tela de Configurações edita ganharam uma segunda porta de entrada: a voz.
+
+### O que passou a funcionar
+
+| Campo de `criancas` | Como o pai (ou a criança) dita | Já funcionava? |
+| --- | --- | --- |
+| `nome` | *"o nome dele na verdade é Marcos Vinícius, pode chamar de Vini"* | 🆕 (antes só no onboarding) |
+| `idade` · `serie` | *"ele tem 9 anos", "tô no terceiro ano do ensino médio"* | ✅ |
+| `materia_favorita` · `materia_dificil` | *"ele ama biologia", "odeio matemática"* | ✅ |
+| `como_aprende` · `hobbies` | *"ele aprende melhor com exemplos", "joga bola"* | ✅ |
+| `estilo_linguagem` | observado pela IA na conversa (não se dita) | ✅ |
+| `prompt_personalizado` | *"não fale sobre morte com ele"*, *"nunca dê a resposta pronta"* | 🆕 |
+| **plano de estudo** | ❌ **exclusivo do Companion, por decisão de produto** | — |
+
+O plano fica de fora de propósito: o robô é o lugar da **conversa com a criança**, e um plano se monta olhando a semana inteira numa tela. Se pedirem por voz, a Cogni explica isso em uma frase (bloco `blocoAjustePorVoz` no prompt).
+
+### `prompt_personalizado` por voz: acrescenta ou substitui?
+
+**Quem decide é a IA**, com o texto atual do campo à vista:
+
+- **Acrescentar** — assunto novo, entra como linha nova no fim. O que o pai digitou no site **não se perde**.
+- **Substituir** — a instrução nova contradiz/cancela uma que já estava lá (*"pode voltar a falar de futebol"*), e o modelo devolve o campo **inteiro reescrito**. É assim que "cancelar" funciona sem precisar de uma ação `remover`.
+- **Estouro dos 600 chars** — quem cede é a instrução **mais antiga**, nunca a que acabou de ser dita (o truncamento normal corta pelo fim, o que jogaria fora exatamente o que o pai falou).
+
+> [!warning] **O robô não verifica QUEM está falando.** Decisão de produto do Nicolas (15/ago): não há reconhecimento de locutor, senha nem modo responsável — se a criança disser *"não me corrija mais"*, isso entra no campo. A defesa que resta é o **enquadramento** que já existia: o texto entra no system prompt como *preferência de quem cuida da criança*, delimitado e **abaixo** da segurança infantil e da persona (`blocoPromptPersonalizado`). Ou seja: o campo pode ser poluído, mas não vira bypass das regras que protegem a criança. Se um dia isso incomodar, o `criancas.codigo_pareamento` (que só o pai vê) é o gancho pronto pra virar trava.
+
+### O bug que veio junto: a série ambígua 🔴
+
+Achado investigando *"falei de química e o Painel mostrou Ciências"*. Não era o site — era a **etapa escolar**:
+
+```
+{serie:"3o ano do ensino medio", idade:17} -> etapa: medio          => quimica ✅
+{serie:"3o ano",                 idade:17} -> etapa: anos-iniciais  => ciencias ❌
+```
+
+O prompt da extração mandava a IA converter *"3º do médio"* → `"12o ano"` **de cabeça**. Quando o modelo devolvia só `"3o ano"`, um aluno de 17 anos era tratado como criança de 8 — e isso **não errava só o rótulo da matéria**: rebaixava a `etapaEscolar`, que calibra a altura da aula inteira. Três correções, todas no servidor:
+
+1. **A conta saiu da mão do modelo.** O prompt agora pede pra ele **copiar** o que foi dito (`"3o ano do ensino medio"`); quem converte pra `"12o ano"` é o `normalizarSerie`, em código.
+2. **A idade virou segunda opinião** (`reconciliarSerieComIdade`): "3o ano" + 17 anos = médio. Só mexe em 1º–3º (os únicos números ambíguos), então um repetente de 15 anos no 8º ano passa intacto, e uma divergência pequena (10 anos no 3º ano) continua sendo só atraso escolar.
+3. **O valor gravado também é corrigido** — é o que o pai lê no Companion.
+
+**Nada a fazer no site nisso**: `"12o ano"` já é um valor que o `<select>` de série conhece.
+
+### ✅ O que o site precisa fazer — **as três feitas em 15/ago/2026**
+
+**Uma coisa só, e é de UX:** o `prompt_personalizado` (e qualquer campo do perfil) pode mudar **enquanto o pai está com a tela aberta**, porque agora o robô escreve nele. Concretamente:
+
+1. **Recarregar o perfil ao abrir/voltar pra tela de Configurações** (ou assinar o Realtime de `criancas`, se já estiver ligado). Sem isso o pai abre a tela com um valor velho em cache e, ao salvar qualquer outro campo, **sobrescreve por cima do que foi ditado** — última escrita vence, e ele nem viu o que apagou.
+   ✅ **Feito sem Realtime** (o site não assina nenhum canal hoje; quem escuta `criancas` é o servidor). `getCrianca()` em `supabase-data.js` ganhou `{ fresco: true }`, que fura o cache de 10s e o **renova** — as outras leituras do mesmo render continuam coalescendo. `config.js` relê em **três** momentos: ao montar a seção, ao **abrir o modal** (é lá que o valor vira o que vai ser gravado) e ao **voltar pra aba** (`visibilitychange`, com o listener se aposentando quando a raiz sai do DOM). Com o modal aberto a releitura por foco **não** roda — repintar por baixo do formulário só confundiria. Falha de rede mantém o perfil que já estava na tela: edição não pode ficar trancada por uma piscada de conexão.
+2. **O textarea precisa preservar quebras de linha (`\n`)**: instruções acumuladas por voz entram uma por linha. Se o campo normalizar/colapsar isso, o texto vira um parágrafo só (funciona, mas fica ilegível pro pai).
+   ✅ **Já preservava** (o valor entra e sai por `.value`, e o submit só apara as pontas com `trim()`) — verificado no navegador: 4 instruções entram e saem com os 3 `\n` intactos, e salvar mexendo só no nome devolve o campo idêntico. O que **faltava era altura**: com `rows="4"` fixo, seis instruções viravam uma janelinha com scroll. Agora o campo cresce com o conteúdo até 260px (e `wrap="soft"` está explícito — `hard` gravaria quebras que o pai não escreveu).
+3. *(opcional, mas fecha o ciclo)* Uma linha de ajuda no campo dizendo que **dá pra ditar isso falando com o robô** — hoje nada na tela conta que essa porta existe.
+   ✅ Nota discreta abaixo do campo, com ícone de microfone: *"Dá pra ditar isso também: fale com o robô ('não fale sobre morte com ele') e a Cogni acrescenta a instrução aqui, uma por linha."*
+
+> ⚠️ **O que a releitura NÃO resolve:** o pai que deixa o modal aberto e salva depois de a criança ditar algo ainda grava por cima. Fechar isso de vez pede **patch diferencial** no `atualizarCrianca` (mandar só os campos que o formulário realmente mudou), o que muda o contrato de escrita do site — **decisão pendente do Nicolas**, não esquecimento. É a mesma família do princípio já registrado na "✍️ ponte do perfil": *formulário que não sabe representar um valor não tem o direito de apagá-lo* — aqui viraria *campo que o pai não tocou não é escrito*.
+
+**Cobertura:** `npm run teste:perfil` (40 casos, offline) + verificação contra o **modelo real** (`gpt-4o-mini`): instrução nova → `acrescentar`; cancelamento → `substituir` sem a linha cancelada; *"me ajuda com a lição"* → **não** vira instrução; *"terceiro ano do ensino médio"* → série com o "médio" preservado; ligação iônica → `quimica`.
+
+> **Gotcha registrado:** *"me ajuda com a lição? é de matemática"* fazia o modelo gravar `materia_dificil = matematica`. Pedir ajuda não é declarar dificuldade — criança pede ajuda até do que gosta. Duas redações do prompt não resolveram (o modelo pequeno ignora as duas), então virou **regra de código** no servidor. É o mesmo princípio da aritmética e dos exercícios: o que o modelo erra de forma sistemática, o servidor decide.
+
+---
+
 ## ✅ Como testar (ponta a ponta)
 
 - **Servidor sem credenciais** → robô/voz idênticos a hoje (fallback JSON).
@@ -877,6 +942,9 @@ O `titulo` e o `conteudo` do plano são injetados **literalmente** no prompt da 
 - **Site** → logar → badge → Dashboard → dados da criança vinculada aparecem; criança de outra família **não** aparece (RLS).
 - **Mapa de Compreensão** → conversar com o robô por >1min tocando 2 assuntos, com a câmera ligada → `GET /api/mapa-aula` retorna `emAndamento: true` com os momentos; após reset (ou 15min parado) a linha aparece em `sessoes_atencao`.
 - **Pareamento** → código no robô → digita no site → criança vincula.
+- **Perfil por voz** → falar *"não fale sobre morte com ele"* → o log mostra `[Perfil] promptPersonalizado (acrescentar por voz): …` e o campo aparece preenchido na tela de Configurações do Companion. Depois, *"pode voltar a falar de futebol"* → o log mostra `(substituir por voz)` e a linha some. Sem rede/API: `npm run teste:perfil` (40 casos, offline).
+- **Perfil por voz, lado do site** → com Configurações **já aberta**, ditar uma instrução ao robô e voltar pra aba: o card se atualiza sozinho. Abrir o modal → a instrução ditada está lá, em linha própria. Editar só o nome e salvar → o texto ditado **continua inteiro** (não foi sobrescrito).
+- **Série do médio** → dizer *"tô no terceiro ano do ensino médio"* e depois pedir química → `conversas.materia` grava `quimica` (não `ciencias`), e o perfil mostra a série como **3ª série (ensino médio)**.
 - **Engenharia de contexto** → conversar ~20 turnos → o log mostra `[Contexto] Compactou N msgs (~X tok) em um resumo de ~Y tok`; `GET /api/contexto/metricas` mostra `taxaCache` subindo depois do 2º turno. Sem rede/API: `npm run teste:contexto` (44 casos, roda offline).
 - Ferramentas: Playwright (já em uso no site) pras telas; scripts pra checar persistência.
 

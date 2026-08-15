@@ -84,6 +84,12 @@ export async function getResponsavel() {
  * memórias e a trilha de aprendizado (`progresso`) a cada conversa —, então uma
  * tela aberta depois tem que enxergar o dado novo. Aqui o cache só coalesce as
  * chamadas de um mesmo render.
+ *
+ * Quem edita o perfil (Configurações) não pode se contentar nem com 10s: desde
+ * 15/ago/2026 o robô escreve nos MESMOS campos que o pai edita (perfil por voz,
+ * `prompt_personalizado` incluído) e o conflito é resolvido por "última escrita
+ * vence". Formulário montado em cima de uma linha velha apaga o que foi ditado
+ * sem ninguém ver. Por isso existe o `{ fresco: true }` abaixo.
  */
 const TTL_CRIANCA_MS = 10000;
 
@@ -110,12 +116,16 @@ async function buscarCrianca() {
 /**
  * Criança pareada ao responsável logado (single-child). A RLS só devolve a
  * criança vinculada a ele. Resultado compartilhado por até `TTL_CRIANCA_MS`.
+ * @param {object} [opcoes]
+ * @param {boolean} [opcoes.fresco=false] — ignora o cache e vai ao banco. Use
+ *   antes de montar um formulário do perfil: o robô também escreve nesses
+ *   campos, e o que está na tela vira o que vai ser gravado.
  * @returns {Promise<object|null>} a criança, ou `null` se ainda não pareou
  *   (estado que dispara o onboarding de pareamento).
  */
-export async function getCrianca() {
+export async function getCrianca({ fresco = false } = {}) {
   const agora = Date.now();
-  if (criancaCache && agora - criancaCache.gravadaEm < TTL_CRIANCA_MS) {
+  if (!fresco && criancaCache && agora - criancaCache.gravadaEm < TTL_CRIANCA_MS) {
     return criancaCache.promessa;
   }
   const promessa = buscarCrianca();

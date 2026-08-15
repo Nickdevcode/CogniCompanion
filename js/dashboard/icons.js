@@ -55,6 +55,12 @@ export const ICON = {
   // Mapa da aula: uma linha do tempo com dois marcos em alturas diferentes — é
   // literalmente o desenho da seção (eixo do tempo + momentos que importam).
   timeline: stroke('<path d="M3 18h18"/><path d="M7.5 18V9.5"/><circle cx="7.5" cy="6.8" r="2.4"/><path d="M16 18v-4.2"/><circle cx="16" cy="11.4" r="2"/>'),
+  // Microfone: a segunda porta de entrada do perfil (o pai fala com o robô e a
+  // instrução cai no campo). Aparece pequeno, ao lado de texto de apoio.
+  mic: stroke(
+    '<rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3.5M9 21.5h6"/>',
+    "1.7"
+  ),
   // Editor de rosto: a própria tela do robô (moldura + dois olhos), que é
   // literalmente o que a seção deixa a criança desenhar.
   face: stroke('<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><rect x="6.5" y="9.5" width="4.5" height="5" rx="2" fill="currentColor" stroke="none"/><rect x="13" y="9.5" width="4.5" height="5" rx="2" fill="currentColor" stroke="none"/>'),

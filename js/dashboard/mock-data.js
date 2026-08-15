@@ -709,11 +709,14 @@ export async function getResponsavel() {
 }
 
 /**
+ * @param {object} [opcoes]
+ * @param {boolean} [opcoes.fresco=false] — pula o cache curto da implementação
+ *   real (o mock não tem cache, então aqui o parâmetro não muda nada).
  * @returns {Promise<object|null>} a criança pareada (linha de `criancas`),
  * ou null se nenhuma estiver pareada. (Single-child: nunca uma lista.)
  */
-export async function getCrianca() {
-  return USAR_SUPABASE ? supa.getCrianca() : _mockCrianca();
+export async function getCrianca(opcoes) {
+  return USAR_SUPABASE ? supa.getCrianca(opcoes) : _mockCrianca();
 }
 
 /**
