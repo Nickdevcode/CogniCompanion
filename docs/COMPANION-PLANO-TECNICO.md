@@ -400,13 +400,15 @@ A limpeza de citações do servidor tinha um falso-positivo grave: a regra que a
 
 Ou seja: o Diário e o Resumo Semanal vinham lendo respostas mutiladas em qualquer conversa que usasse a palavra "fonte" ou "referência". Corrigido (agora só o rótulo `Fonte:` com dois-pontos é removido). **Nada a fazer no site** — os registros novos já nascem completos; os antigos permanecem como estão no banco.
 
-### 3. ⚠️ Migração pendente (ago/2026): `criancas.ultima_sessao`
+### 3. ✅ Migração de ago/2026: `criancas.ultima_sessao` (já rodada)
 
-A engenharia de contexto (ver seção própria abaixo) adicionou **uma** coluna. Enquanto o SQL não roda, o servidor **continua funcionando normalmente**: ele detecta a coluna ausente, avisa no log e sincroniza o resto do perfil sem ela (só a retomada entre sessões fica desligada). **Nada a fazer no site** além de não exibir o campo.
+A engenharia de contexto (ver seção própria abaixo) adicionou **uma** coluna — o SQL abaixo **já foi executado pelo Nicolas em 14/ago/2026** e a coluna está no banco. **Nada a fazer no site** além de não exibir o campo.
 
 ```sql
 alter table criancas add column if not exists ultima_sessao jsonb;
 ```
+
+Fica registrado o comportamento de degradação, que continua valendo para qualquer coluna futura: se o servidor subir contra um banco sem a coluna, ele **não quebra** — detecta a ausência, avisa no log, remove o campo do payload e sincroniza o resto do perfil (só o recurso novo fica desligado).
 
 ---
 
@@ -767,7 +769,7 @@ O único reflexo observável no Companion é **bom**: ao hibernar, o robô avisa
 
 ## 🧠 Engenharia de contexto (ago/2026) — a Cogni deixa de esquecer e para de pagar caro
 
-> **Resumo pro site: praticamente nada muda pra você.** Uma coluna nova (`criancas.ultima_sessao`, **não exibir**) e um endpoint novo de diagnóstico (opcional). Nenhuma tela existente é afetada. Está aqui porque é uma mudança grande do **backend** e o contrato de dados vive neste documento.
+> **Resumo pro site: praticamente nada muda pra você.** Uma coluna nova (`criancas.ultima_sessao`, **já criada no banco**, **não exibir**) e um endpoint novo de diagnóstico (opcional). Nenhuma tela existente é afetada. Está aqui porque é uma mudança grande do **backend** e o contrato de dados vive neste documento.
 
 ### O problema (três, na verdade)
 
@@ -824,6 +826,41 @@ Zera a cada restart do servidor (é um medidor ao vivo, não um relatório) e **
 
 ---
 
+## 🧪 Rodada 2 de 14/ago/2026 — o perfil `desenvolvedor` e o último furo da ponte
+
+> [!note] 🟢 **Nenhuma tarefa nova pro site, e nenhuma mudança de schema.** Esta seção existe por duas razões: uma correção que muda **quando** o que o pai salva chega ao robô, e um perfil que o Companion precisa saber que existe pra continuar ignorando de propósito.
+
+### 1. O merge do Realtime não passava pelo saneamento 🔴 corrigido no robô
+
+A "✍️ ponte do perfil" (acima) unificou os caminhos de refresh num ponto único de merge, `mesclarCamposDoPai()`, que normaliza a série, canoniza a matéria, sanitiza o nome e protege os campos que um `null` do banco não pode apagar. **Sobrou um quarto caminho com uma cópia velha do laço: o do Realtime** — justamente o mais rápido, o que dispara no clique de "Salvar" do pai.
+
+O efeito era um retrocesso silencioso e temporário dos dois defeitos que aquela rodada tinha fechado:
+
+| O que acontecia | Por quanto tempo |
+| --- | --- |
+| `serie` entrava **crua** no cache (`"1º ano do ensino médio"` → etapa de alfabetização) | Até a próxima fala da criança, quando o `refrescarUsuario` remesclava com saneamento |
+| `codigo_pareamento` nulo vindo do banco **apagava** o código do cache, e o backfill gerava outro | Permanente: o código que o pai já tinha anotado virava inválido |
+
+Agora o Realtime chama o mesmo `mesclarCamposDoPai()` dos outros três. **Pro site isso é só garantia:** o que você grava chega ao robô normalizado *na hora*, e não "na hora, torto, e certo um turno depois".
+
+### 2. O perfil `desenvolvedor` — o que é, e por que ele não aparece aqui
+
+`criancas.role` tem dois valores: `estudante` (todo mundo) e `desenvolvedor` (o perfil do Nicolas, usado pra testar o robô). Até esta rodada o perfil dev recebia **só** a camada dele — sem método de ensino, sem didática de domínio, sem a conta resolvida pelo servidor, sem ciclo de prática e sem a memória da própria conversa. Testar o ensino por ele media outra coisa que não o produto. A regra agora é uma só: **o dev tira as travas de criança e mantém todas as habilidades.**
+
+O que isso significa pro Companion:
+
+- **O perfil dev não tem responsável e não deve aparecer no app dos pais.** Ele não é pareado, não tem plano de estudo e não recebe o `prompt_personalizado` — os dois únicos blocos que continuam fora dele, porque são o pedido de um *responsável* sobre uma *criança*, não uma habilidade da Cogni.
+- **Se um dia o site listar perfis, filtre por `role = 'estudante'`.** Hoje a RLS já resolve isso por tabela (o dev não tem `responsavel_id`), então não há nada a fazer — é só não criar o caminho.
+- **Segurança:** com o dev, o filtro de conteúdo infantil e o filtro de palavrão são desligados de propósito. Isso vale **só** para `role = 'desenvolvedor'` e nunca é alcançável por um perfil criado pelo site.
+
+### 3. `planos_estudo.conteudo` entra no system prompt — e o site é a primeira barreira
+
+O `conteudo` do plano é injetado **literalmente** no prompt da Cogni (é o roteiro que ela segue). Diferente do `prompt_personalizado`, ele ainda **não passa pelo saneamento do servidor** — ou seja, hoje o `maxlength="600"` do textarea do site é a única contenção de tamanho.
+
+Não é urgente (quem escreve é o próprio responsável, e o bloco do plano já vem enquadrado como "roteiro, não prisão"), mas vale o combinado: **mantenha o limite de 600 no formulário** e não relaxe. O servidor deve ganhar o mesmo saneamento do campo irmão numa próxima rodada.
+
+---
+
 ## ✅ Como testar (ponta a ponta)
 
 - **Servidor sem credenciais** → robô/voz idênticos a hoje (fallback JSON).
@@ -834,7 +871,7 @@ Zera a cada restart do servidor (é um medidor ao vivo, não um relatório) e **
 - **Site** → logar → badge → Dashboard → dados da criança vinculada aparecem; criança de outra família **não** aparece (RLS).
 - **Mapa de Compreensão** → conversar com o robô por >1min tocando 2 assuntos, com a câmera ligada → `GET /api/mapa-aula` retorna `emAndamento: true` com os momentos; após reset (ou 15min parado) a linha aparece em `sessoes_atencao`.
 - **Pareamento** → código no robô → digita no site → criança vincula.
-- **Engenharia de contexto** → conversar ~20 turnos → o log mostra `[Contexto] Compactou N msgs (~X tok) em um resumo de ~Y tok`; `GET /api/contexto/metricas` mostra `taxaCache` subindo depois do 2º turno. Sem rede/API: `npm run teste:contexto` (34 casos, roda offline).
+- **Engenharia de contexto** → conversar ~20 turnos → o log mostra `[Contexto] Compactou N msgs (~X tok) em um resumo de ~Y tok`; `GET /api/contexto/metricas` mostra `taxaCache` subindo depois do 2º turno. Sem rede/API: `npm run teste:contexto` (44 casos, roda offline).
 - Ferramentas: Playwright (já em uso no site) pras telas; scripts pra checar persistência.
 
 ---
