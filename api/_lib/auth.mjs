@@ -26,8 +26,13 @@ const MAX_POR_DIA = 20;
  * precisa entrar aqui — foi o caso de `pedido` (16/ago/2026), o plano que a mãe pede
  * por escrito sem mandar material. Ele é a chamada mais barata de todas e por isso a
  * mais fácil de repetir sem perceber: fora daqui, o teto não existiria pra ela.
+ *
+ * ⭐ `link` (rodada 3) entra pelo mesmo motivo E por um a mais: é a única origem que
+ * também gasta a NOSSA saída de rede (`/api/ler-link` busca a URL). Fora desta lista, o
+ * teto diário não valeria justamente pra fonte que uma conta válida usaria pra virar
+ * scraper.
  */
-const ORIGENS_DE_IA = ["foto", "arquivo", "audio", "video", "pedido"];
+const ORIGENS_DE_IA = ["foto", "arquivo", "audio", "video", "pedido", "link"];
 
 /**
  * Trava 2 — valida o token do pai contra o Supabase.
@@ -52,7 +57,7 @@ export async function validarSessao(token, env) {
     uid = (await r.json())?.id;
   } catch (err) {
     if (err instanceof ErroHttp) throw err;
-    console.error("[plano-de-material] Falha ao validar a sessão:", err);
+    console.error("[api] Falha ao validar a sessão:", err);
     throw new ErroHttp(502, "Não consegui confirmar seu login agora.");
   }
 
@@ -78,7 +83,7 @@ export async function criancaPareada(token, uid, env) {
     );
     crianca = (await r.json())?.[0];
   } catch (err) {
-    console.error("[plano-de-material] Falha ao ler a criança:", err);
+    console.error("[api] Falha ao ler a criança:", err);
     throw new ErroHttp(502, "Não consegui carregar o perfil agora.");
   }
 
@@ -122,6 +127,6 @@ export async function dentroDaCota(token, criancaId, env) {
     }
   } catch (err) {
     if (err instanceof ErroHttp) throw err;
-    console.warn("[plano-de-material] Não consegui contar a cota (seguindo):", err);
+    console.warn("[api] Não consegui contar a cota (seguindo):", err);
   }
 }
