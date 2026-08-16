@@ -71,8 +71,18 @@ export const ICON = {
   // Câmera: o botão "Da foto". A foto é o atalho que evita o pai digitar o plano
   // inteiro — é a porta de entrada principal da tela, não um extra.
   camera: stroke('<path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1.2-2h8.2l1.2 2h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5Z"/><circle cx="12" cy="12.5" r="3.4"/>'),
-  // Imagem/galeria: o botão "Escolher arquivo" (a foto que já está no celular).
+  // Imagem/galeria: o botão "Escolher foto" (a que já está no celular).
   image: stroke('<rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.5" cy="10" r="1.6"/><path d="m4 17 4.5-4.5 3 3L15.5 11l4.5 4.5"/>'),
+  /* --- Rodada 2 (ago/2026): o material deixou de ser só foto --- */
+  // Documento com o canto dobrado: o botão "Escolher arquivo" e o selo dos planos
+  // que nasceram de PDF, Word, slides ou planilha.
+  file: stroke('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>'),
+  // Câmera de vídeo: o selo do plano que nasceu de um vídeo da lousa. Desenho de
+  // câmera, e não um "play" — play sugere que dá pra assistir, e o vídeo não é
+  // guardado em lugar nenhum.
+  video: stroke('<rect x="3" y="6" width="12.5" height="12" rx="2.5"/><path d="m15.5 10.8 4.6-2.6a.6.6 0 0 1 .9.5v6.6a.6.6 0 0 1-.9.5l-4.6-2.6Z"/>'),
+  // Quadrado: parar a gravação. O par universal do círculo de gravar.
+  stop: stroke('<rect x="6.5" y="6.5" width="11" height="11" rx="2.5"/>'),
   // Faísca: marca o card que a COGNI moveu sozinha. Ícone, não o emoji ✨ — a
   // regra do projeto é ícone na UI, e um emoji herda a fonte do sistema (muda de
   // desenho e de cor entre Windows/Android e ignora o tema).
@@ -121,6 +131,23 @@ const MATERIA_ICONS = {
 /** @returns {string} ícone SVG da matéria (fallback: "outros"). */
 export function materiaIcon(materia) {
   return MATERIA_ICONS[materia] || MATERIA_ICONS.outros;
+}
+
+/* --------------------------------------------------------------------------
+   Ícones por origem do material (planos_estudo.origem)
+   Usados no selo do card do plano, na bandeja da captura e na revisão. Mesmo
+   padrão de `materiaIcon`: um lugar só, pra as três telas não divergirem.
+   -------------------------------------------------------------------------- */
+const ORIGEM_ICONS = {
+  foto: ICON.camera,
+  arquivo: ICON.file,
+  audio: ICON.mic,
+  video: ICON.video,
+};
+
+/** @returns {string|null} ícone da origem, ou null se o plano foi digitado. */
+export function origemIcon(origem) {
+  return ORIGEM_ICONS[origem] || null;
 }
 
 /** Chevron pequeno pra direita (links "ver mais"). */

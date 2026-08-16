@@ -635,7 +635,7 @@
   width: 14px;
   height: 14px;
 }
-.mesa-meta--foto {
+.mesa-meta--origem {
   font-style: italic;
 }
 .mesa-plano__acoes {
@@ -1148,16 +1148,36 @@ body.dnd-arrastando {
   line-height: 1.55;
   color: var(--dash-text-muted);
 }
-.cap__botoes {
+.cap__palco {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 1rem;
+}
+.cap__etapa {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: var(--fw-semibold);
+  color: var(--dash-text);
+}
+/* Quatro entradas em 2×2, sempre.
+   Quatro numa linha caberiam em pixels, mas dentro de um modal de 720px cada
+   botão fica com ~160px e "Escolher arquivo" quebra em duas linhas enquanto
+   "Tirar foto" não — o bloco fica desalinhado. Em 2×2 todos os rótulos ficam
+   numa linha só, o alvo de toque cresce, e a escolha lê como quatro caminhos
+   equivalentes em vez de uma barra de ferramentas apertada. */
+.cap__botoes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.6rem;
 }
 .cap__botao {
-  flex: 1 1 180px;
+  justify-content: center;
+  min-height: 3rem;
 }
 /* Os <input type="file"> ficam fora da tela, mas continuam no fluxo:
-   `display: none` impediria o `.click()` programático em alguns navegadores. */
+   `display: none` impediria o `.click()` programático em alguns navegadores.
+   Eles carregam `tabindex="-1"` e `aria-hidden` no JS — só `opacity: 0` os
+   deixaria tabuláveis, e o focus trap do modal não filtra por opacidade. */
 .cap__input {
   position: absolute;
   width: 1px;
@@ -1165,42 +1185,88 @@ body.dnd-arrastando {
   opacity: 0;
   pointer-events: none;
 }
-.cap__previa {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 0.7rem;
+
+/* A bandeja: uma linha por material, porque agora eles são heterogêneos —
+   miniatura só faz sentido pra foto; PDF, áudio e vídeo pedem texto. */
+.cap__bandeja {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .cap__item {
-  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
   margin: 0;
-  border-radius: 12px;
-  overflow: hidden;
+  padding: 0.6rem 0.7rem;
   border: 1px solid var(--dash-border);
+  border-radius: 12px;
   background-color: var(--dash-surface-2);
 }
 .cap__thumb {
-  display: block;
-  width: 100%;
-  height: 130px;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
   object-fit: cover;
 }
-.cap__remover {
-  position: absolute;
-  top: 6px;
-  right: 6px;
+.cap__item-ico {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  flex: 0 0 auto;
+  color: var(--dash-accent);
+}
+.cap__item-ico svg {
+  width: 18px;
+  height: 18px;
+}
+.cap__item-texto {
+  display: flex;
+  flex: 1 1 10rem;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.cap__item-nome {
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  color: var(--dash-text);
+  overflow-wrap: anywhere;
+}
+.cap__item-aviso {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--st-rascunho);
+}
+.cap__player {
+  flex: 1 1 100%;
+  width: 100%;
+  height: 34px;
+}
+.cap__remover {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
   border: 0;
-  border-radius: 50%;
-  background-color: rgba(8, 12, 56, 0.72);
-  color: #fff;
+  border-radius: 8px;
+  background: none;
+  color: var(--dash-text-faint);
   cursor: pointer;
 }
+.cap__remover:hover {
+  color: #c0392b;
+  background-color: rgba(192, 57, 43, 0.1);
+}
 .cap__remover svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 .cap__acoes {
   display: flex;
@@ -1377,7 +1443,8 @@ body.dnd-arrastando {
   border-top: 1px solid var(--dash-border);
 }
 
-/* "Ver o que a Cogni leu": a auditoria que substitui guardar a foto. */
+/* "Ver o que a Cogni entendeu": a auditoria que substitui guardar o material —
+   e, desde ago/2026, também o texto que alimenta o robô. Por isso é editável. */
 .cap__leitura {
   border: 1px solid var(--dash-border);
   border-radius: 12px;
@@ -1394,6 +1461,11 @@ body.dnd-arrastando {
 .cap__leitura > summary:hover {
   color: var(--dash-text);
 }
+.cap__leitura > .pl-field__hint {
+  padding: 0 0.85rem 0.5rem;
+}
+/* Só leitura: é assim que o card do plano na Mesa mostra o texto já salvo.
+   (Na captura o mesmo bloco é editável — ver `.cap__leitura-campo`.) */
 .cap__leitura-texto {
   margin: 0;
   padding: 0 0.85rem 0.85rem;
@@ -1403,6 +1475,143 @@ body.dnd-arrastando {
   color: var(--dash-text-muted);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.cap__leitura-campo {
+  /* Monoespaçada de propósito: é transcrição literal, e alinhamento de coluna de
+     planilha ou de lista numerada só se lê assim. */
+  width: calc(100% - 1.7rem);
+  margin: 0 0.85rem 0.85rem;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+.cap__detalhe {
+  resize: vertical;
+}
+
+/* Recado do pipeline (PDF que não abriu, plano truncado). */
+.cap__nota {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--st-rascunho);
+  border-radius: 12px;
+  background-color: var(--st-rascunho-soft);
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--dash-text);
+}
+.cap__nota-ico {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+  color: var(--st-rascunho);
+}
+.cap__nota-ico svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* A lista do que foi lido, na revisão. */
+.cap__lidos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.cap__lidos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cap__lido {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  color: var(--dash-text-muted);
+}
+.cap__lido-ico {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--dash-accent);
+}
+.cap__lido-ico svg {
+  width: 15px;
+  height: 15px;
+}
+.cap__lido-texto {
+  overflow-wrap: anywhere;
+}
+.cap__revisao {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* O gravador. */
+.cap__gravador {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  border: 1px solid var(--dash-border);
+  border-radius: 14px;
+  background-color: var(--dash-surface-2);
+}
+.cap__cronometro {
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--dash-text);
+}
+.cap__nivel {
+  flex: 1 1 6rem;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background-color: var(--dash-border);
+  overflow: hidden;
+}
+.cap__nivel-barra {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background-color: var(--dash-accent);
+  transform: scaleX(0.02);
+  transform-origin: left center;
+  transition: transform 90ms linear;
+}
+.cap__gravar.is-gravando {
+  animation: cap-pulso 1.6s ease-in-out infinite;
+}
+@keyframes cap-pulso {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(192, 57, 43, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cap__gravar.is-gravando {
+    animation: none;
+    outline: 2px solid #c0392b;
+    outline-offset: 2px;
+  }
+  .cap__nivel-barra {
+    transition: none;
+  }
 }
 
 /* ==========================================================================

@@ -25,7 +25,7 @@
  */
 
 import { el, sectionRoot, pageHead } from "./_shared.js";
-import { ICON, materiaIcon } from "../icons.js";
+import { ICON, materiaIcon, origemIcon } from "../icons.js";
 import { openModal } from "../modal.js";
 import {
   COLUNAS,
@@ -33,18 +33,19 @@ import {
   materiasAgrupadas,
   materiaLabel,
   statusLabel,
+  origemLabel,
   formatPrazo,
   planoVigente,
   motivoNaoVigente,
 } from "../format.js";
 import { criarQuadro } from "../dnd.js";
 import { assinarMesa } from "../mesa-realtime.js";
-import { abrirCapturaDeFoto } from "../captura.js";
+import { abrirCapturaDeMaterial } from "../captura.js";
 
 /**
  * Status que o pai pode escolher no formulário.
  * `rascunho` fica de fora de propósito: é estado de sistema (plano que a IA montou
- * de uma foto e ele ainda não aprovou), não uma opção de menu.
+ * do material da escola e ele ainda não aprovou), não uma opção de menu.
  */
 const STATUS = ["ativo", "em_andamento", "pausado", "concluido"];
 
@@ -107,20 +108,26 @@ export async function renderMesa(ctx) {
 
   /* ---- Cabeçalho --------------------------------------------------------- */
 
-  const btnFoto = el("button", {
-    class: "dash-btn dash-btn--ghost mesa-acao",
-    attrs: { type: "button" },
-    children: [
-      el("span", { class: "pl-btn__ico", svg: ICON.camera }),
-      el("span", { text: "Da foto" }),
-    ],
-  });
-  const btnNovo = el("button", {
+  /**
+   * Os dois botões competiam: "Da foto" e "Novo plano" criam plano do mesmo jeito, e
+   * o primário era o caminho TRABALHOSO — o que dá trabalho não é feito. Agora o
+   * primário é o atalho, e escrever à mão é a alternativa explícita ("Escrever eu
+   * mesmo" já era o vocabulário do estado vazio).
+   */
+  const btnCogni = el("button", {
     class: "dash-btn dash-btn--primary mesa-acao",
     attrs: { type: "button" },
     children: [
+      el("span", { class: "pl-btn__ico", svg: ICON.sparkle }),
+      el("span", { text: "Criar com a Cogni" }),
+    ],
+  });
+  const btnNovo = el("button", {
+    class: "dash-btn dash-btn--ghost mesa-acao",
+    attrs: { type: "button" },
+    children: [
       el("span", { class: "pl-btn__ico", svg: ICON.plus }),
-      el("span", { text: "Novo plano" }),
+      el("span", { text: "Escrever eu mesmo" }),
     ],
   });
 
@@ -128,7 +135,7 @@ export async function renderMesa(ctx) {
     pageHead({
       title: "Mesa de Estudos",
       subtitle: `O que o ${primeiroNome} vai estudar — e como está indo.`,
-      action: el("div", { class: "mesa-acoes", children: [btnFoto, btnNovo] }),
+      action: el("div", { class: "mesa-acoes", children: [btnCogni, btnNovo] }),
     })
   );
 
@@ -383,13 +390,16 @@ export async function renderMesa(ctx) {
         ],
       })
     );
-    if (plano.origem === "foto") {
+    // De onde o plano nasceu. Desde a rodada 2 são quatro origens possíveis, não só
+    // foto — e o selo some sozinho quando o plano foi digitado à mão (`manual`).
+    const rotuloOrigem = origemLabel(plano.origem);
+    if (rotuloOrigem) {
       metas.append(
         el("span", {
-          class: "mesa-meta mesa-meta--foto",
+          class: "mesa-meta mesa-meta--origem",
           children: [
-            el("span", { class: "mesa-meta__ico", svg: ICON.camera }),
-            el("span", { text: "criado a partir de uma foto" }),
+            el("span", { class: "mesa-meta__ico", svg: origemIcon(plano.origem) }),
+            el("span", { text: rotuloOrigem }),
           ],
         })
       );
@@ -419,7 +429,7 @@ export async function renderMesa(ctx) {
         el("details", {
           class: "cap__leitura",
           children: [
-            el("summary", { text: "Ver o que a Cogni leu" }),
+            el("summary", { text: "Ver o que a Cogni entendeu do material" }),
             el("pre", { class: "cap__leitura-texto", text: plano.extraido_texto }),
           ],
         })
@@ -550,7 +560,7 @@ export async function renderMesa(ctx) {
 
   function vazioDaColuna(colunaId) {
     const textos = {
-      a_fazer: "Nada esperando aqui. Adicione uma tarefa ou crie um plano da foto.",
+      a_fazer: "Nada esperando aqui. Adicione uma tarefa ou crie um plano com a Cogni.",
       fazendo: "Nada em andamento. A Cogni move um card pra cá quando trabalha o assunto.",
       feito: "Ainda nada concluído — e tudo bem, o dia é longo.",
     };
@@ -558,15 +568,15 @@ export async function renderMesa(ctx) {
   }
 
   function vazioGeral() {
-    const foto = el("button", {
+    const comCogni = el("button", {
       class: "dash-btn dash-btn--primary",
       attrs: { type: "button" },
       children: [
-        el("span", { class: "pl-btn__ico", svg: ICON.camera }),
-        el("span", { text: "Criar da foto" }),
+        el("span", { class: "pl-btn__ico", svg: ICON.sparkle }),
+        el("span", { text: "Criar com a Cogni" }),
       ],
     });
-    foto.addEventListener("click", abrirFoto);
+    comCogni.addEventListener("click", abrirCogni);
     const manual = el("button", {
       class: "dash-btn dash-btn--ghost",
       attrs: { type: "button" },
@@ -588,10 +598,10 @@ export async function renderMesa(ctx) {
         el("p", {
           class: "pl-empty__text",
           text:
-            "Fotografe a agenda ou a folha de exercícios: a Cogni lê e monta as " +
-            "tarefas, você só confere.",
+            "Manda o que a escola passou — foto, PDF, slides, planilha ou o áudio da " +
+            "professora. A Cogni lê e monta as tarefas, você só confere.",
         }),
-        el("div", { class: "mesa-empty__acoes", children: [foto, manual] }),
+        el("div", { class: "mesa-empty__acoes", children: [comCogni, manual] }),
       ],
     });
   }
@@ -670,7 +680,7 @@ export async function renderMesa(ctx) {
       meta.append(
         el("span", {
           class: "mesa-chip mesa-chip--confira",
-          attrs: { title: "A Cogni não teve certeza do que leu nesta linha da foto." },
+          attrs: { title: "A Cogni não teve certeza do que leu nesta parte do material." },
           children: [
             el("span", { class: "mesa-chip__ico", svg: ICON.alert }),
             el("span", { text: "confira" }),
@@ -864,8 +874,8 @@ export async function renderMesa(ctx) {
      Formulários
      ========================================================================== */
 
-  function abrirFoto() {
-    abrirCapturaDeFoto({
+  function abrirCogni() {
+    abrirCapturaDeMaterial({
       ctx,
       aoSalvar: async (plano, status) => {
         await carregarPlanos();
@@ -882,7 +892,7 @@ export async function renderMesa(ctx) {
       },
     });
   }
-  btnFoto.addEventListener("click", abrirFoto);
+  btnCogni.addEventListener("click", abrirCogni);
   btnNovo.addEventListener("click", () => abrirFormulario(null));
 
   /** Formulário de plano (criar/editar) — a evolução do de "Planos". */

@@ -195,6 +195,27 @@ export function statusLabel(status) {
 }
 
 /**
+ * De onde o plano nasceu, em português, pro selo do card.
+ *
+ * ⚠️ `planos_estudo.origem` guarda quatro valores e não guarda o FORMATO exato — um
+ * plano feito de PDF e um feito de `.docx` são os dois `arquivo`. Dizer "criado a
+ * partir de um PDF" exigiria uma coluna nova, e a rodada 2 decidiu não criar nenhuma.
+ * O formato exato fica visível nos cabeçalhos do `extraido_texto` ("ver o que a Cogni
+ * entendeu"), que é onde o pai vai olhar se a pergunta importar.
+ *
+ * @returns {string|null} null quando o plano foi digitado à mão
+ */
+export function origemLabel(origem) {
+  const rotulos = {
+    foto: "criado a partir de uma foto",
+    arquivo: "criado a partir de um arquivo",
+    audio: "criado a partir de um áudio",
+    video: "criado a partir de um vídeo",
+  };
+  return rotulos[origem] || null;
+}
+
+/**
  * Formata uma lista de dias (ex.: ["seg","qua","sex"]) em "Seg, Qua, Sex".
  * @param {string[]} dias
  * @returns {string}

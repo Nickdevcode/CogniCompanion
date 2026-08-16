@@ -291,7 +291,7 @@ Agora é a **Mesa de Estudos** (`#/mesa`), e ela faz três coisas:
 
 | | O quê | Por que importa |
 | --- | --- | --- |
-| 📷 | **Foto → plano** | O pai fotografa a atividade, a IA lê e monta as tarefas já quebradas, com matéria e prazo. Ele revisa e aprova |
+| 📎 | **Material → plano** | O pai manda **o que a escola mandou** — foto, PDF, Word, slides, planilha, áudio da professora ou vídeo da lousa — e a IA monta as tarefas já quebradas, com matéria e prazo. Ele revisa e aprova |
 | 🗂️ | **Quadro Kanban** | `A fazer` · `Fazendo` · `Feito`, com arraste de mouse, de dedo **e de teclado** |
 | ✨ | **O quadro é vivo** | A Cogni move os cards sozinha enquanto conversa com a criança — e com a tela aberta o pai **vê acontecer** |
 
@@ -299,14 +299,41 @@ Agora é a **Mesa de Estudos** (`#/mesa`), e ela faz três coisas:
 > pra `#/mesa`. Cair no fallback do router seria pior que 404 — ele mandaria o pai pro Início sem
 > avisar.
 
-**Nada que a IA leu chega ao robô sem o pai ver.** O plano vindo de foto nasce com
+**Nada que a IA leu chega ao robô sem o pai ver.** O plano vindo de material nasce com
 `status = 'rascunho'`, e o servidor já ignora tudo que não é `ativo`/`em_andamento` — a trava
 inteira custou **zero linha** de comportamento novo no robô. Aprovar é mudar o status, que o site
 já sabia fazer.
 
-**A foto não é guardada em lugar nenhum.** Nem bucket, nem Storage, nem base64 no banco. Ela é
-lida, vira o `extraido_texto` (que o pai pode conferir em "ver o que a Cogni leu") e é descartada.
-É caderno de criança — decisão de LGPD, não detalhe de implementação.
+**O material não é guardado em lugar nenhum.** Nem bucket, nem Storage, nem base64 no banco. Ele
+é lido, vira o `extraido_texto` (que o pai confere — e **corrige** — em "ver o que a Cogni
+entendeu do material") e é descartado. Vale pra foto, PDF, Word, slides, planilha, áudio e vídeo.
+É material de criança — decisão de LGPD, não detalhe de implementação.
+
+#### 📎 Quem lê o quê, e por que isso decide a arquitetura
+
+A Vercel corta o corpo da requisição em **4,5 MB antes do nosso código rodar**. A resposta não é
+"aceitar arquivo menor" — é decidir **onde cada formato vira texto**:
+
+| Material | Vira texto onde | Por quê |
+| --- | --- | --- |
+| 📷 Foto | **Navegador** — canvas 1600px, JPEG 0.82 | 4-8 MB viram ~300 KB |
+| 📄 PDF | **A OpenAI** — vai inteiro, base64 | PDF escaneado precisa de OCR; a API lê texto **e** imagem de página |
+| 📝 DOCX / PPTX / XLSX | **Navegador** — são ZIP de XML: `DecompressionStream` nativo + parse | Um `.docx` de 8 MB com fotos vira 30 KB de texto |
+| 🔤 TXT / MD / CSV | **Navegador** — `file.text()` | trivial |
+| 🎙️ Áudio | **A OpenAI** — transcrição, que entra no mesmo pipeline de texto | um caminho só, um schema só |
+| 🎬 Vídeo | **Navegador** — vira quadros + a trilha de áudio | um MP4 de 1 min tem 60-100 MB e jamais caberia |
+
+A sacada do vídeo: **o cliente decompõe e a função nunca sabe o que é vídeo.** Um vídeo vira
+`imagem × N` + `audio`, então a função conhece quatro tipos e continua conhecendo quatro tipos.
+E num vídeo de aula **a fala tem prioridade sobre a imagem** — quem carrega a tarefa é o que a
+professora *diz*; os quadros só confirmam o assunto. Por isso o áudio é reservado primeiro (até
+1min30) e os quadros preenchem o que sobra, de 4 até 1. Vídeo longo não perde o áudio: ele é
+cortado, e a tela avisa com uma saída que o pai consegue executar (*"corte esse trecho no celular
+e mande de novo"* — cortar vídeo todo mundo sabe; extrair áudio de um MP4, não).
+
+> 🧱 **Zero biblioteca.** Nada de pdf.js, JSZip, mammoth ou ffmpeg.wasm: o leitor de ZIP, o parser
+> de OOXML, o encoder de WAV e a extração de quadros são API nativa do navegador. O site continua
+> 100% estático.
 
 #### 🎯 Por que o drag and drop é escrito à mão
 
@@ -327,22 +354,34 @@ gap acaba, e aí a coluna é reindexada de uma vez.
 
 #### ⚙️ O que o Nicolas precisa configurar
 
-A leitura da foto é a **única** parte do Companion que roda fora do navegador — uma Vercel Function
-(`api/plano-de-imagem.mjs`), porque o servidor da Cogni é `127.0.0.1` e do celular do pai ele
-simplesmente não existe. Em *Settings → Environment Variables* do projeto na Vercel:
+A leitura do material é a **única** parte do Companion que roda fora do navegador — uma Vercel
+Function (`api/plano-de-material.mjs`, com os módulos em `api/_lib/`), porque o servidor da Cogni
+é `127.0.0.1` e do celular do pai ele simplesmente não existe. Em *Settings → Environment
+Variables* do projeto na Vercel:
 
 | Variável | Pra quê |
 | --- | --- |
-| `OPENAI_API_KEY` | a leitura da foto |
+| `OPENAI_API_KEY` | a leitura do material **e** a transcrição do áudio |
 | `SUPABASE_URL` | validar o login do pai e ler a criança pareada |
 | `SUPABASE_ANON_KEY` | idem (é a chave pública; quem protege é a RLS) |
 
 Faltando qualquer uma, a função responde **503** com mensagem clara em vez de quebrar. E ela
 **nunca escreve no banco**: devolve a proposta, e quem grava é o site com a sessão do pai.
 
-> 🧪 **Testar sem OpenAI, sem deploy e sem login:** vire `USAR_SUPABASE = false` e o botão
-> "Da foto" devolve uma proposta de exemplo local. Dá pra percorrer a revisão inteira — editar
-> tarefa, apagar, o chip "confira", rascunho × aprovar — offline.
+> 📌 `api/_lib/` começa com `_` de propósito: a Vercel **ignora** arquivos e pastas prefixados
+> com `_` dentro de `api/`, então os módulos compartilhados não viram rotas públicas nem
+> consomem funções do plano Hobby.
+
+> 🗄️ **Uma coisa manual, e ela vem antes do deploy:** o SQL que abre os dois `CHECK` de `origem`
+> (`planos_estudo.origem` passa a aceitar `arquivo`/`audio`/`video`, e `plano_tarefas.origem`
+> aceita `ia`). Se o site subir antes do SQL, salvar um plano de PDF viola a constraint e o pai
+> perde o trabalho. A ordem é **SQL → função → site**.
+
+> 🧪 **Testar sem OpenAI, sem deploy e sem login:** vire `USAR_SUPABASE = false` e "Criar com a
+> Cogni" devolve uma proposta de exemplo local. Só a **rede** é falsa — toda a extração roda de
+> verdade: o unzip do `.docx`, a decomposição do vídeo em quadros, a gravação do microfone. Dá
+> pra percorrer o fluxo inteiro offline, inclusive a revisão (editar tarefa, apagar, o chip
+> "confira", corrigir o texto extraído, rascunho × aprovar).
 
 ### 🗃️ Arquivos do painel
 
@@ -361,8 +400,11 @@ Faltando qualquer uma, a função responde **503** com mensagem clara em vez de 
 | `js/dashboard/mapa-timeline.js` | A linha do tempo da aula (marcadores em HTML/CSS, cada um um `<button>`) |
 | `js/dashboard/dnd.js` | **Drag and drop do quadro** (Pointer Events à mão, com teclado e `aria-live`) |
 | `js/dashboard/mesa-realtime.js` | **O quadro ao vivo**: canal do Supabase, fila durante o arraste, degradação |
-| `js/dashboard/captura.js` | **Foto → plano**: captura, redimensionamento e a tela de revisão |
-| `api/plano-de-imagem.mjs` | **Vercel Function** que lê a foto com IA (a única coisa fora do navegador) |
+| `js/dashboard/captura.js` | **Material → plano**: as quatro entradas, a bandeja e o orçamento |
+| `js/dashboard/revisao.js` | A tela de revisão (o pai confere e edita antes de qualquer coisa valer) |
+| `js/dashboard/material/` | Cada formato virando item: `index` (dispatcher), `orcamento`, `imagem`, `zip`, `ooxml`, `texto`, `audio`, `gravador`, `video`, `wav`, `bytes` |
+| `api/plano-de-material.mjs` | **Vercel Function** que lê o material com IA (a única coisa fora do navegador) |
+| `api/_lib/` | As peças dela: `auth` (as travas), `itens` (tetos), `openai`, `prompt`, `sanear`, `http` |
 | `js/dashboard/sections/*.js` | As 7 seções: Início, Conversas, Aprendizado, **Mapa da aula**, **Mesa de Estudos**, **Rosto da Cogni**, Configurações |
 | `css/dashboard-onboarding.css` | Estilos do onboarding |
 | `css/dashboard-rosto.css` | Estilos do editor de rosto (estética infantil, escopada em `.dash-rosto`) |
@@ -446,7 +488,9 @@ Cogni Software/
 ├── dashboard.html          # Painel Companion (app dos pais)
 │
 ├── api/                    # Vercel Functions (site estático + 1 função)
-│   └── plano-de-imagem.mjs # Foto da agenda → plano com tarefas, por IA
+│   ├── plano-de-material.mjs # Material da escola → plano com tarefas, por IA
+│   └── _lib/               # Peças dela (o "_" impede virar rota): auth, itens,
+│                           #   openai, prompt, sanear, http
 │
 ├── css/                    # Estilos (tokens → base → componentes)
 │   ├── tokens.css          # Design tokens (cor, tipografia, espaçamento)
@@ -474,7 +518,11 @@ Cogni Software/
 │   │   ├── mapa-timeline.js# A linha do tempo da aula (marcadores acessíveis)
 │   │   ├── dnd.js          # Drag and drop do quadro (Pointer Events + teclado)
 │   │   ├── mesa-realtime.js# O quadro ao vivo (canal do Supabase + fila)
-│   │   ├── captura.js      # Foto → plano (captura, resize e revisão)
+│   │   ├── captura.js      # Material → plano (as 4 entradas, bandeja, orçamento)
+│   │   ├── revisao.js      # A revisão do plano (o pai confere e edita)
+│   │   ├── material/       # Cada formato virando item, sem biblioteca:
+│   │   │                   #   index, orcamento, imagem, zip, ooxml, texto,
+│   │   │                   #   audio, gravador, video, wav, bytes
 │   │   ├── router.js       # Roteamento por hash
 │   │   └── sections/       # Início, Conversas, Aprendizado, Mapa, Mesa, Rosto, Config
 │   └── ...
