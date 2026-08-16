@@ -122,12 +122,18 @@
   flex-direction: column;
   gap: 0.5rem;
 }
+/* O status é sufixo do título ("Biomas do Brasil · Ativo"), não um item solto.
+   Com `space-between` ele era jogado pro meio do vazio entre um título curto e o
+   selo da direita, e ficava sem dono. Só o selo "a Cogni está seguindo" continua
+   indo pra ponta — ele é do card inteiro, não do título. */
 .pl-card__topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.45rem 0.6rem;
   flex-wrap: wrap;
+}
+.pl-card__topbar > .mesa-plano__selo {
+  margin-left: auto;
 }
 .pl-card__title {
   font-family: var(--font-display);
@@ -196,24 +202,31 @@
   height: 18px;
 }
 
-/* Badge de status (bolinha + rótulo) */
+/* Badge de status (bolinha + rótulo).
+   O contorno na própria cor do status é o que dá borda à pílula sobre a
+   superfície escura — só o fundo translúcido a deixava esfumaçada, sem forma. */
 .pl-status {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.25rem 0.7rem;
+  padding: 0.2rem 0.65rem 0.2rem 0.55rem;
   border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--st-color, var(--dash-text-muted)) 32%, transparent);
   font-family: var(--font-body);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: var(--fw-semibold);
+  line-height: 1.5;
+  letter-spacing: 0.01em;
   color: var(--st-color, var(--dash-text-muted));
   background-color: var(--st-soft, var(--dash-surface-2));
 }
 .pl-status__dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
   border-radius: 50%;
   background-color: var(--st-color, var(--dash-text-muted));
+  box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--st-color, var(--dash-text-muted)) 22%, transparent);
 }
 .pl-status[data-status="rascunho"] { --st-color: var(--st-rascunho); --st-soft: var(--st-rascunho-soft); }
 .pl-status[data-status="ativo"] { --st-color: var(--st-ativo); --st-soft: var(--st-ativo-soft); }
@@ -437,6 +450,11 @@
   .pl-card__edit {
     order: -1;
     margin-left: auto;
+  }
+  /* Empilhado, o selo cai numa linha só dele — e aí "encostar na direita" vira
+     encostar no nada. Alinha com o título. */
+  .pl-card__topbar > .mesa-plano__selo {
+    margin-left: 0;
   }
   .pl-form__grid {
     grid-template-columns: 1fr;
