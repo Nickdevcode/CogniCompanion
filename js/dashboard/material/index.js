@@ -124,7 +124,7 @@ async function prepararFoto(file, orcamento) {
    * O laço de re-encode aperta até o último degrau, mas não faz milagre: uma página
    * muito densa pode sair maior que o alvo mesmo a 1024px. Barrar AQUI é o que faz o
    * pai descobrir na hora de adicionar — com o nome do arquivo na mão — em vez de
-   * depois de montar quatro materiais e clicar em "Ler com a Cogni".
+   * depois de montar quatro materiais e clicar em "Montar o plano".
    *
    * A pergunta é só uma: **cabe no que sobrou?** (O `alvo` acima tem um piso pra o
    * laço não perseguir um número absurdo quando a bandeja está quase cheia, então
@@ -304,13 +304,20 @@ export async function prepararMaterial(file, orcamento, ctx = {}) {
  * pai mistura fontes a tela precisa escolher **uma**. A precedência vai do material
  * mais distintivo pro mais comum: um plano feito de vídeo + foto nasceu do vídeo.
  *
+ * ⭐ `pedido` (16/ago/2026) fica por ÚLTIMO na escada de propósito: quando veio
+ * material junto, foi o material que virou as tarefas — o pedido só orientou o
+ * recorte, e um selo dizendo "criado a partir do seu pedido" esconderia do pai que
+ * ali dentro tem o que a escola mandou. `manual` continua sendo só o plano digitado
+ * à mão, sem IA nenhuma no meio.
+ *
  * @param {Array<{origem:string}>} materiais
- * @returns {"video"|"audio"|"arquivo"|"foto"|"manual"}
+ * @param {{pedido?:boolean}} [fonte] — houve pedido escrito?
+ * @returns {"video"|"audio"|"arquivo"|"foto"|"pedido"|"manual"}
  */
-export function origemDoPlano(materiais) {
+export function origemDoPlano(materiais, fonte = {}) {
   const origens = new Set(materiais.map((m) => m.origem));
   for (const candidata of ["video", "audio", "arquivo", "foto"]) {
     if (origens.has(candidata)) return candidata;
   }
-  return "manual";
+  return fonte.pedido ? "pedido" : "manual";
 }

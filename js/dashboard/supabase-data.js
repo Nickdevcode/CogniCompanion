@@ -644,11 +644,33 @@ export async function criarPlanoComTarefas(plano, tarefas) {
   const crianca = await getCrianca();
   if (!crianca) throw new Error("Sem criança pareada para criar o plano.");
 
-  const { data: criado, error: erroPlano } = await client()
+  let { data: criado, error: erroPlano } = await client()
     .from("planos_estudo")
     .insert(payloadDePlano(plano, crianca, user))
     .select()
     .single();
+
+  /**
+   * Ponte pro dia em que o site subir antes do SQL.
+   *
+   * `planos_estudo.origem` tem um `CHECK` com a lista de valores aceitos, e cada
+   * valor novo (`arquivo`/`audio`/`video` em 15/ago, `pedido` em 16/ago) precisa que
+   * o SQL rode ANTES do deploy. Se a ordem inverter, o insert morre com 23514
+   * (check_violation) e o pai perde o plano inteiro — depois de ter revisado tarefa
+   * por tarefa. Aqui a gente regrava com a origem antiga (`manual`), que todo banco
+   * aceita: o pai perde o SELO da origem, não o trabalho. Some sozinho quando o SQL
+   * roda, porque a primeira tentativa passa a funcionar.
+   */
+  if (erroPlano && erroPlano.code === "23514" && plano.origem) {
+    console.warn(
+      "[Companion] `origem` recusada pelo banco (rode o SQL do CHECK). Salvando como 'manual'."
+    );
+    ({ data: criado, error: erroPlano } = await client()
+      .from("planos_estudo")
+      .insert(payloadDePlano({ ...plano, origem: null }, crianca, user))
+      .select()
+      .single());
+  }
   if (erroPlano) throw erroPlano;
 
   const lista = Array.isArray(tarefas) ? tarefas : [];

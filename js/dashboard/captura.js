@@ -1,14 +1,20 @@
 /**
- * captura.js — "Criar com a Cogni": o pai manda o que a escola passou, e a IA monta
- * o plano.
+ * captura.js — "Criar com a Cogni": o pai diz o que quer (e/ou manda o que a escola
+ * passou), e a IA monta o plano.
  *
  * É o atalho que resolve o buraco número 1 da tela antiga: escrever plano dá
- * trabalho, e plano que dá trabalho não é criado. A informação já existe — está na
- * agenda escolar, na folha de exercícios, no PDF da lista, no áudio que a professora
- * mandou no grupo.
+ * trabalho, e plano que dá trabalho não é criado.
+ *
+ * ⭐ 16/ago/2026 — **o pedido do responsável virou a entrada principal, e o material
+ * virou opcional.** A versão anterior só sabia perguntar "o que a escola mandou", e
+ * isso era estreito demais: partia do princípio de que existe uma escola organizada
+ * mandando foto de agenda e áudio de professora. Uma mãe que simplesmente quer que a
+ * filha treine tabuada essa semana não tinha o que anexar — e ficava sem a feature
+ * inteira, tendo que escrever o plano na mão. Agora ela escreve a frase, a Cogni
+ * monta as tarefas, e o material da escola entra junto **quando existe**.
  *
  * Este arquivo é só o fluxo de AQUISIÇÃO:
- *   escolher → bandeja → [Ler com a Cogni] → progresso → revisão (`revisao.js`)
+ *   pedido e/ou material → [Montar o plano] → progresso → revisão (`revisao.js`)
  *
  * Quem transforma cada formato em item pronto é `material/` — este aqui não sabe o
  * que é um ZIP, um WAV ou um quadro de vídeo. Sabe só que existem materiais, que eles
@@ -40,6 +46,29 @@ const ENDPOINT = "/api/plano-de-material";
  */
 const TIMEOUT_MS = 120_000;
 
+/**
+ * Teto do pedido escrito. O servidor corta em 800 (`MAX_PEDIDO` em `_lib/itens.mjs`),
+ * então o `maxlength` daqui é o que garante que nada seja cortado sem o pai ver.
+ */
+const PEDIDO_MAX = 600;
+
+/**
+ * Exemplos que viram o pedido num toque.
+ *
+ * Eles não são enfeite: um campo de texto vazio com um rótulo genérico é o lugar onde
+ * a maioria das pessoas trava. Cada um destes é um FORMATO diferente de pedido —
+ * assunto, dificuldade, rotina, prova — porque o que eles ensinam é o tipo de coisa
+ * que dá pra pedir, não a frase em si.
+ */
+const EXEMPLOS_DE_PEDIDO = [
+  // Nenhum repete o placeholder do campo: exemplo igual ao texto apagado que já está
+  // ali não ensina nada — só ocupa um chip.
+  "Reforçar divisão com dois algarismos",
+  "Ela está com dificuldade em interpretação de texto",
+  "Preparar pra prova de ciências sobre o corpo humano",
+  "Uma rotina de leitura pra essa semana",
+];
+
 /** Extensões que o seletor de arquivo oferece. Mime E extensão: o iOS ignora um dos dois. */
 const ACEITA_ARQUIVO = [
   ".pdf,application/pdf",
@@ -65,7 +94,40 @@ class ErroDeLeitura extends Error {}
  * o unzip do `.docx`, a decomposição do vídeo, a gravação do microfone. É assim que a
  * feature é testável antes de existir um deploy.
  */
-function propostaDeExemplo(materiais) {
+function propostaDeExemplo(materiais, pedido) {
+  // Sem material o exemplo tem que ser outro: `extraido_texto` de uma foto que
+  // ninguém mandou faria o modo mock ensaiar uma tela que o modo real não mostra.
+  if (!materiais.length) {
+    return {
+      legivel: true,
+      titulo: "Plano da semana",
+      conteudo: `Atender o que foi pedido: ${pedido}`,
+      foco: "matematica",
+      duracao_dias: 7,
+      extraido_texto: "",
+      truncado: false,
+      aviso: null,
+      tarefas: [
+        {
+          titulo: "Aquecimento do assunto",
+          detalhe: `Primeira sessão do que você pediu: ${pedido}`,
+          materia: "matematica",
+          prazo: null,
+          estimativa_min: 20,
+          confianca: 0.9,
+        },
+        {
+          titulo: "Praticar com exercícios",
+          detalhe: "Uma rodada de exercícios do mesmo assunto, do fácil pro difícil.",
+          materia: "matematica",
+          prazo: null,
+          estimativa_min: 30,
+          confianca: 0.9,
+        },
+      ],
+    };
+  }
+
   const cabecalhos = materiais
     .map((m) => `— ${m.nome} —\n(conteúdo lido deste material apareceria aqui)`)
     .join("\n\n");
@@ -127,13 +189,14 @@ function mensagemDeStatus(status) {
 }
 
 /**
- * Manda os itens pra Vercel Function e devolve a proposta.
+ * Manda o pedido e os itens pra Vercel Function e devolve a proposta.
  *
  * @param {object[]} itens
+ * @param {string} pedido — o que o responsável escreveu (pode ser a única fonte)
  * @param {AbortSignal} signal
  * @returns {Promise<object>} a proposta (ou `{legivel:false, motivo}`)
  */
-async function lerMaterial(itens, signal) {
+async function lerMaterial(itens, pedido, signal) {
   if (!USAR_SUPABASE) {
     await new Promise((r) => window.setTimeout(r, 900));
     return null; // quem chama monta o exemplo — ele depende da bandeja
@@ -150,7 +213,7 @@ async function lerMaterial(itens, signal) {
     resp = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ itens, hoje: new Date().toISOString().slice(0, 10) }),
+      body: JSON.stringify({ itens, pedido, hoje: new Date().toISOString().slice(0, 10) }),
       signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
     });
   } catch (err) {
@@ -231,6 +294,14 @@ function criarFluxo({ ctx, aoSalvar }) {
 
   /** @type {Array<object>} materiais na bandeja */
   let materiais = [];
+  /**
+   * O que o responsável escreveu.
+   *
+   * Vive AQUI, e não no `<textarea>`, porque `etapaEscolher()` repinta o palco inteiro
+   * a cada material adicionado ou removido — o campo é destruído e recriado. Sem esta
+   * cópia, anexar uma foto apagaria a frase que a mãe acabou de escrever.
+   */
+  let pedido = "";
   let orcamento = novoOrcamento();
   let preparando = false;
   let gravador = null;
@@ -244,19 +315,45 @@ function criarFluxo({ ctx, aoSalvar }) {
     window.setTimeout(() => (anuncio.textContent = texto), 60);
   }
 
-  /* ---- Etapa 1: escolher ------------------------------------------------- */
+  /* ---- Etapa 1: o pedido, e o material se houver -------------------------- */
+
+  const primeiroNome = ((ctx.crianca && ctx.crianca.nome) || "").split(/\s+/)[0];
+
+  /** O botão primário da etapa. Recriado a cada repintura — ver `atualizarAcao`. */
+  let btnMontar = null;
+
+  /**
+   * Liga/desliga o botão principal conforme existe alguma fonte.
+   *
+   * Desabilitar é melhor que deixar clicar e reclamar: a regra ("preciso de uma das
+   * duas coisas") fica visível enquanto ele escreve, e não depois de uma ida ao
+   * servidor. O `title` diz o porquê pra quem não deduz do estado.
+   */
+  function atualizarAcao() {
+    if (!btnMontar) return;
+    const temFonte = !!pedido.trim() || materiais.length > 0;
+    btnMontar.disabled = !temFonte;
+    btnMontar.title = temFonte
+      ? ""
+      : "Escreva o que você quer, ou mande o material da escola.";
+  }
 
   function etapaEscolher(erro) {
     palco.replaceChildren();
 
     palco.append(
-      el("h3", { class: "cap__etapa", text: "O que a escola mandou" }),
+      el("h3", {
+        class: "cap__etapa",
+        text: primeiroNome ? `O que ${primeiroNome} vai estudar` : "O que estudar agora",
+      }),
       el("p", {
         class: "cap__intro",
         text:
-          "Manda o que a escola passou — foto, PDF, slides, planilha ou o áudio da " +
-          "professora. A Cogni lê e monta as tarefas; você confere antes de valer.",
-      })
+          "Escreva o que você quer que a Cogni trabalhe com ela. Se a escola mandou " +
+          "alguma coisa, junte aqui também — ela lê e monta as tarefas; você confere " +
+          "antes de valer.",
+      }),
+      campoDoPedido()
     );
 
     /**
@@ -267,16 +364,21 @@ function criarFluxo({ ctx, aoSalvar }) {
     const inputGaleria = entrada({ accept: "image/*", multiple: true });
     const inputArquivo = entrada({ accept: ACEITA_ARQUIVO, multiple: true });
 
-    const botoes = el("div", {
-      class: "cap__botoes",
-      children: [
-        botao("Tirar foto", ICON.camera, () => inputCamera.click(), "primary"),
-        botao("Escolher foto", ICON.image, () => inputGaleria.click()),
-        botao("Escolher arquivo", ICON.file, () => inputArquivo.click()),
-        botao("Gravar áudio", ICON.mic, abrirGravador),
-      ],
-    });
-    palco.append(botoes);
+    palco.append(
+      el("p", {
+        class: "cap__ou",
+        children: [el("span", { text: "e o que a escola mandou, se tiver" })],
+      }),
+      el("div", {
+        class: "cap__botoes",
+        children: [
+          botao("Tirar foto", ICON.camera, () => inputCamera.click()),
+          botao("Escolher foto", ICON.image, () => inputGaleria.click()),
+          botao("Escolher arquivo", ICON.file, () => inputArquivo.click()),
+          botao("Gravar áudio", ICON.mic, abrirGravador),
+        ],
+      })
+    );
 
     if (erro) {
       palco.append(
@@ -288,7 +390,8 @@ function criarFluxo({ ctx, aoSalvar }) {
       );
     }
 
-    if (materiais.length) palco.append(bandeja(), acoesDaBandeja());
+    if (materiais.length) palco.append(bandeja());
+    palco.append(acoesDoPalco());
 
     palco.append(
       el("p", {
@@ -306,6 +409,63 @@ function criarFluxo({ ctx, aoSalvar }) {
      * pra quem usa teclado ou leitor de tela.
      */
     palco.append(inputCamera, inputGaleria, inputArquivo);
+  }
+
+  /**
+   * O campo do pedido, com os exemplos.
+   *
+   * Os exemplos SUBSTITUEM o texto em vez de acrescentar: quem toca num exemplo com o
+   * campo vazio quer aquilo ali, e quem já escreveu não toca. Concatenar produziria
+   * frases coladas que ninguém releu antes de mandar pra IA.
+   */
+  function campoDoPedido() {
+    const id = "cap-pedido";
+    const campo = el("textarea", {
+      class: "pl-input pl-textarea cap__pedido",
+      attrs: {
+        id,
+        rows: "3",
+        maxlength: String(PEDIDO_MAX),
+        placeholder: "Ex.: revisar a tabuada do 7 e do 8, uns 20 minutos por dia",
+      },
+    });
+    campo.value = pedido;
+    campo.addEventListener("input", () => {
+      pedido = campo.value;
+      atualizarAcao();
+    });
+
+    const exemplos = el("div", {
+      class: "cap__exemplos",
+      attrs: { "aria-label": "Exemplos de pedido" },
+    });
+    EXEMPLOS_DE_PEDIDO.forEach((texto) => {
+      const chip = el("button", {
+        class: "cap__exemplo",
+        attrs: { type: "button" },
+        text: texto,
+      });
+      chip.addEventListener("click", () => {
+        pedido = texto;
+        campo.value = texto;
+        campo.focus();
+        atualizarAcao();
+      });
+      exemplos.appendChild(chip);
+    });
+
+    return el("div", {
+      class: "cap__pedido-bloco",
+      children: [
+        el("label", {
+          class: "pl-field__label",
+          attrs: { for: id },
+          text: "Seu pedido pra Cogni",
+        }),
+        campo,
+        exemplos,
+      ],
+    });
   }
 
   /** Botão do grid de entradas. */
@@ -454,26 +614,39 @@ function criarFluxo({ ctx, aoSalvar }) {
     return lista;
   }
 
-  function acoesDaBandeja() {
-    const ler = el("button", {
+  /**
+   * A barra de ação da etapa. Existe SEMPRE agora, e não só quando há bandeja: o
+   * caminho principal virou escrever o pedido, e um botão que só aparece depois de
+   * anexar arquivo escondia justamente o caminho que a gente quer que seja o padrão.
+   */
+  function acoesDoPalco() {
+    btnMontar = el("button", {
       class: "dash-btn dash-btn--primary",
       attrs: { type: "button" },
       children: [
         el("span", { class: "pl-btn__ico", svg: ICON.sparkle }),
-        el("span", { text: "Ler com a Cogni" }),
+        el("span", { text: "Montar o plano" }),
       ],
     });
-    ler.addEventListener("click", executarLeitura);
+    btnMontar.addEventListener("click", executarLeitura);
 
-    const usado = orcamento.usado();
-    const contagem = el("span", {
-      class: "cap__contagem",
-      text:
-        `${materiais.length} de ${MAX_ITENS} · ` +
-        `${formatarBytes(usado)} de ${formatarBytes(CORPO_MAX)}`,
-    });
+    const filhos = [];
+    if (materiais.length) {
+      const usado = orcamento.usado();
+      filhos.push(
+        el("span", {
+          class: "cap__contagem",
+          text:
+            `${materiais.length} de ${MAX_ITENS} · ` +
+            `${formatarBytes(usado)} de ${formatarBytes(CORPO_MAX)}`,
+        })
+      );
+    }
+    filhos.push(btnMontar);
 
-    return el("div", { class: "cap__acoes", children: [contagem, ler] });
+    const barra = el("div", { class: "cap__acoes", children: filhos });
+    atualizarAcao();
+    return barra;
   }
 
   /* ---- O gravador -------------------------------------------------------- */
@@ -664,7 +837,12 @@ function criarFluxo({ ctx, aoSalvar }) {
 
   async function executarLeitura() {
     const itens = materiais.flatMap((m) => m.itens);
-    const corpo = { itens, hoje: new Date().toISOString().slice(0, 10) };
+    const texto = pedido.trim();
+    if (!itens.length && !texto) {
+      etapaEscolher("Escreva o que você quer que ela estude, ou mande o material da escola.");
+      return;
+    }
+    const corpo = { itens, pedido: texto, hoje: new Date().toISOString().slice(0, 10) };
 
     /**
      * A última checagem, e a única que mede o que a plataforma mede. Estourar aqui é
@@ -686,29 +864,31 @@ function criarFluxo({ ctx, aoSalvar }) {
      * estruturar — e não a uma barra decorativa.
      */
     const temAudio = itens.some((i) => i.tipo === "audio");
-    etapaProgresso("enviando o material…");
-    anunciar("Enviando o material pra Cogni.");
+    etapaProgresso(itens.length ? "enviando o material…" : "mandando o pedido…");
+    anunciar(itens.length ? "Enviando o material pra Cogni." : "Enviando o pedido pra Cogni.");
 
-    const fases = temAudio
-      ? [
-          [5000, "transcrevendo o áudio…"],
-          [18000, "lendo o material…"],
-          [32000, "montando as tarefas…"],
-        ]
-      : [
-          [5000, "lendo o material…"],
-          [16000, "montando as tarefas…"],
-        ];
+    const fases = !itens.length
+      ? [[3000, "montando as tarefas…"]]
+      : temAudio
+        ? [
+            [5000, "transcrevendo o áudio…"],
+            [18000, "lendo o material…"],
+            [32000, "montando as tarefas…"],
+          ]
+        : [
+            [5000, "lendo o material…"],
+            [16000, "montando as tarefas…"],
+          ];
     trocaDeFase = fases.map(([ms, texto]) =>
       window.setTimeout(() => etapaProgresso(texto), ms)
     );
 
     try {
-      const resposta = await lerMaterial(itens, controle.signal);
+      const resposta = await lerMaterial(itens, texto, controle.signal);
       limparFases();
       if (controle.signal.aborted) return;
 
-      const proposta = resposta || propostaDeExemplo(materiais);
+      const proposta = resposta || propostaDeExemplo(materiais, texto);
       if (!proposta || proposta.legivel === false) {
         etapaMaterialRuim(proposta && proposta.motivo);
         return;
@@ -722,8 +902,12 @@ function criarFluxo({ ctx, aoSalvar }) {
         err instanceof ErroDeLeitura
           ? err.message
           : err?.name === "TimeoutError"
-            ? "A Cogni está demorando demais pra responder. Tente de novo com menos material."
-            : "Não consegui ler o material agora. Tente de novo em instantes.";
+            ? itens.length
+              ? "A Cogni está demorando demais pra responder. Tente de novo com menos material."
+              : "A Cogni está demorando demais pra responder. Tente de novo em instantes."
+            : itens.length
+              ? "Não consegui ler o material agora. Tente de novo em instantes."
+              : "Não consegui montar o plano agora. Tente de novo em instantes.";
       if (!(err instanceof ErroDeLeitura)) {
         console.error("[Companion] Leitura de material falhou:", err);
       }
@@ -744,7 +928,11 @@ function criarFluxo({ ctx, aoSalvar }) {
     const origens = new Set(materiais.map((m) => m.origem));
     let dica =
       "Confira se o arquivo tem mesmo o texto da lição — se for só imagem, tire uma foto bem enquadrada.";
-    if (origens.has("foto")) {
+    if (!materiais.length) {
+      dica =
+        "Diga o assunto e o que você quer que ela faça — por exemplo: “revisar frações, " +
+        "meia hora por dia até sexta”.";
+    } else if (origens.has("foto")) {
       dica =
         "Tente de novo com a folha inteira no quadro, o celular parado e boa luz — sem sombra por cima do papel.";
     } else if (origens.has("audio") || origens.has("video")) {
@@ -760,7 +948,11 @@ function criarFluxo({ ctx, aoSalvar }) {
           el("span", { class: "cap__ruim-ico", svg: ICON.alert }),
           el("p", {
             class: "cap__ruim-titulo",
-            text: motivo || "Não consegui usar esse material.",
+            text:
+              motivo ||
+              (materiais.length
+                ? "Não consegui usar esse material."
+                : "Não consegui montar um plano com esse pedido."),
           }),
           el("p", { class: "cap__ruim-dica", text: dica }),
         ],
@@ -770,7 +962,10 @@ function criarFluxo({ ctx, aoSalvar }) {
     const tentar = el("button", {
       class: "dash-btn dash-btn--primary",
       attrs: { type: "button" },
-      text: "Tentar outro material",
+      // O pedido escrito NÃO é descartado no caminho de volta (só os materiais são):
+      // reescrever a frase do zero por causa de uma foto ruim seria punir a mãe pelo
+      // erro do arquivo.
+      text: materiais.length ? "Tentar outro material" : "Voltar e ajustar o pedido",
     });
     tentar.addEventListener("click", () => {
       materiais = [];
@@ -778,7 +973,7 @@ function criarFluxo({ ctx, aoSalvar }) {
       etapaEscolher();
     });
     palco.append(el("div", { class: "cap__acoes", children: [tentar] }));
-    anunciar(motivo || "Não consegui usar esse material.");
+    anunciar(motivo || "Não consegui usar o que você mandou.");
   }
 
   /* ---- Etapa 3: revisão -------------------------------------------------- */
@@ -792,11 +987,19 @@ function criarFluxo({ ctx, aoSalvar }) {
       origem: m.origem,
       rotulo: m.rotulo,
     }));
+    const pedidoFeito = pedido.trim();
     materiais = [];
     orcamento = novoOrcamento();
 
     palco.replaceChildren(
-      montarRevisao({ proposta, materiais: resumo, ctx, close: fechar, aoSalvar })
+      montarRevisao({
+        proposta,
+        materiais: resumo,
+        pedido: pedidoFeito,
+        ctx,
+        close: fechar,
+        aoSalvar,
+      })
     );
     anunciar("Confira o que a Cogni entendeu antes de salvar.");
   }
@@ -826,6 +1029,7 @@ function criarFluxo({ ctx, aoSalvar }) {
       limparFases();
       pararGravador();
       materiais = [];
+      pedido = "";
     },
   };
 }

@@ -211,6 +211,9 @@ export function origemLabel(origem) {
     arquivo: "criado a partir de um arquivo",
     audio: "criado a partir de um áudio",
     video: "criado a partir de um vídeo",
+    // ⭐ 16/ago/2026 — o plano que a Cogni montou do que o responsável pediu por
+    // escrito, sem material nenhum da escola.
+    pedido: "criado a partir do seu pedido",
   };
   return rotulos[origem] || null;
 }

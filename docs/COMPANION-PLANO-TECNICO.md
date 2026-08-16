@@ -160,7 +160,7 @@ Um dado, três coelhos. 🎯
 | `foco` | text | matéria (mesma lista de `conversas.materia` — agora **14** valores) |
 | `duracao_dias` | int | |
 | `status` | text | `rascunho` \| `ativo` \| `em_andamento` \| `pausado` \| `concluido`. A Cogni **segue** (injeta no prompt) só os planos `ativo` **ou** `em_andamento`; os outros ela ignora. ⭐ `rascunho` (ago/2026) é o plano que a IA montou de uma foto e o pai **ainda não aprovou** — ver "🧩 Mesa de Estudos" |
-| `origem` | text | ⭐ ATUALIZADA (15/ago/2026) `manual` (default) \| `foto` \| `arquivo` \| `audio` \| `video`. Diz **de onde o plano nasceu** — a tela mostra o selo certo ("criado a partir de um PDF") e o rate limit conta todas as origens de IA, não só `foto` |
+| `origem` | text | ⭐ ATUALIZADA (16/ago/2026) `manual` (default) \| `foto` \| `arquivo` \| `audio` \| `video` \| **`pedido`**. Diz **de onde o plano nasceu** — a tela mostra o selo certo ("criado a partir de um PDF") e o rate limit conta todas as origens de IA, não só `foto`. `pedido` é o plano que a IA montou do que o responsável escreveu, **sem material nenhum**; `manual` continua sendo só o plano digitado à mão. Quando vieram os dois, ganha a origem do MATERIAL — foi ele que virou as tarefas |
 | `extraido_texto` | text | ⭐ ATUALIZADA (15/ago/2026) a transcrição literal do que a IA leu no material (foto, PDF, Word, slides, planilha, áudio, vídeo). Duas funções: **auditoria** — o pai confere o que ela entendeu sem precisar do arquivo, que não é guardado em lugar nenhum — e, desde 15/ago, **conteúdo pro robô**: entra no system prompt pra Cogni conseguir ajudar a FAZER a lição, não só lembrar que ela existe (ver "🧠 O material da escola chega na Cogni") |
 | `criado_em` / `atualizado_em` | timestamptz | `criado_em` define a expiração: um plano vence quando `criado_em + duracao_dias` já passou (1 dia dura 1 dia). Plano vencido a Cogni para de cobrar, mesmo que o status ainda esteja `ativo`. `duracao_dias` null/0 = sem prazo |
 
@@ -1053,7 +1053,7 @@ Cobertura: **`npm run teste:tarefas`** (34 casos, `node:test`, sem rede). A bate
 > 1. Só `POST` (405 no resto).
 > 2. **Exige o JWT do pai logado** (`Authorization: Bearer <access_token>` da sessão Supabase), validado server-side em `GET {SUPABASE_URL}/auth/v1/user`. Sem token válido → **401**.
 > 3. Confirma que ele **tem criança pareada**, lendo `criancas` com o token dele (a RLS faz o trabalho) → **403**.
-> 4. **Rate limit sem infra nova**: conta os planos daquela criança nas últimas 24h com `origem=in.(foto,arquivo,audio,video)`, teto de **20/dia** → **429**. Sem KV, sem tabela nova. ⚠️ Filtrar só por `origem=eq.foto` (como era antes da rodada 2) deixaria PDF, áudio e vídeo **fora da conta** — o teto existiria só no papel.
+> 4. **Rate limit sem infra nova**: conta os planos daquela criança nas últimas 24h com `origem=in.(foto,arquivo,audio,video,pedido)`, teto de **20/dia** → **429**. Sem KV, sem tabela nova. ⚠️ Filtrar só por `origem=eq.foto` (como era antes da rodada 2) deixaria PDF, áudio e vídeo **fora da conta** — o teto existiria só no papel. Mesma armadilha em 16/ago com `pedido`: é a chamada **mais barata e mais fácil de repetir** (não exige anexar nada), então fora da lista ela seria justamente a única sem teto.
 > 5. Tetos por tipo (ver a tabela da rodada 2) — o body inteiro tem que caber nos **4,5 MB** da Vercel.
 > 6. **Nunca** devolver mensagem de erro da OpenAI crua pro cliente.
 
@@ -1064,6 +1064,7 @@ POST /api/plano-de-material
   headers: Authorization: Bearer <supabase access_token>
   body: {
     hoje: "2026-08-15",
+    pedido: "revisar a tabuada do 7 e do 8, 20 min por dia",   ⭐ 16/ago (≤ 800 chars)
     itens: [
       { tipo:"imagem", nome, dados:"data:image/jpeg;base64,…" },
       { tipo:"pdf",    nome, dados:"data:application/pdf;base64,…" },
@@ -1071,6 +1072,7 @@ POST /api/plano-de-material
       { tipo:"audio",  nome, mime:"audio/webm", dados:"data:audio/webm;base64,…", duracao_s }
     ]
   }
+  ⚠️ `itens` pode vir VAZIO se houver `pedido` (e vice-versa). Os dois vazios → 400.
   → 200 { legivel, titulo, conteudo, foco, duracao_dias, extraido_texto,
           truncado, aviso, tarefas: [
             { titulo, detalhe, materia, prazo, estimativa_min, confianca } ] }
@@ -1078,6 +1080,16 @@ POST /api/plano-de-material
   → 400 forma · 401 sem sessão · 403 sem criança · 405 método · 413 tamanho
   → 415 content-type · 429 cota do dia · 502 IA fora · 503 função sem env vars
 ```
+
+⭐ **`pedido` (16/ago/2026) — o material deixou de ser obrigatório.** A pergunta da tela era *"o que a escola mandou?"*, o que só funciona pra escola que manda alguma coisa; a mãe que quer que a filha treine tabuada essa semana não tinha o que anexar. O `systemPrompt` passou a ter **três modos**, e as regras 1-4 mudam com eles (`regrasDaFonte` em `_lib/prompt.mjs`):
+
+| Chegou | Quem manda no conteúdo | `extraido_texto` |
+| --- | --- | --- |
+| só material | o material — a regra anti-invenção original ("extraia SOMENTE o que está ali") | a transcrição literal |
+| material **+** pedido | o material é o conteúdo, o pedido é o **recorte** (prioridade, ritmo, o que deixar de fora); onde se contradisserem, o pedido ganha | a transcrição literal |
+| só pedido | o pedido — aqui **criar é o trabalho**: 3 a 8 tarefas do tamanho de uma sessão, `confianca` 0.9 pro que foi dito com todas as letras | **null** |
+
+O `extraido_texto` fica null no modo pedido de propósito: o robô injeta esse campo sob o título `O MATERIAL DA ESCOLA` (ver `brain/prompt.js`), e escrever ali o que a mãe pediu faria a Cogni apresentar à criança como lição da escola uma coisa que a escola nunca passou. O que orienta o robô num plano de pedido é o `conteudo`, que já é injetado e já é editável na revisão.
 
 Dois campos que a rodada 2 acrescentou, e os dois existem pra **impedir um silêncio**:
 `truncado` (a proposta bateu no teto de 20 tarefas — com foto de uma folha isso nunca acontecia, com um PDF de 40 questões acontece sempre, e o pai veria 20 achando que eram todas) e `aviso` (recado do pipeline, tipo *"não consegui abrir o PDF, montei com o resto"*).
@@ -1111,6 +1123,8 @@ O que o Pedro vai estudar — e como está indo.        [ Da foto ] [ + Novo pla
 - Abas de plano: **Para revisar** (rascunhos) · Ativos · Todos · Concluídos.
 - Card: título, detalhe, chip de matéria, prazo (vermelho se atrasado), selo ✨ + **Desfazer** quando `movida_por='cogni'`, e chip "confira" quando `confianca < 0.6`.
 - Mobile: as três colunas viram scroll horizontal com `scroll-snap`.
+- ⭐ **Excluir plano (16/ago/2026)**: botão de lixeira ao lado do lápis, no card do plano — antes o único caminho era abrir *"editar"*, uma tela que promete o contrário do que o pai quer ali. O botão de dentro do formulário **fica**: quem já está editando e desistiu não precisa fechar o modal. (O card do **quadro** não ganhou botão: o menu `⋯` já resolve, e mais um ícone por card num alvo arrastável só aumentaria o toque errado.)
+- ⭐ **Selecionar vários planos (16/ago/2026)**: botão *"Selecionar"* na toolbar liga um modo em que a faixa de chips deixa de trocar de plano e passa a marcar — com *"selecionar todos"* e exclusão em lote (`Promise.allSettled`, que é o que permite dizer *"excluí 4 de 6"* em vez de mostrar só o erro). Trocar de aba **limpa a seleção**: excluir em lote o que saiu da vista é exatamente o acidente que o modo existe pra evitar.
 
 **3. O drag and drop** (`js/dashboard/dnd.js`, módulo próprio) — **Pointer Events escritos à mão**, não biblioteca. O consenso de 2026 é esse pra quem quer mouse e toque no mesmo código com controle total da animação; e o motivo decisivo é que **SortableJS não tem acessibilidade por teclado** — os botões de mover teriam que ser escritos de qualquer jeito.
 
@@ -1283,6 +1297,9 @@ Cobertura: **`npm run teste:perfil`** (45 casos, offline) — inclusive o caso q
    - publicar **`plano_tarefas`** no Realtime — sem isso o quadro não anda em tempo real em **nenhuma** das duas pontas. O SQL acima já faz (`alter publication supabase_realtime add table …`); pra conferir, **Database → Publications → `supabase_realtime`**, ou `select tablename from pg_publication_tables where pubname='supabase_realtime';`. ⚠️ **Não** é o item *Replication* do menu — esse virou read replicas/pipelines e fica vazio mesmo;
    - na **Vercel**, criar `OPENAI_API_KEY`, `SUPABASE_URL` e `SUPABASE_ANON_KEY` em *Settings → Environment Variables* do projeto do Companion, e redeploy.
 4. ⭐ **Rodada 2 — material → plano (15/ago/2026)**, uma coisa manual só: o **SQL** que abre os dois `CHECK` de `origem` (entregue no chat). `planos_estudo.origem` passa a aceitar `arquivo`/`audio`/`video` e `plano_tarefas.origem` passa a aceitar `ia`. Escrito de forma idempotente (`drop constraint if exists` + `add constraint`), então roda mesmo se a constraint nunca tiver existido. **Nenhuma variável de ambiente nova** — a transcrição usa a `OPENAI_API_KEY` que já está lá.
+
+5. ⭐ **Pedido → plano (16/ago/2026)**, uma coisa manual só: o **SQL** que acrescenta `pedido` ao `CHECK` de `planos_estudo.origem` (entregue no chat), idempotente igual ao da rodada 2. **Nenhuma variável de ambiente nova.**
+   > 🩹 Se o site subir antes do SQL, o insert do plano de pedido morreria com `23514` (check_violation) **depois** de o pai revisar tarefa por tarefa. O `criarPlanoComTarefas` (`supabase-data.js`) detecta esse código e regrava com a origem `manual`: perde-se o **selo**, não o trabalho. A rede some sozinha quando o SQL roda — a primeira tentativa passa a funcionar.
 
 (O Claude gerencia os `.env`. Credenciais rotacionadas depois pelo Nicolas.)
 

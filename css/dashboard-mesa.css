@@ -447,9 +447,16 @@
     width: 28px;
     height: 28px;
   }
-  .pl-card__edit {
+  /* O grupo é que sobe pro topo do card empilhado; os botões DENTRO dele mantêm a
+     ordem natural (editar, excluir) — o `order: -1` herdado os inverteria. */
+  .pl-card__edit,
+  .mesa-plano__botoes {
     order: -1;
     margin-left: auto;
+  }
+  .mesa-plano__botoes .pl-card__edit {
+    order: 0;
+    margin-left: 0;
   }
   /* Empilhado, o selo cai numa linha só dele — e aí "encostar na direita" vira
      encostar no nada. Alinha com o título. */
@@ -525,6 +532,46 @@
   border: 0;
 }
 
+/* --- Seleção de vários planos (ago/2026) ---------------------------------- */
+/* O botão que liga o modo. Ele mora na toolbar, ao lado das abas. */
+.mesa-selecionar[hidden] {
+  display: none;
+}
+.mesa-selecionar.is-active {
+  border-color: var(--dash-accent);
+  background-color: var(--dash-accent-soft);
+  color: var(--dash-text);
+}
+/* A barra do modo: contagem à esquerda, ações à direita. Ela empurra a faixa de
+   chips pra baixo em vez de flutuar por cima — o pai precisa ver as duas coisas
+   ao mesmo tempo pra saber o que está marcado. */
+/* `display` explícito vence o `[hidden]` do navegador — a barra vive no DOM o
+   tempo todo (pelo `aria-live` e pelo foco), então esconder é com `hidden`. */
+.mesa-selecao[hidden] {
+  display: none;
+}
+.mesa-selecao {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  background-color: var(--dash-surface-2);
+}
+.mesa-selecao__contagem {
+  margin-right: auto;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: var(--dash-text-muted);
+}
+.mesa-selecao .pl-btn--danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* --- Seletor de plano (só aparece com 2+ planos na aba) ------------------- */
 .mesa-seletor {
   display: flex;
@@ -533,6 +580,28 @@
   padding-bottom: 0.4rem;
   margin-bottom: 1rem;
   scrollbar-width: thin;
+}
+/* No modo de seleção os chips não são mais abas: quebram em várias linhas em vez
+   de rolar, porque marcar 6 planos com scroll horizontal é uma armadilha. */
+.mesa-seletor.is-selecionando {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+.mesa-chip-plano.is-marcado {
+  border-color: var(--toast-error, #c0392b);
+  background-color: rgba(192, 57, 43, 0.1);
+  color: var(--dash-text);
+  font-weight: var(--fw-semibold);
+}
+.mesa-chip-plano.is-marcado .mesa-chip-plano__ico {
+  color: var(--toast-error, #c0392b);
+}
+[data-theme="dark"] .mesa-chip-plano.is-marcado {
+  border-color: #ff8a8a;
+  background-color: rgba(255, 107, 107, 0.14);
+}
+[data-theme="dark"] .mesa-chip-plano.is-marcado .mesa-chip-plano__ico {
+  color: #ff8a8a;
 }
 .mesa-chip-plano {
   display: inline-flex;
@@ -588,6 +657,25 @@
    em vez de codificar a informação numa cor que só quem já sabe entende. */
 .mesa-plano.is-vigente {
   border-color: var(--dash-accent);
+}
+/* Editar e excluir, lado a lado no canto do card. O excluir só fica vermelho no
+   hover/foco: vermelho permanente ao lado do lápis puxa o olho pra ação destrutiva
+   toda vez que o pai abre a tela. */
+.mesa-plano__botoes {
+  display: flex;
+  gap: 0.15rem;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+.mesa-plano__excluir:hover,
+.mesa-plano__excluir:focus-visible {
+  color: var(--toast-error, #c0392b);
+  background-color: rgba(192, 57, 43, 0.1);
+}
+[data-theme="dark"] .mesa-plano__excluir:hover,
+[data-theme="dark"] .mesa-plano__excluir:focus-visible {
+  color: #ff8a8a;
+  background-color: rgba(255, 107, 107, 0.14);
 }
 .mesa-plano__selo {
   display: inline-flex;
@@ -1159,6 +1247,59 @@ body.dnd-arrastando {
   font-weight: var(--fw-semibold);
   color: var(--dash-text);
 }
+/* --- O pedido escrito: a entrada principal desde 16/ago/2026 -------------- */
+.cap__pedido-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.cap__pedido {
+  min-height: 84px;
+}
+/* Exemplos de pedido. São chips e não uma lista: eles precisam parecer TOCÁVEIS —
+   um exemplo em texto corrido vira instrução que ninguém lê. */
+.cap__exemplos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.cap__exemplo {
+  padding: 0.35rem 0.75rem;
+  border: 1px dashed var(--dash-border-strong, var(--dash-border));
+  border-radius: var(--radius-pill);
+  background: none;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--dash-text-muted);
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+}
+.cap__exemplo:hover {
+  border-style: solid;
+  border-color: var(--dash-accent);
+  background-color: var(--dash-accent-soft);
+  color: var(--dash-text);
+}
+/* O separador entre o pedido e o material: uma linha com o texto no meio, pra
+   deixar claro que o que vem abaixo é OPCIONAL e não a continuação do formulário. */
+.cap__ou {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--dash-text-faint);
+}
+.cap__ou::before,
+.cap__ou::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: var(--dash-border);
+}
+
 /* Quatro entradas em 2×2, sempre.
    Quatro numa linha caberiam em pixels, mas dentro de um modal de 720px cada
    botão fica com ~160px e "Escolher arquivo" quebra em duas linhas enquanto
@@ -1274,6 +1415,13 @@ body.dnd-arrastando {
   justify-content: flex-end;
   gap: 0.8rem;
   flex-wrap: wrap;
+}
+/* "Montar o plano" NASCE desabilitado (sem pedido e sem material), diferente dos
+   outros botões do painel, que só desabilitam por um instante ao salvar. Sem o
+   estado visual, o pai clicaria num botão de aparência normal e nada aconteceria. */
+.cap__acoes .dash-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .cap__contagem {
   margin-right: auto;

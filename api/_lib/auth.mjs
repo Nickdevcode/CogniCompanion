@@ -23,9 +23,11 @@ const MAX_POR_DIA = 20;
  * 🔴 Até a rodada 2 isto era `origem=eq.foto`, e era o erro silencioso mais provável
  * da mudança: PDF, áudio e vídeo ficariam **fora da conta** e o teto de 20/dia
  * existiria só no papel. Todo valor novo de `planos_estudo.origem` que nasça de IA
- * precisa entrar aqui.
+ * precisa entrar aqui — foi o caso de `pedido` (16/ago/2026), o plano que a mãe pede
+ * por escrito sem mandar material. Ele é a chamada mais barata de todas e por isso a
+ * mais fácil de repetir sem perceber: fora daqui, o teto não existiria pra ela.
  */
-const ORIGENS_DE_IA = ["foto", "arquivo", "audio", "video"];
+const ORIGENS_DE_IA = ["foto", "arquivo", "audio", "video", "pedido"];
 
 /**
  * Trava 2 — valida o token do pai contra o Supabase.

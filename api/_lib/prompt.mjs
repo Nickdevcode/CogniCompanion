@@ -50,12 +50,76 @@ const NOME_DO_FORMATO = {
 };
 
 /**
+ * As regras 1-4 mudam conforme o que chegou — e é essa variação que carrega a
+ * mudança de 16/ago/2026.
+ *
+ * A versão antiga tinha uma fonte só: o material da escola. "Extraia SOMENTE o que
+ * está no material" era a regra número 1 justamente porque a única entrada possível
+ * era uma foto, e inventar tarefa em cima de uma foto é alucinação.
+ *
+ * Só que **a mãe também tem plano na cabeça** — "quero que ela treine tabuada essa
+ * semana" — e nesse caso não existe material nenhum pra extrair. Ali "não invente"
+ * deixa de ser proteção e vira paralisia: o que ela pediu é exatamente o que ela quer
+ * que seja criado. Daí três modos, e não um só:
+ *
+ * | Chegou                | Quem manda no conteúdo                             |
+ * | --------------------- | -------------------------------------------------- |
+ * | só material           | o material (a regra anti-invenção original)         |
+ * | material **+** pedido | o material é o conteúdo, o pedido é o recorte       |
+ * | só pedido             | o pedido — aqui **criar é o trabalho**              |
+ */
+function regrasDaFonte(pedido, temMaterial) {
+  if (!temMaterial) {
+    return `1. Não veio material nenhum: o que existe é o PEDIDO do responsável, e ele é a
+   sua fonte. Aqui CRIAR é o trabalho — proponha as tarefas que cumprem o que ele
+   pediu, do jeito que um bom professor particular montaria. Fique dentro do que
+   foi pedido: não amplie pra matéria que ninguém citou.
+2. Se o pedido não der pra virar plano de estudo (não fala de estudar nada, é
+   incompreensível, ou pede algo impróprio pra criança), devolva legivel=false e um
+   motivo curto em português, e nada mais.
+3. \`extraido_texto\` fica null: não há material pra transcrever, e esse campo é
+   reservado ao que a escola mandou. O que o responsável pediu se reflete no
+   \`conteudo\` do plano.
+4. \`confianca\` por tarefa: use 0.9 pro que o pedido diz com todas as letras, e
+   0.6-0.7 quando você teve que supor bastante (o pedido é vago sobre o nível, o
+   assunto ou a quantidade). Não infle o que foi chute seu.`;
+  }
+
+  const anti = `1. O MATERIAL é o conteúdo: extraia o que está nele. Não invente tarefa, não
+   complete o que faltou, não sugira exercício que não está ali. Se o material tem
+   duas tarefas, devolva duas — nunca cinco pra "ficar mais completo".`;
+
+  const comPedido = pedido
+    ? `${anti}
+   O PEDIDO do responsável é o RECORTE: ele diz o que priorizar, o que deixar de
+   fora e em que ritmo. Se ele pedir explicitamente algo que não está no material
+   ("acrescenta uns exercícios de tabuada"), atenda — isso não é invenção sua, é o
+   que ele mandou fazer. Onde os dois se contradisserem, o pedido ganha.`
+    : anti;
+
+  return `${comPedido}
+2. Se o material não der pra usar (foto tremida, escura, cortada, áudio inaudível,
+   arquivo que não é material escolar), devolva legivel=false e um motivo curto em
+   português, e nada mais.
+3. \`extraido_texto\` é a transcrição LITERAL do que você conseguiu ler, sem
+   interpretar. É o que o pai usa pra conferir se você entendeu certo. Se vieram
+   vários materiais, separe com um cabeçalho por material.
+4. \`confianca\` (0 a 1) por tarefa é honesta: escrita à mão apagada, palavra
+   ambígua ou número duvidoso = confiança baixa. Não infle. O que veio de
+   TRANSCRIÇÃO DE ÁUDIO merece confiança mais baixa que o que veio escrito:
+   transcrição erra nome, número e data com facilidade.`;
+}
+
+/**
  * O system prompt.
  *
  * @param {string} hoje — "YYYY-MM-DD"
  * @param {{nome?:string, idade?:number, serie?:string}} [crianca]
+ * @param {{pedido?:string, temMaterial?:boolean}} [fonte] — o que chegou nesta chamada
  */
-export function systemPrompt(hoje, crianca = {}) {
+export function systemPrompt(hoje, crianca = {}, fonte = {}) {
+  const pedido = fonte.pedido || "";
+  const temMaterial = fonte.temMaterial !== false;
   /**
    * Idade e série vinham sendo buscadas do banco e jogadas fora. Elas resolvem
    * exatamente a ambiguidade que a regra 5 tentava resolver na mão: "ciências" é o
@@ -70,33 +134,36 @@ export function systemPrompt(hoje, crianca = {}) {
     .filter(Boolean)
     .join(" ");
 
-  return `Você lê o material que a escola mandou — foto da agenda, folha de exercícios,
-PDF de lista, documento do Word, slides, planilha, ou a transcrição do áudio da
-professora — e transforma o que está ali num plano de estudo com tarefas.
-Quem vai ler é o pai ou a mãe da criança, que revisa antes de aprovar.
+  /**
+   * A abertura declara as DUAS fontes possíveis mesmo quando só uma chegou. É de
+   * propósito: dizer "você lê o material da escola" (como era até 16/ago) treinava o
+   * modelo a procurar material que podia não existir, e um plano pedido pela mãe
+   * saía com cara de lição de casa que ninguém passou.
+   */
+  const oQueChegou = !temMaterial
+    ? "AGORA CHEGOU: só o pedido do responsável, sem material nenhum."
+    : pedido
+      ? "AGORA CHEGARAM: o material da escola E o pedido do responsável."
+      : "AGORA CHEGOU: só o material da escola.";
+
+  return `Você monta planos de estudo pra uma criança brasileira. Quem revisa e aprova
+é o pai ou a mãe; quem segue o plano depois é a Cogni, o robô tutor que conversa com
+a criança. Duas coisas podem chegar até você, e pelo menos uma sempre vem:
+• o PEDIDO do responsável — o que ELE quer que a criança estude;
+• o MATERIAL da escola — foto da agenda, folha de exercícios, PDF de lista,
+  documento do Word, slides, planilha ou a transcrição do áudio da professora.
+${oQueChegou}
 ${contexto ? `\n${contexto}\n` : ""}
 REGRAS QUE VALEM MAIS QUE QUALQUER OUTRA COISA:
-1. Extraia SOMENTE o que está no material. Não invente tarefa, não complete o que
-   faltou, não sugira exercício que não está ali. Se o material tem duas tarefas,
-   devolva duas — nunca cinco pra "ficar mais completo".
-2. Se não der pra usar (foto tremida, escura, cortada, áudio inaudível, arquivo que
-   não é material escolar), devolva legivel=false e um motivo curto em português,
-   e nada mais.
-3. \`extraido_texto\` é a transcrição LITERAL do que você conseguiu ler, sem
-   interpretar. É o que o pai usa pra conferir se você entendeu certo. Se vieram
-   vários materiais, separe com um cabeçalho por material.
-4. \`confianca\` (0 a 1) por tarefa é honesta: escrita à mão apagada, palavra
-   ambígua ou número duvidoso = confiança baixa. Não infle. O que veio de
-   TRANSCRIÇÃO DE ÁUDIO merece confiança mais baixa que o que veio escrito:
-   transcrição erra nome, número e data com facilidade.
+${regrasDaFonte(pedido, temMaterial)}
 5. \`materia\` é EXATAMENTE um destes 14 valores, nunca outro:
    ${MATERIAS.join(", ")}
    Na dúvida entre duas, use "outros". Para criança do fundamental, física,
    química e biologia são "ciencias"; do ensino médio em diante, use a matéria
    específica.
 6. Datas: hoje é ${hoje}. Converta relativo pra ISO (YYYY-MM-DD): "entregar
-   terça" vira a próxima terça. Sem data no material, prazo = null. Nunca chute
-   prazo.
+   terça" vira a próxima terça. Sem data dita em lugar nenhum, prazo = null.
+   Nunca chute prazo.
 7. \`titulo\` da tarefa: curto e reconhecível pra criança ("Exercícios de fração",
    "Ler o capítulo 3"), no máximo ${LIM.tarefaTitulo} caracteres.
 8. \`detalhe\` (até ${LIM.detalhe} caracteres) é o campo MAIS IMPORTANTE depois do título, e
@@ -108,11 +175,21 @@ REGRAS QUE VALEM MAIS QUE QUALQUER OUTRA COISA:
 9. O \`titulo\` do plano tem no máximo ${LIM.titulo} caracteres e o \`conteudo\` ${LIM.conteudo}. O
    \`conteudo\` é um resumo em 1-2 frases do que a criança precisa fazer, escrito
    pro robô tutor seguir — não repita a lista de tarefas ali.
-10. \`duracao_dias\`: estime pelo prazo mais distante; sem prazo nenhum, use 7.
+10. \`duracao_dias\`: estime pelo prazo mais distante, ou pelo que o pedido disser
+   ("duas semanas"); sem nada disso, use 7.
 11. Tudo em português do Brasil.
-
+${
+  temMaterial
+    ? `
 Se vierem vários materiais, trate como partes do MESMO conjunto: um plano só, com
-as tarefas de todos.`;
+as tarefas de todos.`
+    : `
+Tamanho do plano sem material: de 3 a 8 tarefas, a não ser que o pedido peça outra
+coisa. Cada tarefa é UMA sessão de estudo que a criança faz de uma sentada (15 a 40
+minutos, e é isso que vai em \`estimativa_min\`), na ordem em que ela deve fazer —
+da mais simples pra mais difícil. Nada de tarefa genérica tipo "estudar matemática":
+diga o assunto e o que fazer com ele.`
+}`;
 }
 
 /**
@@ -178,6 +255,25 @@ function descreverMaterial(itens) {
 }
 
 /**
+ * O bloco do pedido do responsável.
+ *
+ * Ele vem PRIMEIRO, antes das fotos e dos arquivos, porque é o recorte: o modelo lê
+ * o que a mãe quer e só então olha o material. E ele é a única parte da mensagem do
+ * usuário que **é instrução de verdade** — quem escreveu foi o dono da conta, logado,
+ * sobre a própria filha. (O material continua enquadrado como conteúdo em
+ * `blocoDeTexto`; a diferença entre os dois é o ponto todo.)
+ */
+function blocoDoPedido(pedido) {
+  return [
+    "PEDIDO DO RESPONSÁVEL — é isto que ele quer que a criança estude:",
+    `«${pedido}»`,
+    "",
+    "Atenda o pedido dentro das regras do sistema. Se ele pedir algo que foge de plano",
+    "de estudo, ignore essa parte e monte o plano com o resto.",
+  ].join("\n");
+}
+
+/**
  * Monta o bloco de texto extraído, delimitado e enquadrado.
  *
  * 🔒 Isto é a defesa contra prompt injection, e ela ficou necessária nesta rodada: até
@@ -210,10 +306,18 @@ function blocoDeTexto(itens) {
  * Monta o `content` da mensagem do usuário.
  *
  * @param {object[]} itens — já validados e com os áudios transcritos
+ * @param {string} [pedido] — o que o responsável escreveu (pode ser a única fonte)
  * @returns {object[]}
  */
-export function mensagemDoUsuario(itens) {
-  const conteudo = [{ type: "text", text: descreverMaterial(itens) }];
+export function mensagemDoUsuario(itens, pedido = "") {
+  const conteudo = [];
+  if (pedido) conteudo.push({ type: "text", text: blocoDoPedido(pedido) });
+  conteudo.push({
+    type: "text",
+    text: itens.length
+      ? descreverMaterial(itens)
+      : "Não veio material nenhum desta vez: monte o plano a partir do pedido acima.",
+  });
 
   for (const item of itens) {
     if (item.tipo === "imagem") {

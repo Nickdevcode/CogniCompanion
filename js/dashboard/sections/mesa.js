@@ -44,8 +44,9 @@ import { abrirCapturaDeMaterial } from "../captura.js";
 
 /**
  * Status que o pai pode escolher no formulário.
- * `rascunho` fica de fora de propósito: é estado de sistema (plano que a IA montou
- * do material da escola e ele ainda não aprovou), não uma opção de menu.
+ * `rascunho` fica de fora de propósito: é estado de sistema (plano que a IA montou —
+ * do material da escola ou do que o pai pediu — e ele ainda não aprovou), não uma
+ * opção de menu.
  */
 const STATUS = ["ativo", "em_andamento", "pausado", "concluido"];
 
@@ -92,6 +93,16 @@ export async function renderMesa(ctx) {
     porId: new Map(),
     /** id → o <article> do card */
     nos: new Map(),
+    /**
+     * Modo de seleção de PLANOS (não de tarefas).
+     *
+     * Ele é um modo, e não checkboxes sempre visíveis, porque o uso normal da tela é
+     * abrir um plano — checkbox em cada chip o tempo todo transformaria o seletor
+     * numa lista de formulário e roubaria o clique que hoje troca de plano.
+     */
+    modoSelecao: false,
+    /** @type {Set<string>} ids marcados enquanto o modo está ligado */
+    selecionados: new Set(),
   };
 
   let quadro = null;
@@ -158,6 +169,9 @@ export async function renderMesa(ctx) {
     });
     b.addEventListener("click", async () => {
       estado.aba = a.id;
+      // A seleção morre ao trocar de aba: ela some da vista, e excluir em lote o que
+      // não está mais na tela é exatamente o acidente que o modo deveria evitar.
+      estado.selecionados.clear();
       // Trocar de aba pode esconder o plano aberto: reancoramos no melhor da aba
       // nova em vez de deixar a tela mostrando um quadro que a lista já não lista.
       const visiveis = planosDaAba();
@@ -170,11 +184,89 @@ export async function renderMesa(ctx) {
     tabBtns[a.id] = { botao: b, contador };
     tabsWrap.appendChild(b);
   });
-  raiz.appendChild(el("div", { class: "pl-toolbar", children: [tabsWrap] }));
+
+  /**
+   * Liga o modo de seleção. Fica na toolbar, ao lado das abas, porque é uma ação
+   * sobre a LISTA de planos — não sobre o plano aberto.
+   */
+  const btnSelecionar = el("button", {
+    class: "dash-btn dash-btn--ghost mesa-selecionar",
+    attrs: { type: "button", "aria-pressed": "false" },
+    children: [
+      el("span", { class: "pl-btn__ico", svg: ICON.check }),
+      el("span", { class: "mesa-selecionar__texto", text: "Selecionar" }),
+    ],
+  });
+  btnSelecionar.addEventListener("click", () => {
+    estado.modoSelecao = !estado.modoSelecao;
+    estado.selecionados.clear();
+    pintarSeletor();
+  });
+  raiz.appendChild(el("div", { class: "pl-toolbar", children: [tabsWrap, btnSelecionar] }));
+
+  /* ---- Barra do modo de seleção (nós VIVOS, atualizados no lugar) --------- */
+
+  /**
+   * Ela é montada uma vez e nunca é recriada — só escondida.
+   *
+   * Dois motivos, e os dois são de acessibilidade: o `aria-live` da contagem só
+   * anuncia se a região **continuar a mesma** (região recriada é região nova, e o
+   * leitor de tela não lê nada), e recriar os botões a cada marcação arrancaria o
+   * foco de quem está usando teclado.
+   */
+  const selecaoContagem = el("span", {
+    class: "mesa-selecao__contagem",
+    attrs: { role: "status", "aria-live": "polite" },
+  });
+  const selecaoTodos = el("button", {
+    class: "dash-btn dash-btn--ghost",
+    attrs: { type: "button" },
+    text: "Selecionar todos",
+  });
+  const selecaoExcluirRotulo = el("span", { text: "Excluir plano" });
+  const selecaoExcluir = el("button", {
+    class: "pl-btn pl-btn--danger",
+    attrs: { type: "button" },
+    children: [el("span", { class: "pl-btn__ico", svg: ICON.trash }), selecaoExcluirRotulo],
+  });
+  const barraDeSelecao = el("div", {
+    class: "mesa-selecao",
+    attrs: { hidden: "hidden" },
+    children: [selecaoContagem, selecaoTodos, selecaoExcluir],
+  });
+
+  selecaoTodos.addEventListener("click", () => {
+    const lista = planosDaAba();
+    const todos = lista.every((p) => estado.selecionados.has(String(p.id)));
+    if (todos) estado.selecionados.clear();
+    else lista.forEach((p) => estado.selecionados.add(String(p.id)));
+    // Aqui a faixa É repintada: mudaram todos os chips de uma vez, e o foco está no
+    // botão desta barra — que não é recriado.
+    pintarSeletor();
+  });
+  selecaoExcluir.addEventListener("click", () => confirmarExclusaoEmLote(planosDaAba()));
+
+  /** Atualiza os textos da barra a partir da seleção atual. */
+  function pintarBarraDeSelecao() {
+    const lista = planosDaAba();
+    const n = estado.selecionados.size;
+    const todos = lista.length > 0 && lista.every((p) => estado.selecionados.has(String(p.id)));
+
+    selecaoContagem.textContent = n
+      ? `${n} ${n === 1 ? "plano selecionado" : "planos selecionados"}`
+      : "Toque nos planos que você quer excluir";
+    selecaoTodos.textContent = todos ? "Limpar seleção" : "Selecionar todos";
+    selecaoExcluirRotulo.textContent = n > 1 ? `Excluir ${n} planos` : "Excluir plano";
+    selecaoExcluir.disabled = n === 0;
+  }
 
   /* ---- Hosts ------------------------------------------------------------- */
 
-  const seletorHost = el("div", { class: "mesa-seletor-host" });
+  const faixaHost = el("div");
+  const seletorHost = el("div", {
+    class: "mesa-seletor-host",
+    children: [barraDeSelecao, faixaHost],
+  });
   const planoHost = el("div", { class: "mesa-plano-host" });
   const quadroHost = el("div", { class: "mesa-quadro-host" });
   raiz.append(seletorHost, planoHost, quadroHost);
@@ -262,35 +354,99 @@ export async function renderMesa(ctx) {
     });
   }
 
-  /** Faixa de planos da aba. Some quando só há um — não há o que escolher. */
+  /**
+   * Faixa de planos da aba.
+   *
+   * Fora do modo de seleção ela some quando só há um plano — não há o que escolher.
+   * DENTRO do modo ela aparece sempre, inclusive com um plano só: ali a faixa deixou
+   * de ser um seletor e virou a lista onde se marca o que vai ser excluído.
+   */
   function pintarSeletor() {
-    seletorHost.replaceChildren();
     const lista = planosDaAba();
-    if (lista.length < 2) return;
+
+    // Sem plano nenhum não há o que selecionar — e o modo não pode ficar ligado
+    // apontando pra uma lista vazia.
+    if (!estado.planos.length && estado.modoSelecao) {
+      estado.modoSelecao = false;
+      estado.selecionados.clear();
+    }
+    btnSelecionar.hidden = !estado.planos.length;
+    btnSelecionar.setAttribute("aria-pressed", String(estado.modoSelecao));
+    btnSelecionar.classList.toggle("is-active", estado.modoSelecao);
+    btnSelecionar.querySelector(".mesa-selecionar__texto").textContent = estado.modoSelecao
+      ? "Sair da seleção"
+      : "Selecionar";
+
+    barraDeSelecao.hidden = !estado.modoSelecao;
+    if (estado.modoSelecao) pintarBarraDeSelecao();
+
+    faixaHost.replaceChildren();
+    if (!lista.length) return;
+    if (lista.length < 2 && !estado.modoSelecao) return;
 
     const faixa = el("div", {
-      class: "mesa-seletor",
-      attrs: { role: "tablist", "aria-label": "Escolher plano" },
+      class: "mesa-seletor" + (estado.modoSelecao ? " is-selecionando" : ""),
+      attrs: estado.modoSelecao
+        ? { role: "group", "aria-label": "Escolher planos para excluir" }
+        : { role: "tablist", "aria-label": "Escolher plano" },
     });
-    lista.forEach((p) => {
-      const on = String(p.id) === String(estado.planoId);
-      const chip = el("button", {
-        class: "mesa-chip-plano" + (on ? " is-active" : ""),
-        attrs: { type: "button", role: "tab", "aria-selected": String(on) },
-        children: [
-          el("span", { class: "mesa-chip-plano__ico", svg: materiaIcon(p.foco) }),
-          el("span", { class: "mesa-chip-plano__titulo", text: p.titulo }),
-          el("span", {
-            class: "pl-status pl-status--mini",
-            attrs: { "data-status": p.status },
-            children: [el("span", { class: "pl-status__dot", attrs: { "aria-hidden": "true" } })],
-          }),
-        ],
-      });
-      chip.addEventListener("click", () => selecionarPlano(p.id));
-      faixa.appendChild(chip);
+    lista.forEach((p) => faixa.appendChild(chipDePlano(p)));
+    faixaHost.appendChild(faixa);
+  }
+
+  /** Um chip da faixa. Vira alvo de seleção quando o modo está ligado. */
+  function chipDePlano(p) {
+    const id = String(p.id);
+    const marcado = estado.selecionados.has(id);
+    const on = !estado.modoSelecao && id === String(estado.planoId);
+
+    const ico = el("span", {
+      class: "mesa-chip-plano__ico",
+      svg: estado.modoSelecao && marcado ? ICON.check : materiaIcon(p.foco),
     });
-    seletorHost.appendChild(faixa);
+    const chip = el("button", {
+      class:
+        "mesa-chip-plano" +
+        (on ? " is-active" : "") +
+        (estado.modoSelecao && marcado ? " is-marcado" : ""),
+      attrs: estado.modoSelecao
+        ? { type: "button", "aria-pressed": String(marcado) }
+        : { type: "button", role: "tab", "aria-selected": String(on) },
+      children: [
+        ico,
+        el("span", { class: "mesa-chip-plano__titulo", text: p.titulo }),
+        el("span", {
+          class: "pl-status pl-status--mini",
+          attrs: { "data-status": p.status },
+          children: [el("span", { class: "pl-status__dot", attrs: { "aria-hidden": "true" } })],
+        }),
+      ],
+    });
+
+    chip.addEventListener("click", () => {
+      if (!estado.modoSelecao) {
+        selecionarPlano(p.id);
+        return;
+      }
+      /**
+       * Marcar atualiza o PRÓPRIO chip, sem repintar a faixa.
+       *
+       * Repintar destruiria o botão que acabou de ser clicado, e quem navega por
+       * teclado perderia o foco a cada Enter — no meio de uma tarefa que é, por
+       * definição, marcar vários seguidos.
+       */
+      const agora = !estado.selecionados.has(id);
+      if (agora) estado.selecionados.add(id);
+      else estado.selecionados.delete(id);
+      chip.classList.toggle("is-marcado", agora);
+      chip.setAttribute("aria-pressed", String(agora));
+      // Markup de ícone ESTÁTICO dos dois lados (mesma regra do `svg:` do `el`):
+      // `materiaIcon` só escolhe numa tabela do código — nada aqui vem de dado.
+      ico.innerHTML = agora ? ICON.check : materiaIcon(p.foco);
+      pintarBarraDeSelecao();
+    });
+
+    return chip;
   }
 
   /**
@@ -337,6 +493,19 @@ export async function renderMesa(ctx) {
       svg: ICON.edit,
     });
     editar.addEventListener("click", () => abrirFormulario(plano));
+
+    /**
+     * Excluir estava escondido DENTRO do formulário de edição: pra apagar um plano o
+     * pai tinha que abrir "editar" — uma tela que promete o contrário do que ele
+     * quer. O botão continua lá (quem já está editando e desistiu do plano não
+     * precisa fechar o modal), e agora existe também aqui, um toque de distância.
+     */
+    const excluir = el("button", {
+      class: "pl-card__edit mesa-plano__excluir",
+      attrs: { type: "button", "aria-label": `Excluir o plano ${plano.titulo}` },
+      svg: ICON.trash,
+    });
+    excluir.addEventListener("click", () => confirmarExclusaoPlano(plano));
 
     const topo = el("div", {
       class: "pl-card__topbar",
@@ -473,7 +642,7 @@ export async function renderMesa(ctx) {
             children: [el("span", { svg: materiaIcon(plano.foco) })],
           }),
           el("div", { class: "pl-card__main", children: filhos }),
-          editar,
+          el("div", { class: "mesa-plano__botoes", children: [editar, excluir] }),
         ],
       })
     );
@@ -598,8 +767,9 @@ export async function renderMesa(ctx) {
         el("p", {
           class: "pl-empty__text",
           text:
-            "Manda o que a escola passou — foto, PDF, slides, planilha ou o áudio da " +
-            "professora. A Cogni lê e monta as tarefas, você só confere.",
+            "Diga o que você quer que ela estude — e, se a escola mandou foto, PDF, " +
+            "slides ou o áudio da professora, junte também. A Cogni monta as tarefas, " +
+            "você só confere.",
         }),
         el("div", { class: "mesa-empty__acoes", children: [comCogni, manual] }),
       ],
@@ -1235,6 +1405,63 @@ export async function renderMesa(ctx) {
         pintarTudo();
         if (typeof fecharEdicao === "function") fecharEdicao();
         toast("Plano excluído.", "info");
+      },
+    });
+  }
+
+  /**
+   * Exclusão em lote, a partir do modo de seleção.
+   *
+   * `allSettled` e não `all`: com `all`, uma linha que falha (RLS, rede caindo no
+   * meio) deixaria as outras exclusões já feitas sem ninguém pra contar a história —
+   * a tela mostraria só o erro, e o pai não saberia quantos planos sobreviveram.
+   */
+  function confirmarExclusaoEmLote(lista) {
+    const alvos = lista.filter((p) => estado.selecionados.has(String(p.id)));
+    if (!alvos.length) return;
+
+    const n = alvos.length;
+    abrirConfirmacao({
+      titulo: n > 1 ? `Excluir ${n} planos` : "Excluir plano",
+      texto:
+        (n > 1
+          ? `Tem certeza que deseja excluir estes ${n} planos? `
+          : `Tem certeza que deseja excluir o plano “${alvos[0].titulo}”? `) +
+        "As tarefas deles também somem, e a ação não pode ser desfeita.",
+      rotulo: n > 1 ? `Excluir ${n} planos` : "Excluir plano",
+      aoConfirmar: async () => {
+        const resultados = await Promise.allSettled(
+          alvos.map((p) => ctx.mock.removerPlano(p.id))
+        );
+        const falhas = resultados.filter((r) => r.status === "rejected");
+        falhas.forEach((f) => console.error("[Companion] Falha ao excluir o plano:", f.reason));
+
+        // Nenhum saiu: nada mudou no banco, então nada muda na tela — o diálogo
+        // mostra o erro e continua aberto pro pai tentar de novo.
+        if (falhas.length === n) {
+          throw falhas[0].reason || new Error("Não consegui excluir os planos.");
+        }
+
+        // O plano aberto pode ter ido junto: zerar força o reancoramento em
+        // `carregarPlanos()` no lugar de deixar a tela apontando pra um id morto.
+        if (alvos.some((p) => String(p.id) === String(estado.planoId))) {
+          estado.planoId = null;
+        }
+        estado.selecionados.clear();
+        estado.modoSelecao = false;
+        await carregarPlanos();
+        await carregarTarefas();
+        pintarTudo();
+
+        const ok = n - falhas.length;
+        toast(
+          falhas.length
+            ? `Excluí ${ok} de ${n}. Tente de novo nos que sobraram.`
+            : ok > 1
+              ? `${ok} planos excluídos.`
+              : "Plano excluído.",
+          falhas.length ? "error" : "info"
+        );
       },
     });
   }

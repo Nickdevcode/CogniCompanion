@@ -26,6 +26,16 @@ const TETO = { imagem: 1_600_000, pdf: 3_200_000, audio: 4_100_000 };
 const MAX_TEXTO_ITEM = 32_000;
 const MAX_TEXTO_TOTAL = 64_000;
 
+/**
+ * Teto do pedido do responsável ("quero que ela revise a tabuada do 7").
+ *
+ * O cliente para em 600 (o `maxlength` do textarea); aqui sobra folga pela mesma
+ * razão dos outros tetos — quem barra tem que ser sempre o cliente, que tem a
+ * mensagem boa. Acima disto o texto é **cortado**, não recusado: um pedido comprido
+ * demais é uma mãe empolgada, não um ataque.
+ */
+const MAX_PEDIDO = 800;
+
 const TIPOS = ["imagem", "pdf", "texto", "audio"];
 
 /**
@@ -49,8 +59,12 @@ export function normalizarHoje(valor) {
 /**
  * Valida o corpo inteiro.
  *
+ * ⭐ Desde 16/ago/2026 o material é **opcional**: o pedido escrito do responsável é
+ * uma fonte legítima sozinho ("quero que ela treine tabuada essa semana"). O que não
+ * pode é vir vazio dos dois lados — aí não há o que ler nem o que atender.
+ *
  * @param {unknown} corpo
- * @returns {{itens: object[], hoje: string}}
+ * @returns {{itens: object[], hoje: string, pedido: string}}
  * @throws {ErroHttp} 400 (forma) ou 413 (tamanho)
  */
 export function validarCorpo(corpo) {
@@ -67,9 +81,15 @@ export function validarCorpo(corpo) {
     );
   }
 
-  const bruto = corpo?.itens;
-  if (!Array.isArray(bruto) || !bruto.length) {
-    throw new ErroHttp(400, "Mande pelo menos um material.");
+  const pedido =
+    typeof corpo?.pedido === "string" ? corpo.pedido.trim().slice(0, MAX_PEDIDO) : "";
+
+  const bruto = Array.isArray(corpo?.itens) ? corpo.itens : [];
+  if (!bruto.length && !pedido) {
+    throw new ErroHttp(
+      400,
+      "Escreva o que você quer que ela estude, ou mande o material da escola."
+    );
   }
   if (bruto.length > MAX_ITENS) {
     throw new ErroHttp(413, `No máximo ${MAX_ITENS} materiais por vez.`);
@@ -146,5 +166,5 @@ export function validarCorpo(corpo) {
     throw new ErroHttp(413, "Mande um áudio por vez.");
   }
 
-  return { itens, hoje: normalizarHoje(corpo?.hoje) };
+  return { itens, hoje: normalizarHoje(corpo?.hoje), pedido };
 }

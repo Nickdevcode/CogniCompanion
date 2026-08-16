@@ -56,24 +56,47 @@ function selectMateria(valor, id) {
   return sel;
 }
 
-/** A lista do que a Cogni leu — uma linha por material, com o que saiu de cada um. */
-function listaDeMateriais(materiais) {
-  if (!materiais.length) return null;
+/**
+ * A lista do que gerou o plano — o pedido escrito e uma linha por material.
+ *
+ * O pedido entra aqui, e primeiro, pela mesma razão que os materiais entram: o pai
+ * está conferindo uma proposta de IA, e conferir sem ver a ENTRADA é chute. Quando o
+ * plano nasceu só de uma frase, essa frase é a única coisa que explica as tarefas.
+ */
+function listaDeFontes(materiais, pedido) {
+  if (!materiais.length && !pedido) return null;
 
-  const itens = materiais.map((m) =>
-    el("li", {
-      class: "cap__lido",
-      children: [
-        el("span", { class: "cap__lido-ico", svg: origemIcon(m.origem) || ICON.file }),
-        el("span", { class: "cap__lido-texto", text: m.rotulo }),
-      ],
-    })
+  const itens = [];
+  if (pedido) {
+    itens.push(
+      el("li", {
+        class: "cap__lido",
+        children: [
+          el("span", { class: "cap__lido-ico", svg: origemIcon("pedido") }),
+          el("span", { class: "cap__lido-texto", text: `“${pedido}”` }),
+        ],
+      })
+    );
+  }
+  materiais.forEach((m) =>
+    itens.push(
+      el("li", {
+        class: "cap__lido",
+        children: [
+          el("span", { class: "cap__lido-ico", svg: origemIcon(m.origem) || ICON.file }),
+          el("span", { class: "cap__lido-texto", text: m.rotulo }),
+        ],
+      })
+    )
   );
 
   return el("div", {
     class: "cap__lidos",
     children: [
-      el("h3", { class: "cap__subtitulo", text: "O que a Cogni leu" }),
+      el("h3", {
+        class: "cap__subtitulo",
+        text: materiais.length ? "O que a Cogni leu" : "O que você pediu",
+      }),
       el("ul", { class: "cap__lidos-lista", children: itens }),
     ],
   });
@@ -85,12 +108,13 @@ function listaDeMateriais(materiais) {
  * @param {object} cfg
  * @param {object} cfg.proposta — a resposta saneada da função
  * @param {Array<object>} cfg.materiais — o que estava na bandeja (pra origem e rótulos)
+ * @param {string} [cfg.pedido] — o que o responsável escreveu, se escreveu
  * @param {object} cfg.ctx — contexto do painel (usa `ctx.mock` pra gravar)
  * @param {() => void} cfg.close
  * @param {(plano:object, status:string) => void} cfg.aoSalvar
  * @returns {HTMLElement}
  */
-export function montarRevisao({ proposta, materiais, ctx, close, aoSalvar }) {
+export function montarRevisao({ proposta, materiais, pedido = "", ctx, close, aoSalvar }) {
   const raiz = el("div", { class: "cap__revisao" });
 
   const estado = {
@@ -112,7 +136,9 @@ export function montarRevisao({ proposta, materiais, ctx, close, aoSalvar }) {
         ? `Confira antes de aprovar — ${baixas} ${
             baixas === 1 ? "tarefa está marcada" : "tarefas estão marcadas"
           } com "confira", porque a Cogni não teve certeza do que leu.`
-        : "Confira o que a Cogni entendeu. Dá pra editar tudo antes de salvar.",
+        : materiais.length
+          ? "Confira o que a Cogni entendeu. Dá pra editar tudo antes de salvar."
+          : "Esta é a proposta da Cogni pro seu pedido. Dá pra editar tudo antes de salvar.",
     })
   );
 
@@ -152,7 +178,7 @@ export function montarRevisao({ proposta, materiais, ctx, close, aoSalvar }) {
     );
   }
 
-  const lidos = listaDeMateriais(materiais);
+  const lidos = listaDeFontes(materiais, pedido);
   if (lidos) raiz.append(lidos);
 
   /* ---- Cabeçalho do plano ------------------------------------------------ */
@@ -206,29 +232,46 @@ export function montarRevisao({ proposta, materiais, ctx, close, aoSalvar }) {
 
   /* ---- O que a Cogni entendeu: agora EDITÁVEL ---------------------------- */
 
-  const idExtraido = proximoId();
-  const txtExtraido = el("textarea", {
-    class: "pl-input pl-textarea cap__leitura-campo",
-    attrs: { id: idExtraido, rows: "8", maxlength: String(MAX_EXTRAIDO) },
-  });
-  txtExtraido.value = estado.extraido_texto;
-  txtExtraido.addEventListener("input", () => (estado.extraido_texto = txtExtraido.value));
+  /**
+   * O bloco só existe quando houve MATERIAL.
+   *
+   * `extraido_texto` é, dos dois lados, "o que a escola mandou": o robô o injeta no
+   * prompt sob o título `O MATERIAL DA ESCOLA` (ver `brain/prompt.js`). Num plano que
+   * nasceu de uma frase da mãe não há material nenhum pra transcrever — mostrar uma
+   * caixa vazia chamada "o que a Cogni entendeu do material" convidaria o pai a
+   * escrever ali uma lição que a escola nunca passou, e o robô a apresentaria à
+   * criança como se tivesse passado. O que orienta a Cogni num plano de pedido é o
+   * `conteudo`, logo acima, que já é editável.
+   */
+  if (materiais.length) {
+    const idExtraido = proximoId();
+    const txtExtraido = el("textarea", {
+      class: "pl-input pl-textarea cap__leitura-campo",
+      attrs: { id: idExtraido, rows: "8", maxlength: String(MAX_EXTRAIDO) },
+    });
+    txtExtraido.value = estado.extraido_texto;
+    txtExtraido.addEventListener("input", () => (estado.extraido_texto = txtExtraido.value));
 
-  raiz.append(
-    el("details", {
-      class: "cap__leitura",
-      children: [
-        el("summary", { text: "Ver o que a Cogni entendeu do material" }),
-        el("p", {
-          class: "pl-field__hint",
-          text:
-            "Esse texto vai junto pro robô: é com ele que a Cogni consegue ajudar a FAZER a lição, " +
-            "e não só lembrar que ela existe. Se ela entendeu algo errado, corrija ou apague aqui.",
-        }),
-        txtExtraido,
-      ],
-    })
-  );
+    raiz.append(
+      el("details", {
+        class: "cap__leitura",
+        children: [
+          el("summary", { text: "Ver o que a Cogni entendeu do material" }),
+          el("p", {
+            class: "pl-field__hint",
+            text:
+              "Esse texto vai junto pro robô: é com ele que a Cogni consegue ajudar a FAZER a lição, " +
+              "e não só lembrar que ela existe. Se ela entendeu algo errado, corrija ou apague aqui.",
+          }),
+          txtExtraido,
+        ],
+      })
+    );
+  } else {
+    // Sem material, nada de `extraido_texto` — nem o que a IA por acaso tenha
+    // devolvido ali contrariando o prompt.
+    estado.extraido_texto = "";
+  }
 
   /* ---- Tarefas ----------------------------------------------------------- */
 
@@ -401,7 +444,7 @@ export function montarRevisao({ proposta, materiais, ctx, close, aoSalvar }) {
           foco: estado.foco,
           duracao_dias: estado.duracao_dias,
           status,
-          origem: origemDoPlano(materiais),
+          origem: origemDoPlano(materiais, { pedido: !!pedido }),
           // Vai junto pra o pai poder auditar depois o que a IA entendeu, sem o
           // material — que não existe mais em lugar nenhum. E desde ago/2026 ele
           // também é conteúdo pro robô.

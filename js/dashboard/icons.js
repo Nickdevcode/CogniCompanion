@@ -143,6 +143,9 @@ const ORIGEM_ICONS = {
   arquivo: ICON.file,
   audio: ICON.mic,
   video: ICON.video,
+  // O plano pedido por escrito: balão de conversa, porque foi o pai FALANDO com a
+  // Cogni — não tem arquivo nenhum por trás dele.
+  pedido: ICON.chat,
 };
 
 /** @returns {string|null} ícone da origem, ou null se o plano foi digitado. */

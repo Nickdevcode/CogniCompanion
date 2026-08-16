@@ -291,15 +291,24 @@ Agora é a **Mesa de Estudos** (`#/mesa`), e ela faz três coisas:
 
 | | O quê | Por que importa |
 | --- | --- | --- |
-| 📎 | **Material → plano** | O pai manda **o que a escola mandou** — foto, PDF, Word, slides, planilha, áudio da professora ou vídeo da lousa — e a IA monta as tarefas já quebradas, com matéria e prazo. Ele revisa e aprova |
+| 💬 | **Pedido → plano** | O pai escreve o que quer (*"revisar a tabuada do 7, 20 min por dia"*) e a IA monta as tarefas. **Não depende de a escola ter mandado nada** |
+| 📎 | **Material → plano** | E quando a escola mandou, ele junta — foto, PDF, Word, slides, planilha, áudio da professora ou vídeo da lousa — e a IA extrai as tarefas de lá, com matéria e prazo. Ele revisa e aprova |
 | 🗂️ | **Quadro Kanban** | `A fazer` · `Fazendo` · `Feito`, com arraste de mouse, de dedo **e de teclado** |
 | ✨ | **O quadro é vivo** | A Cogni move os cards sozinha enquanto conversa com a criança — e com a tela aberta o pai **vê acontecer** |
+
+> 💬 **Por que o pedido virou a entrada principal (16/ago/2026).** A primeira versão perguntava
+> *"o que a escola mandou?"* e só isso — o que assume uma escola organizada mandando PDF e áudio no
+> grupo. Mãe que simplesmente sabe que a filha precisa treinar tabuada não tinha o que anexar, e
+> ficava de fora da feature inteira. Agora o campo de texto vem primeiro e o material é opcional; o
+> **pedido manda no recorte, o material manda no conteúdo**, e o prompt tem três modos (só pedido,
+> só material, os dois). Os planos que nascem só do pedido gravam `origem = 'pedido'` — e entram
+> na mesma cota diária de IA, senão o caminho mais barato de todos seria o único sem teto.
 
 > 🔗 O link velho `#/planos` continua funcionando: `main.js` tem um alias explícito que reescreve
 > pra `#/mesa`. Cair no fallback do router seria pior que 404 — ele mandaria o pai pro Início sem
 > avisar.
 
-**Nada que a IA leu chega ao robô sem o pai ver.** O plano vindo de material nasce com
+**Nada que a IA propôs chega ao robô sem o pai ver.** O plano vindo de material (ou de pedido) nasce com
 `status = 'rascunho'`, e o servidor já ignora tudo que não é `ativo`/`em_andamento` — a trava
 inteira custou **zero linha** de comportamento novo no robô. Aprovar é mudar o status, que o site
 já sabia fazer.
@@ -400,7 +409,7 @@ Faltando qualquer uma, a função responde **503** com mensagem clara em vez de 
 | `js/dashboard/mapa-timeline.js` | A linha do tempo da aula (marcadores em HTML/CSS, cada um um `<button>`) |
 | `js/dashboard/dnd.js` | **Drag and drop do quadro** (Pointer Events à mão, com teclado e `aria-live`) |
 | `js/dashboard/mesa-realtime.js` | **O quadro ao vivo**: canal do Supabase, fila durante o arraste, degradação |
-| `js/dashboard/captura.js` | **Material → plano**: as quatro entradas, a bandeja e o orçamento |
+| `js/dashboard/captura.js` | **Pedido/material → plano**: o campo do pedido, as quatro entradas de material, a bandeja e o orçamento |
 | `js/dashboard/revisao.js` | A tela de revisão (o pai confere e edita antes de qualquer coisa valer) |
 | `js/dashboard/material/` | Cada formato virando item: `index` (dispatcher), `orcamento`, `imagem`, `zip`, `ooxml`, `texto`, `audio`, `gravador`, `video`, `wav`, `bytes` |
 | `api/plano-de-material.mjs` | **Vercel Function** que lê o material com IA (a única coisa fora do navegador) |
@@ -488,7 +497,7 @@ Cogni Software/
 ├── dashboard.html          # Painel Companion (app dos pais)
 │
 ├── api/                    # Vercel Functions (site estático + 1 função)
-│   ├── plano-de-material.mjs # Material da escola → plano com tarefas, por IA
+│   ├── plano-de-material.mjs # Pedido do pai e/ou material da escola → plano, por IA
 │   └── _lib/               # Peças dela (o "_" impede virar rota): auth, itens,
 │                           #   openai, prompt, sanear, http
 │

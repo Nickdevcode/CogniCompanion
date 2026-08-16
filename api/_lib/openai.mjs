@@ -179,7 +179,7 @@ function recusouArquivo(err) {
   );
 }
 
-async function disparar(chave, modelo, conteudoUsuario, hoje, crianca, formato) {
+async function disparar(chave, modelo, conteudoUsuario, hoje, crianca, formato, fonte) {
   const resp = await buscar(
     "https://api.openai.com/v1/chat/completions",
     {
@@ -188,7 +188,7 @@ async function disparar(chave, modelo, conteudoUsuario, hoje, crianca, formato) 
       body: JSON.stringify({
         model: modelo,
         messages: [
-          { role: "system", content: systemPrompt(hoje, crianca) },
+          { role: "system", content: systemPrompt(hoje, crianca, fonte) },
           { role: "user", content: conteudoUsuario },
         ],
         max_completion_tokens: MAX_TOKENS_SAIDA,
@@ -232,19 +232,31 @@ async function disparar(chave, modelo, conteudoUsuario, hoje, crianca, formato) 
  * refaz UMA vez com `json_object`. O schema também está descrito no prompt, então a
  * resposta continua utilizável — e o `sanear` valida tudo de novo do outro lado.
  */
-async function tentarComModelo(chave, modelo, itens, hoje, crianca) {
-  const conteudo = mensagemDoUsuario(itens);
+async function tentarComModelo(chave, modelo, itens, hoje, crianca, pedido) {
+  const conteudo = mensagemDoUsuario(itens, pedido);
+  // O modo do prompt segue os itens DESTA tentativa, não os da chamada: no degrau
+  // "seguindo sem o PDF" o material pode ter acabado, e aí a regra que vale é a do
+  // plano feito só de pedido.
+  const fonte = { pedido, temMaterial: itens.length > 0 };
   try {
-    return await disparar(chave, modelo, conteudo, hoje, crianca, {
-      type: "json_schema",
-      json_schema: { name: "plano_do_material", strict: true, schema: SCHEMA },
-    });
+    return await disparar(
+      chave,
+      modelo,
+      conteudo,
+      hoje,
+      crianca,
+      {
+        type: "json_schema",
+        json_schema: { name: "plano_do_material", strict: true, schema: SCHEMA },
+      },
+      fonte
+    );
   } catch (err) {
     const recusouSchema =
       err.status === 400 && /response_format|json_schema/i.test(err.corpo || "");
     if (!recusouSchema) throw err;
     console.warn("[plano-de-material] json_schema recusado; caindo pra json_object.");
-    return disparar(chave, modelo, conteudo, hoje, crianca, { type: "json_object" });
+    return disparar(chave, modelo, conteudo, hoje, crianca, { type: "json_object" }, fonte);
   }
 }
 
@@ -262,35 +274,42 @@ async function tentarComModelo(chave, modelo, itens, hoje, crianca) {
  *
  * @returns {Promise<{cru:object, aviso:string|null}>}
  */
-export async function lerMaterial(chave, { itens, hoje, crianca }) {
+export async function lerMaterial(chave, { itens, hoje, crianca, pedido = "" }) {
   const temPdf = itens.some((i) => i.tipo === "pdf");
 
   try {
-    return { cru: await tentarComModelo(chave, MODELO, itens, hoje, crianca), aviso: null };
+    return {
+      cru: await tentarComModelo(chave, MODELO, itens, hoje, crianca, pedido),
+      aviso: null,
+    };
   } catch (err) {
     if (!temPdf || err instanceof FalhaSuave || !recusouArquivo(err)) throw err;
 
     console.warn("[plano-de-material] PDF recusado pelo modelo; tentando o fallback.");
     try {
       return {
-        cru: await tentarComModelo(chave, MODELO_FALLBACK_PDF, itens, hoje, crianca),
+        cru: await tentarComModelo(chave, MODELO_FALLBACK_PDF, itens, hoje, crianca, pedido),
         aviso: null,
       };
     } catch (err2) {
       if (err2 instanceof FalhaSuave || !recusouArquivo(err2)) throw err2;
 
       const semPdf = itens.filter((i) => i.tipo !== "pdf");
-      if (!semPdf.length) {
+      // Sem o PDF pode não sobrar material nenhum — e aí o pedido escrito ainda
+      // salva o plano, em vez de o pai perder tudo por causa de um arquivo.
+      if (!semPdf.length && !pedido) {
         throw new FalhaSuave(
           "Não consegui abrir esse PDF. Tente tirar foto das páginas da lição e mandar as fotos."
         );
       }
       console.warn("[plano-de-material] Seguindo sem o PDF.");
       return {
-        cru: await tentarComModelo(chave, MODELO, semPdf, hoje, crianca),
-        aviso:
-          "Não consegui abrir o PDF, então montei o plano com o resto do material. " +
-          "Se a lição está no PDF, tire foto das páginas e mande de novo.",
+        cru: await tentarComModelo(chave, MODELO, semPdf, hoje, crianca, pedido),
+        aviso: semPdf.length
+          ? "Não consegui abrir o PDF, então montei o plano com o resto do material. " +
+            "Se a lição está no PDF, tire foto das páginas e mande de novo."
+          : "Não consegui abrir o PDF, então montei o plano só com o que você escreveu. " +
+            "Se a lição está no PDF, tire foto das páginas e mande de novo.",
       };
     }
   }

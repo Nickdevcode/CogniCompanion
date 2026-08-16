@@ -22,14 +22,21 @@
  * foto, PDF, Word, slides, planilha, áudio e vídeo: é material de menor de idade, e
  * o dado que sobra é o mínimo necessário pro pai auditar o que a IA entendeu.
  *
+ * ⭐ 16/ago/2026 — **o material virou opcional.** O responsável pode simplesmente
+ * escrever o que quer que a criança estude (`pedido`), com ou sem material junto. A
+ * escola não é a única a ter plano pra criança, e a mãe que sabe o que a filha
+ * precisa treinar não tinha por onde dizer isso. Regras do prompt por modo em
+ * `_lib/prompt.mjs`.
+ *
  * Contrato (docs/COMPANION-PLANO-TECNICO.md → "📎 Rodada 2"):
  *   POST /api/plano-de-material
  *     headers: Authorization: Bearer <supabase access_token>
- *     body: { hoje: "2026-08-16", itens: [
+ *     body: { hoje: "2026-08-16", pedido: "revisar a tabuada do 7", itens: [
  *       { tipo:"imagem", nome, dados:"data:image/jpeg;base64,…" },
  *       { tipo:"pdf",    nome, dados:"data:application/pdf;base64,…" },
  *       { tipo:"texto",  nome, formato:"docx"|"pptx"|"xlsx"|"txt", texto:"…" },
  *       { tipo:"audio",  nome, mime, dados:"data:audio/webm;base64,…", duracao_s } ] }
+ *       (`itens` pode vir vazio se houver `pedido`, e vice-versa — os dois vazios = 400)
  *     → 200 { legivel, titulo, conteudo, foco, duracao_dias, extraido_texto,
  *             truncado, aviso, tarefas: [{ titulo, detalhe, materia, prazo,
  *             estimativa_min, confianca }] }
@@ -94,7 +101,7 @@ export default async function handler(req, res) {
     }
 
     /* Trava 5 — forma e tamanho de cada item, e do corpo inteiro. */
-    const { itens, hoje } = validarCorpo(corpo);
+    const { itens, hoje, pedido } = validarCorpo(corpo);
 
     /* Trava 3 — tem criança pareada? (a RLS é quem responde) */
     const crianca = await criancaPareada(token, uid, env);
@@ -122,16 +129,38 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!prontos.length) {
+    /**
+     * O áudio emudeceu tudo que havia. Com pedido escrito ainda dá pra montar o
+     * plano — e o pai precisa saber que o áudio dele não entrou, senão ele acha que
+     * a Cogni ouviu e discordou.
+     */
+    if (!prontos.length && !pedido) {
       return responder(res, 200, {
         legivel: false,
         motivo:
           "Não ouvi nada nesse áudio. Grave mais perto de quem está falando, num lugar mais silencioso.",
       });
     }
+    const audioMudo = itens.length > 0 && !prontos.length;
 
-    const { cru, aviso } = await lerMaterial(OPENAI_API_KEY, { itens: prontos, hoje, crianca });
-    return responder(res, 200, sanear(cru, aviso));
+    const { cru, aviso } = await lerMaterial(OPENAI_API_KEY, {
+      itens: prontos,
+      hoje,
+      crianca,
+      pedido,
+    });
+    return responder(
+      res,
+      200,
+      sanear(cru, {
+        aviso:
+          aviso ||
+          (audioMudo
+            ? "Não ouvi nada no áudio, então montei o plano só com o que você escreveu."
+            : null),
+        temMaterial: prontos.length > 0,
+      })
+    );
   } catch (err) {
     if (err instanceof ErroHttp) {
       return responder(res, err.status, { erro: err.message });

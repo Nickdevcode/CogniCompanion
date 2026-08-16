@@ -29,17 +29,40 @@ function grampear(valor, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
-const MOTIVO_PADRAO =
-  "Não consegui ler esse material. Tente de novo com a folha inteira no quadro e boa luz.";
+/**
+ * Os textos-padrão dependem de ter havido material.
+ *
+ * Um plano pedido por escrito que dá errado não pode devolver "tente com a folha
+ * inteira no quadro e boa luz" — a mãe não fotografou nada, e uma mensagem que não
+ * corresponde ao que ela fez é o jeito mais rápido de ensinar alguém a ignorar as
+ * nossas mensagens.
+ */
+const PADROES = {
+  material: {
+    motivo:
+      "Não consegui ler esse material. Tente de novo com a folha inteira no quadro e boa luz.",
+    titulo: "Atividades da escola",
+    semTarefa: "Consegui ver o material, mas não achei nenhuma tarefa escrita nele.",
+  },
+  pedido: {
+    motivo:
+      "Não consegui montar um plano com esse pedido. Tente dizer o assunto e o que você quer que ela faça.",
+    titulo: "Plano de estudos",
+    semTarefa:
+      "Não consegui virar esse pedido em tarefas. Tente dizer o assunto e o que você quer que ela faça.",
+  },
+};
 
 /**
  * @param {object} cru — o JSON que a IA devolveu
- * @param {string|null} [aviso] — recado do pipeline (ex.: o PDF ficou de fora)
+ * @param {{aviso?:string|null, temMaterial?:boolean}} [ctx]
  * @returns {object} a resposta 200 final
  */
-export function sanear(cru, aviso = null) {
+export function sanear(cru, { aviso = null, temMaterial = true } = {}) {
+  const padrao = temMaterial ? PADROES.material : PADROES.pedido;
+
   if (!cru || cru.legivel === false) {
-    return { legivel: false, motivo: cortar(cru?.motivo, 240) || MOTIVO_PADRAO };
+    return { legivel: false, motivo: cortar(cru?.motivo, 240) || padrao.motivo };
   }
 
   const brutas = Array.isArray(cru.tarefas) ? cru.tarefas : [];
@@ -73,15 +96,12 @@ export function sanear(cru, aviso = null) {
 
   // Sem nenhum título legível, o "legível" que a IA declarou não se sustenta.
   if (!tarefas.length) {
-    return {
-      legivel: false,
-      motivo: "Consegui ver o material, mas não achei nenhuma tarefa escrita nele.",
-    };
+    return { legivel: false, motivo: padrao.semTarefa };
   }
 
   return {
     legivel: true,
-    titulo: cortar(cru.titulo, LIM.titulo) || "Atividades da escola",
+    titulo: cortar(cru.titulo, LIM.titulo) || padrao.titulo,
     conteudo: cortar(cru.conteudo, LIM.conteudo),
     // Fallback pra matéria da primeira tarefa (e não "outros"): se a IA classificou
     // as tarefas, ela já disse do que o plano trata.
