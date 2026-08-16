@@ -22,11 +22,39 @@ import { renderInicio } from "./sections/inicio.js";
 import { renderConversas } from "./sections/conversas.js";
 import { renderAprendizado } from "./sections/aprendizado.js";
 import { renderMapa } from "./sections/mapa.js";
-import { renderPlanos } from "./sections/planos.js";
+import { renderMesa } from "./sections/mesa.js";
 import { renderRosto } from "./sections/rosto.js";
 import { renderConfig } from "./sections/config.js";
 
 const LOGIN_URL = "login.html";
+
+/**
+ * Rotas que mudaram de nome (chave velha → chave nova).
+ *
+ * "Planos" virou "Mesa de Estudos" em ago/2026. Link velho no histórico do pai não
+ * pode dar 404 — e cair no fallback do router seria pior que 404: ele manda hash
+ * desconhecido pro `DEFAULT_ROUTE` ("inicio"), então `#/planos` levaria o pai
+ * silenciosamente pra tela errada. Por isso o alias é explícito.
+ */
+const ALIAS_ROTA = { planos: "mesa" };
+
+/**
+ * Reescreve o hash quando ele aponta pra uma rota que mudou de nome.
+ *
+ * Roda ANTES do handler do router (o listener daqui é registrado antes do
+ * `router.start()`), e `history.replaceState` não dispara um novo `hashchange` —
+ * então o `handleRoute()` do router já lê o hash novo e marca o link certo como
+ * ativo. `replaceState` (e não `location.hash = …`) pra não empilhar histórico:
+ * o botão "voltar" ficaria preso alternando entre as duas grafias da mesma tela.
+ */
+function normalizarRota() {
+  const chave = (window.location.hash || "")
+    .replace(/^#\/?/, "")
+    .split("/")[0]
+    .toLowerCase();
+  const destino = ALIAS_ROTA[chave];
+  if (destino) window.history.replaceState(null, "", "#/" + destino);
+}
 
 /**
  * A URL do servidor local mudou de casa: agora mora em `servidor.js`, junto dos
@@ -198,9 +226,14 @@ async function init() {
   router.register("conversas", renderConversas);
   router.register("aprendizado", renderAprendizado);
   router.register("mapa", renderMapa);
-  router.register("planos", renderPlanos);
+  router.register("mesa", renderMesa);
   router.register("rosto", renderRosto);
   router.register("config", renderConfig);
+
+  // Alias antes do router: assim o `start()` e todo `hashchange` já enxergam a
+  // rota nova, e nem o router nem as seções precisam saber que houve rename.
+  window.addEventListener("hashchange", normalizarRota);
+  normalizarRota();
 
   router.start();
 }

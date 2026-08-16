@@ -50,7 +50,7 @@
     <link rel="stylesheet" href="css/dashboard-conversas.css" />
     <link rel="stylesheet" href="css/dashboard-aprendizado.css" />
     <link rel="stylesheet" href="css/dashboard-mapa.css" />
-    <link rel="stylesheet" href="css/dashboard-planos.css" />
+    <link rel="stylesheet" href="css/dashboard-mesa.css" />
     <link rel="stylesheet" href="css/dashboard-rosto.css" />
     <link rel="stylesheet" href="css/dashboard-config.css" />
     <link rel="stylesheet" href="css/dashboard-onboarding.css" />
@@ -124,11 +124,15 @@
             </span>
             <span>Mapa da aula</span>
           </a>
-          <a href="#/planos" class="dash-nav__link" data-dash-link="planos">
+          <!-- Mesa de Estudos (era "Planos"): o plano deixou de ser um parágrafo e
+               virou um quadro de tarefas que o pai arrasta e a Cogni move sozinha.
+               Daí o ícone de colunas no lugar do calendário. `#/planos` continua
+               funcionando por alias (ver ALIAS_ROTA em main.js). -->
+          <a href="#/mesa" class="dash-nav__link" data-dash-link="mesa">
             <span class="dash-nav__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5" /><path d="M3.5 9.5h17M8 3v4M16 3v4" /></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.5" /><path d="M9 4.5v15M15 4.5v15" /></svg>
             </span>
-            <span>Planos</span>
+            <span>Mesa de Estudos</span>
           </a>
           <!-- Única seção do painel feita pra CRIANÇA usar (ver sections/rosto.js). -->
           <a href="#/rosto" class="dash-nav__link" data-dash-link="rosto">
@@ -243,11 +247,12 @@
             </span>
             <span class="dash-tabbar__label">Mapa</span>
           </a>
-          <a href="#/planos" class="dash-tabbar__link" data-dash-link="planos">
+          <a href="#/mesa" class="dash-tabbar__link" data-dash-link="mesa">
             <span class="dash-tabbar__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5" /><path d="M3.5 9.5h17M8 3v4M16 3v4" /></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.5" /><path d="M9 4.5v15M15 4.5v15" /></svg>
             </span>
-            <span class="dash-tabbar__label">Planos</span>
+            <!-- Rótulo curto: são 7 abas e a tab bar precisa caber em 320px. -->
+            <span class="dash-tabbar__label">Mesa</span>
           </a>
           <a href="#/rosto" class="dash-tabbar__link" data-dash-link="rosto">
             <span class="dash-tabbar__icon" aria-hidden="true">

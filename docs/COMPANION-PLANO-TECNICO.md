@@ -54,7 +54,7 @@ A regra de ouro: **as duas pontas programam contra o contrato de dados deste doc
 ## 🗂️ Escopo do MVP (o que entra de verdade)
 
 ### Telas do dashboard
-Sidebar: **Início · Conversas · Aprendizado · Mapa da aula · Planos · Rosto da Cogni · Configurações** (a "Família" foi fundida em Configurações: o item da sidebar chama "Configurações", o título da tela continua "Configurações da família"). Entrada: badge de logado → dropdown → **Dashboard**.
+Sidebar: **Início · Conversas · Aprendizado · Mapa da aula · Mesa de Estudos · Rosto da Cogni · Configurações** (a "Família" foi fundida em Configurações: o item da sidebar chama "Configurações", o título da tela continua "Configurações da família"). Entrada: badge de logado → dropdown → **Dashboard**.
 
 > Os dois últimos itens nasceram depois do Figma e ficaram **fora** de Configurações de propósito: **Rosto da Cogni** (jul/2026) e **Mapa da aula** (ago/2026) são as duas contribuições que a banca precisa ver, e enterrá-las num submenu as esconderia. A tab bar do mobile aguenta os 7 itens até em 320px (verificado).
 
@@ -67,7 +67,7 @@ Sidebar: **Início · Conversas · Aprendizado · Mapa da aula · Planos · Rost
 | 🏠 **Início** | Tempo de uso do dia, última conversa, próximo plano, resumo da semana (**sem conquistas**), Dica do Cogni (IA) | Tempo de uso = soma da duração das conversas. Dica = IA 1×/dia com base em memórias + tópicos recentes |
 | 🗣️ **Conversas** | Timeline por dia; cada conversa com **matéria** + **horário**; balões criança/Cogni; filtro de **tópicos sensíveis**; busca + filtro por matéria | Gravado a cada turno (ver Diário). Sensível = a **IA** marca (bullying, tristeza, medo… mesmo sem palavra-chave) + `verificarEntrada()` do `safety.js` como rede de segurança |
 | 📚 **Aprendizado** | Tempo por matéria, **Trilha de aprendizado** (praticando × já domina), tópicos explorados, gráfico de evolução (min/dia), **Dicas da Cogni** (era "Curiosidades da criança"), contadores (**sem conquistas**) | Tempo por matéria/gráfico = soma das durações por matéria. Trilha = `criancas.progresso` (ver seção própria; read-only pro site). Tópicos = extraídos das conversas. **Dicas da Cogni** = dica atual (`/api/dica`) + histórico (tabela `dicas`). As "curiosidades da criança" (frases tipo "perguntou 4× sobre X") foram **aposentadas** (jun/2026) — a seção virou Dicas da Cogni |
-| ✏️ **Planos** | Lista (Ativos/Todos/Concluídos) + criar/editar. Campos: título, conteúdo, foco, duração (dias), status | O **pai digita**. O plano ativo é injetado no system prompt da Cogni |
+| 🗒️ **Mesa de Estudos** (era "Planos") ⭐ | Plano (título, conteúdo, foco, duração, status) **+ quadro Kanban** com drag and drop **+ criar plano a partir de uma FOTO** da agenda/atividade | Três fontes: o pai **digita**, a **IA lê a foto** (e o pai aprova), e a **Cogni move os cards** conversando. O plano ativo e o quadro são injetados no system prompt |
 | ⚙️ **Configurações** (inclui "Família") | Perfil da criança pareada → detalhe (ver/editar infos + prompt personalizado); conta; tema; status da conexão do robô | Edição bidirecional do perfil (pai edita no site, robô capta por voz — os dois mexem no mesmo registro). O pai pode preencher infos antes mesmo do robô captar. **Editar o perfil no site já conta como onboarding feito**: a Cogni não refaz as perguntas de apresentação (ver instrumentação). Desde ago/2026 bastam **idade e série** pra isso — os demais campos a Cogni aprende conversando, sem perguntar |
 | 📬 **Resumo Semanal** | Bilhete carinhoso por IA | IA resume as conversas da semana (depende do Diário; feito por último) |
 
@@ -159,10 +159,38 @@ Um dado, três coelhos. 🎯
 | `conteudo` | text | texto livre injetado no system prompt |
 | `foco` | text | matéria (mesma lista de `conversas.materia` — agora **14** valores) |
 | `duracao_dias` | int | |
-| `status` | text | `ativo` \| `em_andamento` \| `pausado` \| `concluido`. A Cogni **segue** (injeta no prompt) só os planos `ativo` **ou** `em_andamento`; `pausado`/`concluido` ela ignora |
+| `status` | text | `rascunho` \| `ativo` \| `em_andamento` \| `pausado` \| `concluido`. A Cogni **segue** (injeta no prompt) só os planos `ativo` **ou** `em_andamento`; os outros ela ignora. ⭐ `rascunho` (ago/2026) é o plano que a IA montou de uma foto e o pai **ainda não aprovou** — ver "🧩 Mesa de Estudos" |
+| `origem` | text | ⭐ NOVO (ago/2026) `manual` (default) \| `foto`. Só serve pra tela dizer "criado a partir de uma foto" e pro rate limit da geração |
+| `extraido_texto` | text | ⭐ NOVO (ago/2026) a transcrição literal do que a IA leu na foto. **Auditoria**: o pai confere o que ela entendeu sem precisar da imagem — que não é guardada em lugar nenhum |
 | `criado_em` / `atualizado_em` | timestamptz | `criado_em` define a expiração: um plano vence quando `criado_em + duracao_dias` já passou (1 dia dura 1 dia). Plano vencido a Cogni para de cobrar, mesmo que o status ainda esteja `ativo`. `duracao_dias` null/0 = sem prazo |
 
 Índice parcial: `(crianca_id) where status = 'ativo'`.
+
+### `plano_tarefas` — os cards do quadro ⭐ NOVO (ago/2026)
+
+> Os cards da **Mesa de Estudos**. É a tabela que transforma o plano de um parágrafo num progresso: três colunas (`a_fazer` · `fazendo` · `feito`), o pai arrasta, e **a Cogni move sozinha** enquanto conversa com a criança. Ver a seção "🧩 Mesa de Estudos" para as regras.
+
+| Coluna | Tipo | Notas |
+| --- | --- | --- |
+| `id` | bigint identity PK | |
+| `plano_id` | bigint | FK → planos_estudo(id), on delete cascade |
+| `crianca_id` | text | FK → criancas(id), on delete cascade. **Desnormalizado de propósito**: deixa a RLS barata e o servidor lê o quadro sem join |
+| `titulo` | text NOT NULL | o card. Teto útil **120** |
+| `detalhe` | text | a linha de baixo ("páginas 42 e 43"). Teto útil **240** |
+| `materia` | text | uma das **14** canônicas; `null` = herda o `foco` do plano |
+| `coluna` | text NOT NULL | `a_fazer` (default) \| `fazendo` \| `feito`. Valor desconhecido o servidor lê como `a_fazer` — card que aparece na coluna errada é visível; card que some é silencioso |
+| `ordem` | double precision NOT NULL | posição na coluna. **Fracionária** (gap de 1000): soltar entre dois cards grava a média dos vizinhos = **1 UPDATE por movimento**, não a coluna inteira |
+| `prazo` | date | quando a IA acha data na foto ("entregar terça") |
+| `estimativa_min` | int | sugestão da IA |
+| `origem` | text NOT NULL | `pai` (default) \| `ia_foto` \| `cogni` |
+| `movida_por` | text | `null` \| `cogni` — quem fez a **última troca de coluna**. É o que acende o selo ✨ e o botão Desfazer na tela |
+| `movida_em` | timestamptz | |
+| `evidencia` | jsonb | **por que** a Cogni moveu: `{motivo, conceito?, acertos?, trecho?, em}`. `motivo` ∈ `conversa` \| `pratica` \| `fala` |
+| `confianca` | real | 0..1 da extração por foto (`null` = digitado pelo pai). Abaixo de **0.6** a tela marca "confira" |
+| `concluida_em` | timestamptz | acompanha a coluna: sair de `feito` limpa |
+| `criado_em` / `atualizado_em` | timestamptz | default now() |
+
+Índices: `(plano_id, coluna, ordem)` e `(crianca_id, atualizado_em desc)`.
 
 ### `dicas` — histórico das Dicas da Cogni
 > A "Dica do Cogni" da tela Início é gerada por IA (cache curto de 1h no servidor). Cada dica gerada é **guardada** aqui (só se diferente da última) pra o Companion listar o histórico na tela **"Dicas da Cogni"** (a antiga "Curiosidades da criança", em Aprendizado).
@@ -275,6 +303,7 @@ Todas as tabelas com RLS **habilitado** e default-deny. O `service_role` (servid
 - **dicas**: pai só **lê** (SELECT) as dicas dos próprios filhos; **não escreve** (só o servidor grava). Mesma policy de `conversas`.
 - **sessoes_atencao**: pai só **lê** (SELECT) as sessões dos próprios filhos; **não escreve** (só o servidor grava). Mesma policy de `conversas`.
 - **planos_estudo**: pai vê/cria/edita planos dos próprios filhos.
+- **plano_tarefas** ⭐ (ago/2026): **mesma policy de `planos_estudo`** — pai vê/cria/edita/apaga as tarefas dos próprios filhos. É a segunda (e última) tabela em que o site escreve. O servidor também escreve aqui (service_role, bypassa RLS), mas **só a coluna** — ver "🧩 Mesa de Estudos".
 - **pareamento**: não há tabela exposta. O código mora em `criancas.codigo_pareamento` e o vínculo (setar `responsavel_id`) é feito **só pelo servidor** (service_role, via `POST /api/pareamento/vincular`) — o site nunca escreve esse campo direto.
 
 `on delete cascade` nas FKs = **direito ao esquecimento** (apagar a criança apaga conversas e planos).
@@ -290,6 +319,8 @@ O site lê/escreve via `@supabase/supabase-js` (anon key, já carregado nos HTML
 - **Ler conversas (Diário):** `from('conversas').select('*').eq('crianca_id', id).order('criado_em', { ascending: false })`. Agrupar por dia no front. Filtro de matéria = `.eq('materia', x)`; tópicos sensíveis = `.eq('sensivel', true)`.
 - **Aprendizado:** derivar do `select` de `conversas` (somar `duracao_ms` por `materia` e por dia) + ler `idiomas_estudando`/`memorias` do perfil. **Tópicos explorados:** usar a coluna `topico` (preenchida pelo servidor; `null` = papo sem assunto) → lista de `topico` distintos. As **"curiosidades da criança"** (agrupar `topico` e contar, ex: "perguntou 4× sobre dinossauros") foram **aposentadas** (jun/2026): aquela seção da tela Aprendizado virou **"Dicas da Cogni"** (ver Dica do Cogni / Histórico de dicas acima). O `topico` continua alimentando "Tópicos explorados" e o Resumo Semanal.
 - **Planos:** CRUD em `planos_estudo` (o pai escreve direto; RLS protege).
+- **Quadro da Mesa de Estudos** ⭐ (ago/2026): CRUD em `plano_tarefas`, mesma forma. `from('plano_tarefas').select('*').eq('crianca_id', id).order('coluna').order('ordem')`. Duas regras que não estão em código: (1) toda escrita aqui também chama `pingPlanosAtualizados()` — o plano B do Realtime vale igual pros cards; (2) **assine o Realtime desta tabela** enquanto a tela estiver montada, senão o pai não vê a Cogni mover os cards (é a parte que impressiona).
+- **Gerar plano a partir de foto** ⭐ (ago/2026): **não** é o servidor local — é uma **Vercel Function do próprio site** (`POST /api/plano-de-imagem`). O servidor da Cogni é `127.0.0.1`, ou seja, do celular do pai ele não existe; a feature morreria fora de casa. Ver "🧩 Mesa de Estudos" para o contrato e as travas de segurança.
 - **Resumo Semanal:** **não** é Supabase — é um endpoint do servidor (a chave da OpenAI vive só lá). O site faz `GET {SERVIDOR}/api/resumo-semanal?criancaId=<id>` e recebe `{ resumo, periodoDias, totalConversas, materias, topicos, vazio }`. O servidor lê as conversas dos últimos 7 dias e gera o bilhete com IA, sob demanda (quando o pai abre a tela). `vazio: true` = sem conversas na semana (o `resumo` já vem com uma mensagem amigável). `{SERVIDOR}` = a URL do servidor local da Cogni (ex: `http://localhost:3000`).
 - **Dica do Cogni (tela Início):** endpoint do servidor (IA + chave da OpenAI). O site faz `GET {SERVIDOR}/api/dica?criancaId=<id>` e recebe `{ dica, deCache, vazio }`. A IA gera **uma** dica curta e acionável pros pais, com base nas memórias + tópicos recentes da criança. **Cache curto de 1h** no servidor (reflete a conversa recente sem gerar a cada reload — antes era 1 dia, dava "delay"). `deCache: true` = veio do cache; `vazio: true` = perfil sem dados ainda (dica genérica amigável). `?forcar=1` ignora o cache. Cada dica gerada é **guardada na tabela `dicas`** (só se diferente da última).
 - **Histórico de dicas (tela "Dicas da Cogni", em Aprendizado):** o site **lê direto do Supabase** (RLS), igual conversas: `from('dicas').select('*').eq('crianca_id', id).order('criado_em', { ascending: false })`. A dica **atual** (destaque) vem do `GET /api/dica`; o **histórico** (lista) vem desse select. Essa tela é a antiga "Curiosidades da criança", renomeada pra **"Dicas da Cogni"**.
@@ -368,11 +399,11 @@ Cada função: **eu (backend) → atualizo o contrato → Claude do site (tela) 
 - **Marcar sensível:** ✅ **feito.** A **IA** pós-resposta (`brain/memoria-ai.js`, a mesma chamada que extrai memória/tópico) devolve `sensivel` (entende nuance: bullying, tristeza, medo, sem precisar de palavra-chave). O `pipelinePosResposta` grava `sensivel = IA || verificarEntrada()` (regex do `safety.js` como rede de segurança). Sensível **marca pro pai**, não bloqueia (o bloqueio é só pro conteúdo realmente impróprio).
 - **Classificar matéria:** ✅ **feito.** A **IA** pós-resposta também classifica a `materia` (mais precisa que regex). O `brain/materia.js` (regex) é só fallback quando a IA não classifica. Grava no insert (regex) e a IA enriquece via UPDATE (`atualizarConversaPosIA` em `supabase.js`).
 - **Onboarding inteligente:** ✅ **feito.** `brain/memoria-ai.js` → `camposEssenciaisFaltantes(usuario)`/`temEssenciais(usuario)` (idade, série, hobbies, comoAprende). Se o pai preencheu tudo no site, o `verificarOnboarding` fecha a flag na hora e o `blocoOnboarding` (prompt.js) vira no-op — a Cogni **não refaz** as perguntas nem sobrescreve. Se faltam campos, ela pergunta **só os que faltam**.
-- **Injetar plano no prompt:** ✅ **feito.** `server/modules/planos.js` faz cache RAM do plano ativo por criança — `obterPlanoAtivo(id)` é leitura **síncrona** (robô não trava), `hidratarPlanos()` pré-carrega no boot. O `blocoPlanoEstudo(usuario, plano, gancho)` em `prompt.js` injeta título+foco+conteúdo (tom roteiro-não-prisão) via `extras.plano`, só pro estudante. Conta `status` `ativo` **ou** `em_andamento`; **expira** por `criado_em + duracao_dias` (1 dia dura 1 dia → para de cobrar). **1 plano vigente por criança** (single-child); se houver vários, vale o mais recente por `atualizado_em`. **Propagação e proatividade foram refeitas em ago/2026 — ver a seção própria abaixo.**
+- **Injetar plano no prompt:** ✅ **feito.** `server/modules/planos.js` faz cache RAM do plano ativo por criança — `obterPlanoAtivo(id)` é leitura **síncrona** (robô não trava), `hidratarPlanos()` pré-carrega no boot. O `blocoPlanoEstudo(usuario, plano, gancho)` em `prompt.js` injeta título+foco+conteúdo (tom roteiro-não-prisão) via `extras.plano`, só pro estudante. Conta `status` `ativo` **ou** `em_andamento`; **expira** por `criado_em + duracao_dias` (1 dia dura 1 dia → para de cobrar). **1 plano vigente por criança** (single-child); se houver vários, vale o mais recente por `atualizado_em`. **Propagação e proatividade foram refeitas em ago/2026 — ver a seção própria abaixo.** ⭐ Desde 15/ago o plano vem com o **quadro** (`plano_tarefas`) embutido na mesma query, `obterTarefas(id)` lê do mesmo cache síncrono, e `moverTarefa()` é a **única escrita** do servidor nessa área — ver "🧩 Mesa de Estudos".
 - **Dica do Cogni:** ✅ **feito.** `server/modules/brain/dica.js` (novo) → `gerarDicaDoCogni({openai, modelo}, criancaId)`, exposto em `GET /api/dica?criancaId=`. IA gera uma dica curta e acionável pros pais com base em memórias + tópicos recentes. **Cache RAM curto de 1h** por criança (antes era 1 dia, dava "delay" — agora reflete a conversa recente sem regerar a cada reload); `?forcar=1` ignora o cache. Cada dica gerada é guardada na tabela `dicas` (só se diferente da última).
 - **Personalização do responsável:** ✅ **feito (ago/2026).** `blocoPromptPersonalizado()` em `brain/prompt.js` injeta `prompt_personalizado` no system prompt (bloco delimitado + ponteiro no recap final), e `brain/perfil-campos.js` é o dicionário único de série/matéria entre o site e a IA do robô. Ver "✍️ A ponte do perfil". Antes disto o campo era gravado e **nunca lido**.
 - **Camada de dados:** `server/modules/memoria.js` (cache + fila por usuário `filasPorUsuario` + `atualizarUsuario` async já existem — reaproveitar pro merge robô↔pai).
-- **Sync de volta (Supabase → robô):** ✅ **feito.** Antes a hidratação só rodava no **boot** — o que o pai editava no site nunca voltava pro cache do robô (ele refazia o onboarding por cima). Agora há 3 caminhos, com **degradação graciosa** (se um falha, o outro cobre): (a) `refrescarUsuario(id)` fire-and-forget no início de cada conversa (`brain.js`), traz a edição do pai pro turno seguinte; (b) `carregarUsuarioFresco(id)` **awaited** — só quando o perfil do cache parece incompleto (perfil novo / sem essenciais), garante que o **1º turno** já use o que o pai configurou, sem refazer onboarding; (c) **Realtime** do Supabase na tabela `criancas` (`iniciarRealtimeUsuarios` no boot) atualiza o cache **na hora** que o pai salva. Além disso, `GET /api/usuarios` chama `refrescarTodosUsuarios()` (puxa a lista fresca) pra um perfil **criado no site** aparecer na interface localhost sem reiniciar. **Regra de merge:** os campos que o pai edita (perfil, prompt, vínculo, `onboarding_completo`) vêm do Supabase; `memorias`/`idiomas_estudando`/`estilo` que o robô aprende são **preservados** (não sobrescritos). ⚠️ O Realtime exige habilitar a tabela `criancas` em *Database → Replication* no painel do Supabase — sem isso, só os caminhos (a)/(b) funcionam (suficientes, só não instantâneos).
+- **Sync de volta (Supabase → robô):** ✅ **feito.** Antes a hidratação só rodava no **boot** — o que o pai editava no site nunca voltava pro cache do robô (ele refazia o onboarding por cima). Agora há 3 caminhos, com **degradação graciosa** (se um falha, o outro cobre): (a) `refrescarUsuario(id)` fire-and-forget no início de cada conversa (`brain.js`), traz a edição do pai pro turno seguinte; (b) `carregarUsuarioFresco(id)` **awaited** — só quando o perfil do cache parece incompleto (perfil novo / sem essenciais), garante que o **1º turno** já use o que o pai configurou, sem refazer onboarding; (c) **Realtime** do Supabase na tabela `criancas` (`iniciarRealtimeUsuarios` no boot) atualiza o cache **na hora** que o pai salva. Além disso, `GET /api/usuarios` chama `refrescarTodosUsuarios()` (puxa a lista fresca) pra um perfil **criado no site** aparecer na interface localhost sem reiniciar. **Regra de merge:** os campos que o pai edita (perfil, prompt, vínculo, `onboarding_completo`) vêm do Supabase; `memorias`/`idiomas_estudando`/`estilo` que o robô aprende são **preservados** (não sobrescritos). ⚠️ O Realtime exige a tabela `criancas` **publicada** (*Database → Publications → `supabase_realtime`*; o item *Replication* do menu é outra coisa) — sem isso, só os caminhos (a)/(b) funcionam (suficientes, só não instantâneos).
 - **Ciência do Companion no prompt:** ✅ **feito.** `secaoCompanion()` em `brain/prompt.js`: a Cogni **sabe** o que é o app dos pais (acompanham conversas/tempo/tópicos, criam planos, recebem resumo semanal + dicas, pareiam por código) e responde dúvidas da criança com **honestidade e leveza** (acompanham pra apoiar, não pra vigiar). Só pro estudante.
 - **Boot/shutdown:** `server/index.js` (boot vira async com `await inicializar()` antes do `listen`; `flushSync` no shutdown).
 - **Flag/config:** `server/config.js` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_HABILITADO`).
@@ -639,7 +670,17 @@ Eram **dois** problemas somados, e a auditoria achou **três** causas:
 
 **Propagação — agora são quatro caminhos, em degradação graciosa** (se um falha, o de baixo cobre):
 
-1. **Realtime do Supabase** em `planos_estudo` (`iniciarRealtimePlanos()` em `planos.js`, espelhando o de `criancas`). O pai salva no site → o cache do robô muda **na hora**. Escuta `*` (INSERT/UPDATE/DELETE). ✅ **Já verificado no ar** — o canal sobe `SUBSCRIBED`, então a tabela já está habilitada em *Database → Replication*.
+1. **Realtime do Supabase** em `planos_estudo` (`iniciarRealtimePlanos()` em `planos.js`, espelhando o de `criancas`). O pai salva no site → o cache do robô muda **na hora**. Escuta `*` (INSERT/UPDATE/DELETE). ✅ **Já verificado no ar.**
+
+> [!warning] ⚠️ Correção (15/ago/2026): `SUBSCRIBED` **não prova** que a tabela está publicada
+> Esta seção dizia *"o canal sobe `SUBSCRIBED`, então a tabela já está habilitada"*. **É falso**, e foi verificado: ao assinar `plano_tarefas` quando a tabela **nem existia**, o canal subiu `SUBSCRIBED` do mesmo jeito. O `SUBSCRIBED` confirma só que o **canal** conectou — os `.on()` de tabelas não publicadas simplesmente nunca disparam, em silêncio, sem derrubar o canal nem os outros `.on()` dele.
+>
+> A única checagem confiável é no banco:
+> ```sql
+> select tablename from pg_publication_tables
+> where pubname = 'supabase_realtime' order by tablename;
+> ```
+> Na UI, o caminho é **Database → Publications → `supabase_realtime`**. (O item *Replication* do menu mudou de significado: hoje é read replicas / pipelines de analytics, e estar vazio ali é o normal.)
 2. **`garantirPlanoFresco(id)`** — awaited **com teto de 900ms** no **1º turno** de cada conversa. É o que faz um plano criado agora valer *nesta* conversa, e não na próxima. Estourou o tempo, segue com o cache (o princípio "o robô nunca fica refém da nuvem" continua valendo).
 3. **`refrescarPlanoAtivo(id)`** fire-and-forget nos demais turnos, e também na **troca de perfil** (`definirUsuarioAtivo`) e no **reset** (`limparConversa`).
 4. **`hidratarPlanos()`** no boot, como antes.
@@ -932,12 +973,197 @@ O prompt da extração mandava a IA converter *"3º do médio"* → `"12o ano"` 
 
 ---
 
+## 🧩 Mesa de Estudos (15/ago/2026) — a tela de Planos vira quadro vivo
+
+> [!important] 🔴 **A maior tarefa do site desde o Mapa da Aula.** Tela renomeada, rota nova, tabela nova, uma Vercel Function nova e um Kanban com drag and drop. O backend já está pronto e **já roda sem nada disso** (ver a válvula abaixo) — o site pode ir no seu ritmo sem quebrar o robô.
+
+### Por que a tela mudou de nome
+
+A tela de **Planos** fazia uma coisa só: o pai digitava um parágrafo e a Cogni seguia o assunto. Dois buracos de produto, e o Nicolas apontou os dois:
+
+| # | O buraco | Por que doía |
+| --- | --- | --- |
+| 1 | **Escrever plano dá trabalho** | O pai já tem a informação — está na agenda escolar, na folha de exercícios, no bilhete da professora. Ele só não quer digitar tudo de novo. Na prática, plano que dá trabalho não é criado |
+| 2 | **O plano era um parágrafo, não um progresso** | `conteudo` é texto corrido: ninguém sabe o que já foi feito, o que está rolando e o que falta. Nem o pai na tela, nem a Cogni no prompt. Ela ficava puxando "vamos de matemática?" quando podia puxar "e aqueles exercícios da página 42?" |
+
+O nome **Mesa de Estudos** (rota `#/mesa`) cobre as três coisas que a tela passa a fazer, e entra na mesma família de "Mapa da aula" e "Rosto da Cogni". `#/planos` continua funcionando com redirect — link velho no histórico do pai não pode dar 404.
+
+### As três funções da tela
+
+1. **Plano** — igual a hoje (título, conteúdo, foco, duração, status). Nada regrediu.
+2. **📷 Foto → plano** — o pai fotografa (ou pega da galeria) uma atividade/agenda, a IA lê, monta o plano **com as tarefas já quebradas**, classifica a matéria e extrai prazos. O pai revisa, edita e aprova.
+3. **🗂️ Quadro Kanban** — `A fazer` · `Fazendo` · `Feito`, com drag and drop de mouse e de toque. E o quadro é **vivo**: a Cogni move os cards sozinha enquanto conversa com a criança.
+
+### A trava de aprovação, e por que ela custou zero no robô
+
+Nada que a IA leu de uma foto chega ao robô sem o pai ver. O jeito óbvio seria uma coluna `revisado boolean` — e seria uma regra nova pro servidor entender.
+
+Em vez disso, o plano vindo de foto **nasce com `status = 'rascunho'`**, e o servidor já ignora tudo que não é `ativo`/`em_andamento` (`STATUS_VIGENTES`, em `planos.js`). **Zero linha de comportamento novo no robô** pra ter a trava inteira. Aprovar = mudar o status pra `ativo`, que o site já sabe fazer.
+
+> `rascunho` **não entra no `<select>`** do formulário: é estado de sistema, não escolha do pai. Ele aparece como badge e como a aba **"Para revisar"**.
+
+### O que o servidor já faz (nada disso é do site) ✅
+
+| O quê | Onde |
+| --- | --- |
+| O plano vem do banco **com o quadro embutido** (`plano_tarefas(*)` na mesma query — não pode virar um segundo round-trip dentro do teto de 900ms do 1º turno) | `modules/planos.js` |
+| **Realtime de `plano_tarefas`** no mesmo canal `planos-estudo`. O pai arrasta um card no site e a Cogni já fala do card certo no turno seguinte | `modules/planos.js` |
+| `obterTarefas(criancaId)` — leitura **síncrona** do mesmo cache RAM. O robô nunca espera a nuvem, como sempre | `modules/planos.js` |
+| O quadro entra no system prompt (`fazendo` primeiro, `a fazer`, `feito`), saneado e delimitado igual ao roteiro | `brain/prompt.js` |
+| O gancho passa a mirar **um card específico**, e a ordem no recap final cita o card pelo nome | `brain/plano-gancho.js` + `prompt.js` |
+| O motor que decide os movimentos do quadro (puro, offline, 34 casos de teste) | `brain/plano-tarefas.js` |
+| A escrita — a única do servidor nesta área | `moverTarefa()` em `planos.js` |
+
+> [!warning] A válvula: a tabela pode não existir, e isso **não pode derrubar o plano**
+> Um embed pra tabela inexistente faz o PostgREST recusar a **query inteira** (`PGRST200`), e o plano — que não tem nada a ver com isso — sumiria do system prompt. A Cogni pararia de seguir o roteiro sem ninguém entender por quê.
+>
+> Então no primeiro erro desses o servidor **desliga o embed pelo resto da sessão**, refaz a consulta na hora (sem retry o turno atual perderia o plano) e avisa **uma vez**. Espelha a mecânica de `colunasAusentes` do `supabase.js`. **Verificado contra o banco real** antes de a tabela existir: o aviso saiu, a hidratação completou, o plano ativo continuou no cache com `tarefas: []`, e o canal Realtime subiu normalmente mesmo com um `.on()` apontando pra tabela que não existe.
+
+### O quadro vivo — o que a Cogni pode e o que ela nunca faz
+
+Decisão do Nicolas: ela move tudo, **inclusive concluir**. A regra que organiza as travas é que **mover é barato e errar é caro** — um card que anda pra `fazendo` sem motivo não machuca ninguém; um card que some pra `feito` sem ter sido feito tira a tarefa da tela do pai e diz pra criança que a lição que ela ia fazer já estava pronta.
+
+| Movimento | Só acontece quando |
+| --- | --- |
+| → `fazendo` | A Cogni **realmente** tocou no assunto do card mirado (o gancho confere a resposta — se o modelo ignorou a ordem, nada anda). É fato observado, não previsão |
+| → `feito` | **(a)** a criança **disse** que terminou, e a frase toca as palavras do card; **ou** **(b)** o ciclo de prática registrou **2 acertos** no conceito daquele card |
+
+E as travas duras:
+
+- Ela **só troca a coluna**. Nunca cria, nunca apaga, nunca edita título/detalhe/prazo. O estrago máximo é um card na coluna errada.
+- **Nunca move para trás.** Desfazer é do pai, que tem o botão.
+- **No máximo 1 conclusão automática por sessão** (zerada no reset/troca de perfil). Se a detecção errar, ela erra **uma** tarefa — nunca o quadro inteiro.
+- Todo movimento grava `movida_por='cogni'`, `movida_em` e a `evidencia` (o motivo, o conceito, os acertos, ou o trecho da fala). **Movimento sem rastro seria mágica, e mágica assusta pai.**
+
+Dois falsos positivos que a suíte cobre explicitamente, porque são os que doem:
+- *"terminei"* solto **não** conclui nada (criança termina o lanche, o jogo e a paciência). Precisa tocar as palavras do card — mesmo princípio do `pedidoDeCorrecao` no `caderno.js`.
+- *"**não** terminei a lição de fração"* tem o verbo **e** o assunto, e está dizendo o contrário. Negação cancela.
+
+Cobertura: **`npm run teste:tarefas`** (34 casos, `node:test`, sem rede). A bateria inteira segue em 217/217.
+
+### ✅ O que o site construiu — **os 7 itens, feitos em 15/ago/2026**
+
+> A lista original está preservada abaixo (é ela que define o contrato). O "como ficou" de cada item, e as 6 decisões que o backend precisa conhecer, estão em "✅ Como o site construiu" no fim desta seção.
+
+**1. A Vercel Function `api/plano-de-imagem.mjs`** — a IA da foto **não** roda no servidor local, e essa é a decisão mais importante desta rodada: o servidor da Cogni é `127.0.0.1:3000`, ou seja, **do celular do pai ele não existe**. Rodar lá mataria a feature exatamente no cenário pra que ela foi feita. Uma pasta `/api` no topo do projeto vira Serverless Function na Vercel mesmo em site estático, e o Hobby é grátis.
+
+> `.mjs` de propósito (dispensa `package.json` na raiz) e **zero dependência npm** — `fetch` nativo pra OpenAI e pra API REST do Supabase. O site continua 100% estático + 1 função.
+
+> [!warning] É um endpoint público que gasta a chave da OpenAI
+> Sem as travas abaixo, qualquer um que descobrir a URL torra a conta. Elas não são opcionais:
+> 1. Só `POST` (405 no resto).
+> 2. **Exige o JWT do pai logado** (`Authorization: Bearer <access_token>` da sessão Supabase), validado server-side em `GET {SUPABASE_URL}/auth/v1/user`. Sem token válido → **401**.
+> 3. Confirma que ele **tem criança pareada**, lendo `criancas` com o token dele (a RLS faz o trabalho) → **403**.
+> 4. **Rate limit sem infra nova**: conta os planos `origem='foto'` daquela criança nas últimas 24h, teto de **20/dia** → **429**. Sem KV, sem tabela nova.
+> 5. No máximo **3 imagens**, cada uma ≤ 1,5 MB em base64, mime `image/jpeg|png|webp` — o body inteiro tem que caber nos **4,5 MB** da Vercel.
+> 6. **Nunca** devolver mensagem de erro da OpenAI crua pro cliente.
+
+Contrato:
+
+```
+POST /api/plano-de-imagem
+  headers: Authorization: Bearer <supabase access_token>
+  body: { imagens: ["data:image/jpeg;base64,…"], hoje: "2026-08-15" }
+  → 200 { titulo, conteudo, foco, duracao_dias, extraido_texto, legivel, tarefas: [
+            { titulo, detalhe, materia, prazo, estimativa_min, confianca } ] }
+  → 200 { legivel: false, motivo: "…" }   ← foto ruim NÃO é erro HTTP
+  → 401 sem sessão · 403 sem criança · 413 imagem grande · 429 cota do dia · 502 IA fora
+```
+
+A função **não escreve no banco**. Ela devolve a proposta e o site grava com a sessão do pai — a RLS continua sendo a única guardiã da escrita.
+
+**2. A tela** (`js/dashboard/sections/mesa.js`, evolução do `planos.js`):
+
+```
+Mesa de Estudos
+───────────────
+O que o Pedro vai estudar — e como está indo.        [ Da foto ] [ + Novo plano ]
+
+┌ Plano ativo ──────────────────────────────────────────────┐
+│ 🔢 Semana da Tabuada                    [ativo] · 30 dias │
+│ Treinar tabuada do 6 ao 9 com jogos e desafios curtos.    │
+└───────────────────────────────────────────────────────────┘
+
+┌ A fazer · 3 ───┐  ┌ Fazendo · 1 ───┐  ┌ Feito · 2 ─────┐
+│ Tabuada do 7   │  │ Frações pág 42 │  │ Porcentagem  ✨ │
+│ até sexta      │  │        ✨ Cogni │  │   [Desfazer]   │
+│ ─────────────  │  └────────────────┘  │ ─────────────  │
+│ Ler capítulo 3 │                      │ Lista de somas │
+└────────────────┘                      └────────────────┘
+```
+
+- Abas de plano: **Para revisar** (rascunhos) · Ativos · Todos · Concluídos.
+- Card: título, detalhe, chip de matéria, prazo (vermelho se atrasado), selo ✨ + **Desfazer** quando `movida_por='cogni'`, e chip "confira" quando `confianca < 0.6`.
+- Mobile: as três colunas viram scroll horizontal com `scroll-snap`.
+
+**3. O drag and drop** (`js/dashboard/dnd.js`, módulo próprio) — **Pointer Events escritos à mão**, não biblioteca. O consenso de 2026 é esse pra quem quer mouse e toque no mesmo código com controle total da animação; e o motivo decisivo é que **SortableJS não tem acessibilidade por teclado** — os botões de mover teriam que ser escritos de qualquer jeito.
+
+- Threshold de **8px** antes de virar arraste (senão o toque de editar vira drag) e **150ms** de espera em toque (senão o scroll da página vira drag).
+- `transform: translate3d()` no fantasma — nunca `top/left`. FLIP nos vizinhos. Auto-scroll perto da borda (obrigatório no mobile). `prefers-reduced-motion` respeitado.
+- **Teclado**: Espaço pega, ←/→ troca de coluna, ↑/↓ reordena, Espaço solta, Esc cancela, com `aria-live` anunciando *"Movido para Fazendo, posição 2 de 4"*.
+
+**4. `ordem` fracionária** — gap de 1000; soltar entre dois cards grava a **média dos vizinhos**: 1 UPDATE por movimento, não a coluna inteira. Reindexa (1000, 2000, 3000…) só quando o gap cai abaixo de 1.
+
+**5. Captura** (`js/dashboard/captura.js`) — dois botões explícitos: *Tirar foto* (`<input type="file" accept="image/*" capture="environment">`) e *Escolher da galeria* (o mesmo sem `capture`). **Redimensiona no canvas pra 1600px no maior lado, JPEG 0.82** antes de subir: cabe nos 4,5 MB da Vercel, corta o custo de tokens de visão e sobe rápido no 4G.
+
+**6. Realtime no site** (novo — o site não assinava canal nenhum até aqui). Assinar `plano_tarefas` filtrando por `crianca_id` enquanto a Mesa estiver montada: com a tela aberta, **o card anda sozinho** enquanto a criança conversa com o robô. É a parte que impressiona. **Cancelar a assinatura ao desmontar** — o router troca de seção sem recarregar a página, e canal vazado vira memory leak.
+
+**7. Camada de dados** — `getTarefas`, `criarTarefa`, `atualizarTarefa`, `moverTarefa`, `removerTarefa`, `criarPlanoComTarefas` e `aprovarPlano`. Todas as escritas continuam chamando **`pingPlanosAtualizados()`**: o plano B do Realtime vale igual pros cards.
+
+### ✅ Como o site construiu (15/ago/2026 — feito)
+
+Seção **"Mesa de Estudos"** (`#/mesa`, 5º item da sidebar e da tab bar, rótulo curto "Mesa" no mobile), em `js/dashboard/sections/mesa.js` + `dnd.js` (o arraste) + `mesa-realtime.js` (o canal e a fila) + `captura.js` (foto → revisão) + `api/plano-de-imagem.mjs` (a function) + `css/dashboard-mesa.css`.
+
+| # | Item | Como ficou |
+| --- | --- | --- |
+| 1 | Vercel Function | `api/plano-de-imagem.mjs`, `.mjs` sem `package.json` e sem dependência. As 6 travas **verificadas rodando** (405 no GET, 503 sem env, 401 sem token, 403 sem criança, 429 no 20º plano do dia, 413 em 4 imagens / mime proibido / imagem grande, e um erro forjado da OpenAI que ficou só no log). Saneamento na volta: matéria fora das 14 vira `outros`, `confianca` grampeada em 0..1, `prazo` que não é `YYYY-MM-DD` vira `null`, textos cortados nos limites do contrato |
+| 2 | A tela | Abas **Para revisar · Ativos · Todos · Concluídos** (só a primeira tem contador, e só quando há o que revisar) + faixa de planos + card do plano + quadro. `rascunho` **não** entra no `<select>`; aparece como badge, como aba e como o botão "Aprovar e ativar" |
+| 3 | Drag and drop | `js/dashboard/dnd.js`, Pointer Events à mão. Limiar de 8px, 150ms no toque, `translate3d`, placeholder + FLIP, auto-scroll, cancelar fora da coluna, `prefers-reduced-motion`. Teclado completo (Espaço · ←/→ · ↑/↓ · Home/End · Esc) com `aria-live` |
+| 4 | `ordem` fracionária | `calcularOrdem()`/`precisaReindexar()` exportadas e testadas: gap de 1000, média dos vizinhos, reindexação da coluna quando o gap cai abaixo de 1 — o que acontece na **10ª** soltura no mesmo ponto |
+| 5 | Captura | Dois botões (`capture="environment"` × galeria), redimensionamento em canvas pra 1600px / JPEG 0.82 com EXIF (`createImageBitmap(…, {imageOrientation:'from-image'})`), até 3 fotos com prévia e remover |
+| 6 | Realtime | `mesa-realtime.js`: canal `mesa-<criancaId>`, dois `.on()` filtrados por `crianca_id`, fila durante o arraste, e o cleanup abaixo |
+| 7 | Camada de dados | As 7 funções em `supabase-data.js` **e** em `mock-data.js`, com o mesmo shape. Toda escrita em `plano_tarefas` chama `pingPlanosAtualizados()` pelo `avisarRobo()` que já existia |
+
+**As 6 decisões que o backend precisa conhecer:**
+
+1. **O quadro é do plano SELECIONADO**, não da criança inteira — é o que o servidor implementa. Como o pai pode abrir o quadro de um plano que a Cogni **não** segue (pausado, concluído, rascunho, vencido), a tela avisa: *"A Cogni não está seguindo este plano agora"* + o motivo. Sem isso ele arrastaria card esperando o robô reagir.
+2. **A regra de "plano vigente" foi COPIADA pro front** (`planoVigente()` em `format.js`): `status ∈ ('ativo','em_andamento')`, não vencido por `criado_em + duracao_dias`, e desempate por `atualizado_em` → `criado_em` → `id`. É uma segunda cópia de uma regra do servidor — o que o projeto evita por princípio (ver a nota das 14 matérias) — e existe só porque não há endpoint que responda "qual é o vigente?". **Se a regra mudar no servidor, ela muda aqui junto.**
+3. **O eco da própria escrita é distinguido por `movida_por`.** Toda gravação do site manda `movida_por: null`/`movida_em: null` (é o que apaga o selo ✨ quando o pai assume o card), então `movida_por === 'cogni'` **nunca** é eco nosso. O site também guarda as escritas em voo por 12s pra reconhecer o retorno do próprio UPDATE.
+4. **Evento que chega no meio de um arraste vai pra uma fila** e entra quando o quadro para, colapsado por id (duas mexidas da Cogni no mesmo card durante o arraste viram uma só). Verificado no navegador.
+5. **O cleanup do canal não pode depender do `hashchange`.** Ele dispara **antes** de o router chamar `outlet.replaceChildren()` (o render é `await`ado), então nesse instante a raiz ainda está conectada e a checagem passaria batido — vazando um canal por visita. O gatilho é um `MutationObserver` no outlet, e a **decisão** é `raiz.isConnected`, que é o que fecha a corrida de sair da Mesa e voltar rápido. Verificado: 2 visitas = 2 canais criados e 2 removidos.
+6. **No modo mock (`USAR_SUPABASE = false`) o botão "Da foto" devolve uma proposta de exemplo local**, sem rede. É o que permite demonstrar e testar a revisão inteira sem OpenAI, sem deploy e sem login — e é o único caminho com o site rodando num servidor estático, onde `/api/*` não existe. No modo real, um 404 vira a mensagem *"a leitura por foto só funciona no site publicado"*, não um erro genérico.
+
+**Três bugs que só apareceram no navegador** (ficam registrados porque são armadilhas do próprio Pointer Events, não do projeto):
+
+- `lostpointercapture` dispara **junto com** o `pointerup`. Sem uma guarda, ele desmontava o estado no meio da aterrissagem e o card ficava preso na camada, sumindo da coluna.
+- `insertBefore` de um nó **focado** o desfoca. Sem refocar, o foco caía no `<body>` e a tecla seguinte nem chegava no handler — o card ficava pego e o Espaço não soltava mais.
+- `overflow-x: auto` faz o `overflow-y` computar como `auto`, e com isso o quadro vira a referência do `position: sticky`. O offset pensado pro header do painel passava a contar do topo do **quadro** e jogava o cabeçalho da coluna em cima do primeiro card, no mobile.
+
+Acessibilidade: cada card é `role="button"` + `aria-roledescription="tarefa arrastável"` + `tabindex="0"`, com instruções em `aria-describedby`; uma região `aria-live="polite"` anuncia cada movimento (*"Movido para Fazendo, posição 2 de 4"*), inclusive os que a Cogni faz sozinha; e **todo** movimento do arraste tem o caminho equivalente no menu "⋯" do card. O quadro inteiro foi operado só pelo teclado no teste.
+
+### 🔒 A foto não é guardada
+
+Decisão de arquitetura, e vale dizer na banca: **a imagem nunca é armazenada**. Não há bucket, não há Storage, não há RLS de arquivo. Ela é lida, vira `extraido_texto` + tarefas, e é descartada. É foto de caderno de menor — o dado que sobra é o mínimo necessário pro pai auditar o que a IA entendeu.
+
+### Dicas de visão que já valem (do cookbook da OpenAI e do nosso `caderno.js`)
+
+- `detail: "high"`. O `auto` encolhe a imagem e come letra pequena de caderno — a mesma escolha que o `caderno.js` já tinha feito por tentativa e erro.
+- `response_format: { type: "json_schema" }` **estrito**, não `json_object` solto.
+- O prompt manda **extrair só o que está escrito**, devolver `confianca` por item, classificar em uma das **14 matérias canônicas** (a lista vai literal no prompt), converter data relativa usando a data de hoje enviada no body, e devolver `legivel: false` quando a foto não dá.
+
+---
+
 ## ✅ Como testar (ponta a ponta)
 
 - **Servidor sem credenciais** → robô/voz idênticos a hoje (fallback JSON).
 - **Servidor com credenciais** → perfis hidratam do Supabase; conversas aparecem na tabela.
 - **Plano em tempo real** → com o robô conversando, criar/editar um plano no site → o log do servidor mostra `Realtime de planos ativo` no boot, e a Cogni já usa o plano **no turno seguinte**, sem trocar de perfil nem reiniciar a conversa. Sem esperar o Realtime: `curl -X POST http://127.0.0.1:3000/api/planos/refrescar -H "Content-Type: application/json" -d '{"criancaId":"<id>"}'` → `{ ok: true, temPlanoAtivo: true }`.
 - **O gancho** → com plano ativo, dizer "oi" e depois algo neutro ("nada demais") → no 2º ou 3º turno **ela mesma** puxa o assunto do plano, sem que ninguém pergunte.
+- **Mesa de Estudos, SEM o SQL rodado** (o teste que mais importa) → subir o servidor com a tabela `plano_tarefas` ainda ausente e conversar. Esperado: o aviso `Quadro de tarefas indisponivel (…)` **uma vez**, o plano continua entrando no prompt normalmente e o quadro simplesmente não aparece. **Se o plano sumir do prompt, a válvula falhou.**
+- **Mesa de Estudos, com o SQL rodado** → criar um card no site: o log do servidor mostra o refresh pelo Realtime na hora. Conversar: no 2º/3º turno ela puxa **a tarefa concreta** ("e aqueles exercícios da página 42?"), não a matéria genérica. Com a Mesa aberta no navegador, o card anda sozinho pra **Fazendo**. Acertar 2 exercícios do assunto → vai pra **Feito** com selo ✨, e **Desfazer** volta.
+- **Os dois falsos positivos** → dizer *"já terminei a lição de fração"* **conclui**; dizer só *"terminei"* **não conclui**; dizer *"não terminei a lição de fração"* **não conclui**. Sem rede: `npm run teste:tarefas` (34 casos, offline).
+- **Foto → plano** (no site) → fotografar uma agenda/folha real, revisar, aprovar. Testar também foto tremida (mensagem clara com dica de enquadramento, não erro genérico), sem login (**401**) e a 21ª geração do dia (**429**).
+- **Drag and drop** → mouse no desktop; toque no celular (arrastar **não** pode rolar a página, e rolar a página **não** pode arrastar); e o quadro inteiro operável **só pelo teclado**, com o leitor de tela anunciando cada movimento.
 - **Internet cai com servidor no ar** → robô continua conversando (cache RAM).
 - **Site** → logar → badge → Dashboard → dados da criança vinculada aparecem; criança de outra família **não** aparece (RLS).
 - **Mapa de Compreensão** → conversar com o robô por >1min tocando 2 assuntos, com a câmera ligada → `GET /api/mapa-aula` retorna `emAndamento: true` com os momentos; após reset (ou 15min parado) a linha aparece em `sessoes_atencao`.
@@ -954,6 +1180,10 @@ O prompt da extração mandava a IA converter *"3º do médio"* → `"12o ano"` 
 
 1. **Conta Supabase + credenciais** (URL, anon key, service_role key) — passo a passo no chat na Fase 0.
 2. Decisões de produto pontuais que surgirem.
+3. ⭐ **Mesa de Estudos (ago/2026)**, três coisas manuais:
+   - o **SQL** da tabela `plano_tarefas` + as 2 colunas novas de `planos_estudo` + índices + RLS (entregue no chat);
+   - publicar **`plano_tarefas`** no Realtime — sem isso o quadro não anda em tempo real em **nenhuma** das duas pontas. O SQL acima já faz (`alter publication supabase_realtime add table …`); pra conferir, **Database → Publications → `supabase_realtime`**, ou `select tablename from pg_publication_tables where pubname='supabase_realtime';`. ⚠️ **Não** é o item *Replication* do menu — esse virou read replicas/pipelines e fica vazio mesmo;
+   - na **Vercel**, criar `OPENAI_API_KEY`, `SUPABASE_URL` e `SUPABASE_ANON_KEY` em *Settings → Environment Variables* do projeto do Companion, e redeploy.
 
 (O Claude gerencia os `.env`. Credenciais rotacionadas depois pelo Nicolas.)
 

@@ -323,7 +323,7 @@ export async function renderInicio(ctx) {
     class: "ini-grid",
     children: [
       cardUltimaConversa(conversas, nome, ctx.now, go("conversas")),
-      cardProximoPlano(planoAtivo, go("planos")),
+      cardProximoPlano(planoAtivo, go("mesa")),
       cardResumoSemana(conversas, ctx.now, go("aprendizado")),
       // Bilhete da semana gerado por IA. Fonte estável: lê o último resumo salvo
       // (tabela `resumos_semanais`, via ctx.mock) na hora e atualiza com a versão

@@ -146,8 +146,9 @@ confirmação). O vínculo é **permanente**: só some se você desvincular.
 
 Desde **15/ago/2026** a tela de Configurações deixou de ser o único caminho pro perfil do filho: o pai
 consegue ajustar os **9 campos** falando com o robô — inclusive o `prompt_personalizado` ("não fale sobre
-morte com ele"). Planos de estudo continuam **exclusivos do site** (plano se monta olhando a semana inteira
-numa tela, não de viva-voz). Não há coluna, endpoint nem contrato novo — o que muda é **quem escreve**.
+morte com ele"). Os planos da **Mesa de Estudos** continuam **exclusivos do site** (plano se monta olhando
+a semana inteira numa tela, não de viva-voz — o que o robô faz lá é só **mover card de coluna**). Não há
+coluna, endpoint nem contrato novo — o que muda é **quem escreve**.
 
 Como `criancas` resolve conflito por **última escrita vence**, um formulário montado sobre uma linha velha
 apaga o que foi ditado — sem erro, sem aviso. Por isso o perfil é relido em **três momentos**:
@@ -195,7 +196,7 @@ Do lado do site, três coisas que isso exigiu:
   (o nome e o ícone estão sempre do lado) — ela comunica a **área**: as ciências da natureza na família do
   verde, as humanas na do roxo, as linguagens no quente. As 7 cores originais **não mudaram**. A paleta foi
   conferida por contraste (WCAG) e por distância perceptual (CIEDE2000) nos dois temas.
-- 🧭 **Listas agrupadas.** O filtro do Diário e os `<select>` de Planos e Ajustes separam as opções por área
+- 🧭 **Listas agrupadas.** O filtro do Diário e os `<select>` da Mesa de Estudos e de Ajustes separam por área
   (`materiasAgrupadas()` em `format.js`). O agrupamento é **só apresentação**: o dado e o filtro continuam
   usando a matéria fina. E os grupos derivam de `MATERIAS`, então uma matéria futura que ninguém agrupar
   cai no último grupo em vez de sumir da tela.
@@ -278,6 +279,71 @@ Quatro cuidados que sustentam a tela:
 > tabela, as aulas anteriores sumiriam da tela **exatamente durante a demonstração ao vivo** — e o
 > histórico também continua valendo com o robô desligado.
 
+### 🗒️ Mesa de Estudos — o plano vira um quadro que anda sozinho
+
+A tela de **Planos** fazia uma coisa só: o pai digitava um parágrafo e a Cogni seguia o assunto.
+Dois problemas nisso. **Escrever plano dá trabalho** — a informação já está na agenda, na folha de
+exercícios, no bilhete da professora — e na prática plano que dá trabalho não é criado. E **um
+parágrafo não é um progresso**: ninguém sabia o que já tinha sido feito, o que estava rolando e o
+que faltava.
+
+Agora é a **Mesa de Estudos** (`#/mesa`), e ela faz três coisas:
+
+| | O quê | Por que importa |
+| --- | --- | --- |
+| 📷 | **Foto → plano** | O pai fotografa a atividade, a IA lê e monta as tarefas já quebradas, com matéria e prazo. Ele revisa e aprova |
+| 🗂️ | **Quadro Kanban** | `A fazer` · `Fazendo` · `Feito`, com arraste de mouse, de dedo **e de teclado** |
+| ✨ | **O quadro é vivo** | A Cogni move os cards sozinha enquanto conversa com a criança — e com a tela aberta o pai **vê acontecer** |
+
+> 🔗 O link velho `#/planos` continua funcionando: `main.js` tem um alias explícito que reescreve
+> pra `#/mesa`. Cair no fallback do router seria pior que 404 — ele mandaria o pai pro Início sem
+> avisar.
+
+**Nada que a IA leu chega ao robô sem o pai ver.** O plano vindo de foto nasce com
+`status = 'rascunho'`, e o servidor já ignora tudo que não é `ativo`/`em_andamento` — a trava
+inteira custou **zero linha** de comportamento novo no robô. Aprovar é mudar o status, que o site
+já sabia fazer.
+
+**A foto não é guardada em lugar nenhum.** Nem bucket, nem Storage, nem base64 no banco. Ela é
+lida, vira o `extraido_texto` (que o pai pode conferir em "ver o que a Cogni leu") e é descartada.
+É caderno de criança — decisão de LGPD, não detalhe de implementação.
+
+#### 🎯 Por que o drag and drop é escrito à mão
+
+Sem biblioteca, e o motivo é chato de contornar: o drag-and-drop **nativo do HTML5 não funciona em
+toque**, e o SortableJS — a escolha óbvia — **não tem acessibilidade por teclado**. Como os botões
+de mover teriam que ser escritos de qualquer jeito, a lib só somaria peso e uma animação que não dá
+pra controlar. Então `js/dashboard/dnd.js` faz tudo com Pointer Events:
+
+- **8px** de folga antes de virar arraste (senão o toque de abrir o card vira drag) e **150ms** de
+  dedo parado no toque (senão rolar a página arranca um card junto).
+- Teclado inteiro: `Espaço` pega · `←/→` troca de coluna · `↑/↓` reordena · `Home/End` · `Esc`
+  cancela — com um `aria-live` anunciando *"Movido para Fazendo, posição 2 de 4"*.
+- E **todo** movimento tem o caminho equivalente no menu `⋯` do card. Arrastar nunca é o único jeito.
+
+`ordem` é fracionária com gap de 1000: soltar entre dois cards grava a **média dos vizinhos**, o
+que dá **1 UPDATE por movimento** em vez de reescrever a coluna. Só na 10ª soltura no mesmo ponto o
+gap acaba, e aí a coluna é reindexada de uma vez.
+
+#### ⚙️ O que o Nicolas precisa configurar
+
+A leitura da foto é a **única** parte do Companion que roda fora do navegador — uma Vercel Function
+(`api/plano-de-imagem.mjs`), porque o servidor da Cogni é `127.0.0.1` e do celular do pai ele
+simplesmente não existe. Em *Settings → Environment Variables* do projeto na Vercel:
+
+| Variável | Pra quê |
+| --- | --- |
+| `OPENAI_API_KEY` | a leitura da foto |
+| `SUPABASE_URL` | validar o login do pai e ler a criança pareada |
+| `SUPABASE_ANON_KEY` | idem (é a chave pública; quem protege é a RLS) |
+
+Faltando qualquer uma, a função responde **503** com mensagem clara em vez de quebrar. E ela
+**nunca escreve no banco**: devolve a proposta, e quem grava é o site com a sessão do pai.
+
+> 🧪 **Testar sem OpenAI, sem deploy e sem login:** vire `USAR_SUPABASE = false` e o botão
+> "Da foto" devolve uma proposta de exemplo local. Dá pra percorrer a revisão inteira — editar
+> tarefa, apagar, o chip "confira", rascunho × aprovar — offline.
+
 ### 🗃️ Arquivos do painel
 
 | Arquivo | Função |
@@ -293,10 +359,15 @@ Quatro cuidados que sustentam a tela:
 | `js/dashboard/rosto-api.js` | Leitura/gravação do rosto: PUT ao vivo no robô + persistência no Supabase |
 | `js/dashboard/mapa-api.js` | Dados do Mapa da aula: endpoint (ao vivo) + tabela (histórico) e o saneamento dos momentos |
 | `js/dashboard/mapa-timeline.js` | A linha do tempo da aula (marcadores em HTML/CSS, cada um um `<button>`) |
-| `js/dashboard/sections/*.js` | As 7 seções: Início, Conversas, Aprendizado, **Mapa da aula**, Planos, **Rosto da Cogni**, Configurações |
+| `js/dashboard/dnd.js` | **Drag and drop do quadro** (Pointer Events à mão, com teclado e `aria-live`) |
+| `js/dashboard/mesa-realtime.js` | **O quadro ao vivo**: canal do Supabase, fila durante o arraste, degradação |
+| `js/dashboard/captura.js` | **Foto → plano**: captura, redimensionamento e a tela de revisão |
+| `api/plano-de-imagem.mjs` | **Vercel Function** que lê a foto com IA (a única coisa fora do navegador) |
+| `js/dashboard/sections/*.js` | As 7 seções: Início, Conversas, Aprendizado, **Mapa da aula**, **Mesa de Estudos**, **Rosto da Cogni**, Configurações |
 | `css/dashboard-onboarding.css` | Estilos do onboarding |
 | `css/dashboard-rosto.css` | Estilos do editor de rosto (estética infantil, escopada em `.dash-rosto`) |
 | `css/dashboard-mapa.css` | Estilos do Mapa da aula (tons dos momentos, faixa do tempo, selo ao vivo) |
+| `css/dashboard-mesa.css` | Estilos da Mesa de Estudos (quadro, cards, arraste, captura) — o prefixo `.pl-` dos formulários fica, porque Configurações reusa |
 
 > 🧪 Para testar **com o robô ligado**: suba o servidor da Cogni (`http://127.0.0.1:3000`), pegue o código
 > de pareamento (na tela do servidor ou pedindo pra Cogni falar) e digite no onboarding. Para testar **sem
@@ -374,6 +445,9 @@ Cogni Software/
 ├── cadastro.html           # Cadastro
 ├── dashboard.html          # Painel Companion (app dos pais)
 │
+├── api/                    # Vercel Functions (site estático + 1 função)
+│   └── plano-de-imagem.mjs # Foto da agenda → plano com tarefas, por IA
+│
 ├── css/                    # Estilos (tokens → base → componentes)
 │   ├── tokens.css          # Design tokens (cor, tipografia, espaçamento)
 │   ├── base.css            # Reset e estilos globais
@@ -398,8 +472,11 @@ Cogni Software/
 │   │   ├── dica.js         # Dica do Cogni (IA, servidor local)
 │   │   ├── mapa-api.js     # Mapa da aula: ao vivo (servidor) + histórico (Supabase)
 │   │   ├── mapa-timeline.js# A linha do tempo da aula (marcadores acessíveis)
+│   │   ├── dnd.js          # Drag and drop do quadro (Pointer Events + teclado)
+│   │   ├── mesa-realtime.js# O quadro ao vivo (canal do Supabase + fila)
+│   │   ├── captura.js      # Foto → plano (captura, resize e revisão)
 │   │   ├── router.js       # Roteamento por hash
-│   │   └── sections/       # Início, Conversas, Aprendizado, Mapa, Planos, Rosto, Config
+│   │   └── sections/       # Início, Conversas, Aprendizado, Mapa, Mesa, Rosto, Config
 │   └── ...
 │
 └── assets/                 # Mídia

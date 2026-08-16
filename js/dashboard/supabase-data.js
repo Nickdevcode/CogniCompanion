@@ -13,6 +13,9 @@
  *     servidor). Aqui só há SELECT.
  *   - `planos_estudo`: CRUD direto (anon key + RLS). `responsavel_id` é NOT NULL
  *     no banco → sempre enviar o `auth.uid()` ao criar.
+ *   - `plano_tarefas` (Mesa de Estudos, ago/2026): CRUD direto, mesma policy de
+ *     `planos_estudo`. É a segunda e última tabela em que o site escreve. O
+ *     servidor também escreve nela, mas SÓ a coluna (`moverTarefa()`).
  *   - O pareamento (setar `responsavel_id`) NUNCA acontece aqui: é só pelo
  *     endpoint do servidor (service_role). Ver onboarding.js.
  *
@@ -294,16 +297,15 @@ function avisarRobo(criancaId) {
 }
 
 /**
- * Cria um plano. Só os 5 campos do contrato + as FKs. `responsavel_id` é NOT
- * NULL no banco → sempre o `auth.uid()`. `crianca_id` vem da criança pareada.
- * @param {object} dados — { titulo, conteudo, foco, duracao_dias, status }
- * @returns {Promise<object>} o plano criado (linha completa)
+ * Monta o payload de INSERT de um plano. Extraído de `criarPlano` porque
+ * `criarPlanoComTarefas` precisa exatamente do mesmo objeto — duas cópias
+ * divergiriam no dia em que o contrato ganhasse mais um campo.
+ * @param {object} dados
+ * @param {object} crianca
+ * @param {object} user
+ * @returns {object}
  */
-export async function criarPlano(dados) {
-  const user = await currentUser();
-  const crianca = await getCrianca();
-  if (!crianca) throw new Error("Sem criança pareada para criar o plano.");
-
+function payloadDePlano(dados, crianca, user) {
   const payload = {
     crianca_id: crianca.id,
     responsavel_id: user.id, // NOT NULL — sempre o dono logado
@@ -313,9 +315,29 @@ export async function criarPlano(dados) {
     duracao_dias: Number(dados.duracao_dias) || 0,
     status: dados.status || "ativo",
   };
+  // `origem`/`extraido_texto` (ago/2026) só viajam quando existem: o default de
+  // `origem` é 'manual' no banco, e mandar `extraido_texto: null` num plano
+  // digitado é ruído.
+  if (dados.origem) payload.origem = dados.origem;
+  if (dados.extraido_texto) payload.extraido_texto = dados.extraido_texto;
+  return payload;
+}
+
+/**
+ * Cria um plano. Campos do contrato + as FKs. `responsavel_id` é NOT NULL no
+ * banco → sempre o `auth.uid()`. `crianca_id` vem da criança pareada.
+ * @param {object} dados — { titulo, conteudo, foco, duracao_dias, status,
+ *   origem?, extraido_texto? }
+ * @returns {Promise<object>} o plano criado (linha completa)
+ */
+export async function criarPlano(dados) {
+  const user = await currentUser();
+  const crianca = await getCrianca();
+  if (!crianca) throw new Error("Sem criança pareada para criar o plano.");
+
   const { data, error } = await client()
     .from("planos_estudo")
-    .insert(payload)
+    .insert(payloadDePlano(dados, crianca, user))
     .select()
     .single();
   if (error) throw error;
@@ -332,7 +354,17 @@ export async function criarPlano(dados) {
  */
 export async function atualizarPlano(id, patch) {
   const campos = {};
-  for (const k of ["titulo", "conteudo", "foco", "duracao_dias", "status"]) {
+  // Allowlist explícita: campo fora dela é descartado em SILÊNCIO, então toda
+  // coluna nova do contrato precisa ser acrescentada aqui também.
+  for (const k of [
+    "titulo",
+    "conteudo",
+    "foco",
+    "duracao_dias",
+    "status",
+    "origem",
+    "extraido_texto",
+  ]) {
     if (k in patch) campos[k] = patch[k];
   }
   if ("duracao_dias" in campos) {
@@ -411,4 +443,265 @@ export async function atualizarCrianca(patch) {
   // trazer o perfil salvo (e não o de antes de o pai editar).
   invalidarCacheCrianca();
   return data;
+}
+
+/* ==========================================================================
+   Mesa de Estudos — o quadro (`plano_tarefas`) ⭐ ago/2026
+
+   A segunda (e última) tabela em que o site escreve. O servidor também escreve
+   aqui (service_role), mas SÓ a coluna: `moverTarefa()` em `modules/planos.js`.
+   Tudo o que o pai faz na tela passa por estas funções.
+   ========================================================================== */
+
+/** Colunas válidas do quadro. Valor desconhecido o servidor lê como `a_fazer`. */
+const COLUNAS_TAREFA = ["a_fazer", "fazendo", "feito"];
+
+/**
+ * Campos que o pai pode escrever numa tarefa. `crianca_id`/`plano_id` ficam de
+ * fora de propósito: mudar a criança ou o plano de um card não é edição, é outra
+ * operação — e nenhuma tela oferece isso.
+ */
+const TAREFA_EDITAVEL = [
+  "titulo",
+  "detalhe",
+  "materia",
+  "prazo",
+  "estimativa_min",
+  "coluna",
+  "ordem",
+];
+
+/**
+ * Tarefas do quadro. Sem `planoId`, traz as da criança inteira (é o que o filtro
+ * do Realtime enxerga); com `planoId`, só as daquele plano — que é o quadro que
+ * a tela mostra.
+ *
+ * A ordenação tem TRÊS critérios de propósito. `ordem` é fracionária e pode
+ * empatar (uma reindexação interrompida deixa dois cards no mesmo valor); sem o
+ * `id` como desempate, os dois trocariam de lugar entre duas leituras sem nada
+ * ter mudado. É o mesmo cuidado que o servidor tem em `comQuadroOrdenado()`.
+ *
+ * @param {number} [planoId]
+ * @returns {Promise<Array<object>>} (vazio se não há criança pareada)
+ */
+export async function getTarefas(planoId) {
+  const crianca = await getCrianca();
+  if (!crianca) return [];
+  let q = client().from("plano_tarefas").select("*").eq("crianca_id", crianca.id);
+  if (planoId != null) q = q.eq("plano_id", planoId);
+  const { data, error } = await q
+    .order("coluna", { ascending: true })
+    .order("ordem", { ascending: true })
+    .order("id", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Cria um card.
+ *
+ * ⚠️ `ordem` é NOT NULL **sem default** no banco: quem chama sempre manda. O
+ * fallback de 1000 aqui é a primeira posição de uma coluna vazia, não um valor
+ * mágico — deixar o banco recusar o insert por falta de `ordem` seria um erro
+ * que só aparece em produção.
+ *
+ * @param {object} dados — { plano_id, titulo, detalhe?, materia?, coluna?,
+ *   ordem?, prazo?, estimativa_min?, origem?, confianca? }
+ * @returns {Promise<object>} o card criado (linha completa)
+ */
+export async function criarTarefa(dados) {
+  const crianca = await getCrianca();
+  if (!crianca) throw new Error("Sem criança pareada para criar a tarefa.");
+  if (dados.plano_id == null) throw new Error("Tarefa sem plano_id.");
+
+  const coluna = COLUNAS_TAREFA.includes(dados.coluna) ? dados.coluna : "a_fazer";
+  const payload = {
+    plano_id: dados.plano_id,
+    // Desnormalizado de propósito (ver o schema): deixa a RLS barata e o servidor
+    // lê o quadro sem join.
+    crianca_id: crianca.id,
+    titulo: dados.titulo || "Nova tarefa",
+    detalhe: dados.detalhe || null,
+    materia: dados.materia || null,
+    coluna,
+    ordem: Number.isFinite(Number(dados.ordem)) ? Number(dados.ordem) : 1000,
+    prazo: dados.prazo || null,
+    estimativa_min: dados.estimativa_min == null ? null : Number(dados.estimativa_min),
+    origem: dados.origem || "pai",
+    confianca: dados.confianca == null ? null : Number(dados.confianca),
+  };
+  const { data, error } = await client()
+    .from("plano_tarefas")
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  avisarRobo(crianca.id);
+  return data;
+}
+
+/**
+ * Edita o texto/metadados de um card. Para trocar de coluna, use `moverTarefa` —
+ * ela cuida de `movida_por`/`concluida_em`, que esta aqui não toca.
+ * @param {number} id
+ * @param {object} patch
+ * @returns {Promise<object|null>} o card atualizado, ou null se nada bateu
+ */
+export async function atualizarTarefa(id, patch) {
+  const campos = {};
+  for (const k of TAREFA_EDITAVEL) if (k in patch) campos[k] = patch[k];
+  if (!Object.keys(campos).length) return null;
+  campos.atualizado_em = new Date().toISOString();
+
+  const { data, error } = await client()
+    .from("plano_tarefas")
+    .update(campos)
+    .eq("id", id)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  if (data) avisarRobo(data.crianca_id);
+  return data || null;
+}
+
+/**
+ * Move um card de coluna/posição — a escrita mais frequente da tela.
+ *
+ * É o espelho invertido do `moverTarefa()` do servidor: lá `movida_por` vira
+ * `'cogni'`, aqui vira **null**. Não é detalhe — `movida_por` é exatamente o que
+ * acende o selo ✨ e o botão "Desfazer" no card. O pai arrastando um card que a
+ * Cogni tinha movido está justamente dizendo "eu assumo este daqui", e o selo
+ * tem que apagar.
+ *
+ * `concluida_em` acompanha a coluna nos dois sentidos: entrar em `feito` carimba,
+ * sair limpa. Um card que volta pro quadro carregando data de conclusão antiga
+ * mentiria pro pai e pro robô.
+ *
+ * @param {number} id
+ * @param {{ coluna: string, ordem: number }} destino
+ * @returns {Promise<object|null>}
+ */
+export async function moverTarefa(id, { coluna, ordem } = {}) {
+  if (!COLUNAS_TAREFA.includes(coluna)) {
+    throw new Error(`Coluna inválida: ${coluna}`);
+  }
+  const agora = new Date().toISOString();
+  const campos = {
+    coluna,
+    ordem: Number(ordem),
+    movida_por: null,
+    movida_em: null,
+    concluida_em: coluna === "feito" ? agora : null,
+    atualizado_em: agora,
+  };
+  const { data, error } = await client()
+    .from("plano_tarefas")
+    .update(campos)
+    .eq("id", id)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  if (data) avisarRobo(data.crianca_id);
+  return data || null;
+}
+
+/**
+ * Apaga um card.
+ * @param {number} id
+ * @returns {Promise<boolean>} true se removeu
+ */
+export async function removerTarefa(id) {
+  const { error, count } = await client()
+    .from("plano_tarefas")
+    .delete({ count: "exact" })
+    .eq("id", id);
+  if (error) throw error;
+  const removeu = (count || 0) > 0;
+  // O DELETE não devolve a linha; o id da criança vem do perfil pareado, igual
+  // ao `removerPlano`.
+  if (removeu) avisarRobo();
+  return removeu;
+}
+
+/**
+ * Cria um plano JÁ com o quadro — o que a revisão da foto grava ao aprovar.
+ *
+ * Dois inserts, e o segundo é em LOTE (um `.insert([...])` só): N round-trips
+ * numa conexão de celular seriam N chances de o pai ficar olhando um spinner.
+ *
+ * Se o insert das tarefas falhar, o plano recém-criado é **apagado** e o erro
+ * sobe. Um plano vazio que a tela apresenta como "criado a partir de uma foto"
+ * confunde mais do que um erro honesto — e o pai perderia a foto sem saber que
+ * perdeu.
+ *
+ * @param {object} plano — { titulo, conteudo, foco, duracao_dias, status,
+ *   origem, extraido_texto }
+ * @param {Array<object>} tarefas — na ordem em que devem aparecer
+ * @returns {Promise<object>} o plano criado, com `tarefas` anexadas
+ */
+export async function criarPlanoComTarefas(plano, tarefas) {
+  const user = await currentUser();
+  const crianca = await getCrianca();
+  if (!crianca) throw new Error("Sem criança pareada para criar o plano.");
+
+  const { data: criado, error: erroPlano } = await client()
+    .from("planos_estudo")
+    .insert(payloadDePlano(plano, crianca, user))
+    .select()
+    .single();
+  if (erroPlano) throw erroPlano;
+
+  const lista = Array.isArray(tarefas) ? tarefas : [];
+  if (!lista.length) {
+    avisarRobo(crianca.id);
+    return { ...criado, tarefas: [] };
+  }
+
+  const linhas = lista.map((t, i) => ({
+    plano_id: criado.id,
+    crianca_id: crianca.id,
+    titulo: t.titulo || "Nova tarefa",
+    detalhe: t.detalhe || null,
+    materia: t.materia || null,
+    coluna: COLUNAS_TAREFA.includes(t.coluna) ? t.coluna : "a_fazer",
+    // Gap de 1000 desde o nascimento: é o que permite soltar um card entre dois
+    // vizinhos gravando a média, com 1 UPDATE em vez da coluna inteira.
+    ordem: Number.isFinite(Number(t.ordem)) ? Number(t.ordem) : (i + 1) * 1000,
+    prazo: t.prazo || null,
+    estimativa_min: t.estimativa_min == null ? null : Number(t.estimativa_min),
+    origem: t.origem || "pai",
+    confianca: t.confianca == null ? null : Number(t.confianca),
+  }));
+
+  const { data: cards, error: erroTarefas } = await client()
+    .from("plano_tarefas")
+    .insert(linhas)
+    .select();
+
+  if (erroTarefas) {
+    // Rollback à mão (não há transação pelo PostgREST). Se o próprio rollback
+    // falhar, ainda assim é o erro do insert que interessa ao pai.
+    try {
+      await client().from("planos_estudo").delete().eq("id", criado.id);
+    } catch (e) {
+      console.error("[Companion] Plano órfão em", criado.id, e);
+    }
+    throw erroTarefas;
+  }
+
+  avisarRobo(crianca.id);
+  return { ...criado, tarefas: cards || [] };
+}
+
+/**
+ * Aprova um plano que veio de foto: `rascunho` → `ativo`.
+ *
+ * Função própria (em vez de `atualizarPlano(id, {status:'ativo'})`) porque é o
+ * ato da trava de aprovação — nada que a IA leu de uma foto chega ao robô sem o
+ * pai ver, e o servidor já ignora tudo que não é `ativo`/`em_andamento`.
+ * @param {number} id
+ * @returns {Promise<object|null>}
+ */
+export async function aprovarPlano(id) {
+  return atualizarPlano(id, { status: "ativo" });
 }

@@ -1,0 +1,1493 @@
+/* ==========================================================================
+   dashboard-mesa.css — Seção "Mesa de Estudos" (era "Planos de estudo")
+   Abas, plano, quadro Kanban com drag and drop, captura por foto, formulários.
+   Usa tokens de dashboard.css (incl. cores por matéria e por status). Dois temas.
+
+   ⚠️ O prefixo `.pl-` fica: os formulários daqui são COMPARTILHADOS com a tela de
+   Configurações (`config.js` usa `.pl-form__erro` e `.pl-btn--danger`). Renomear o
+   prefixo quebraria Configurações sem nenhum aviso. As peças novas da Mesa usam
+   `.mesa-`, a captura usa `.cap-` e o drag and drop usa `.dnd-`.
+   ========================================================================== */
+
+/* Botão "Criar novo plano" no cabeçalho */
+.pl-create {
+  white-space: nowrap;
+}
+.pl-btn__ico {
+  display: grid;
+  place-items: center;
+}
+.pl-btn__ico svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* --------------------------------------------------------------------------
+   Toolbar: abas + contador
+   -------------------------------------------------------------------------- */
+.pl-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+.pl-tabs {
+  display: inline-flex;
+  gap: 0.4rem;
+  padding: 4px;
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-pill);
+}
+.pl-tab {
+  padding: 0.5rem 1.1rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  font-weight: var(--fw-semibold);
+  color: var(--dash-text-muted);
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.pl-tab:hover {
+  color: var(--dash-text);
+}
+.pl-tab.is-active {
+  background-color: var(--dash-navy);
+  color: #fff;
+}
+[data-theme="dark"] .pl-tab.is-active {
+  background-color: var(--brand-gold);
+  color: #080c38;
+}
+.pl-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.9rem;
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: var(--fw-medium);
+  color: var(--dash-text-muted);
+}
+.pl-count__ico {
+  display: grid;
+  place-items: center;
+  color: var(--dash-accent);
+}
+.pl-count__ico svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* --------------------------------------------------------------------------
+   Lista de cards
+   -------------------------------------------------------------------------- */
+.pl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.pl-card {
+  display: flex;
+  align-items: stretch;
+  gap: 1.1rem;
+  padding: 1.25rem;
+}
+.pl-card__disc {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+  border-radius: 18px;
+  background-color: var(--mat-soft, var(--dash-accent-soft));
+  color: var(--mat-color, var(--dash-accent));
+}
+.pl-card__disc svg {
+  width: 40px;
+  height: 40px;
+}
+/* A cor da matéria no disco vem do mapeamento único em dashboard.css. */
+
+.pl-card__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.pl-card__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.pl-card__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.25rem;
+  color: var(--dash-text);
+  line-height: 1.2;
+}
+.pl-card__desc {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--dash-text-muted);
+}
+.pl-card__metas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.75rem;
+  margin-top: 0.25rem;
+}
+.pl-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.pl-meta__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  color: var(--dash-text-faint);
+}
+.pl-meta__ico {
+  display: grid;
+  place-items: center;
+}
+.pl-meta__ico svg {
+  width: 13px;
+  height: 13px;
+}
+.pl-meta__value {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.95rem;
+  color: var(--dash-text);
+}
+
+.pl-card__edit {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  border-radius: 10px;
+  color: var(--dash-text-muted);
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.pl-card__edit:hover {
+  background-color: var(--dash-nav-hover-bg);
+  color: var(--dash-text);
+}
+.pl-card__edit svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Badge de status (bolinha + rótulo) */
+.pl-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: var(--fw-semibold);
+  color: var(--st-color, var(--dash-text-muted));
+  background-color: var(--st-soft, var(--dash-surface-2));
+}
+.pl-status__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--st-color, var(--dash-text-muted));
+}
+.pl-status[data-status="rascunho"] { --st-color: var(--st-rascunho); --st-soft: var(--st-rascunho-soft); }
+.pl-status[data-status="ativo"] { --st-color: var(--st-ativo); --st-soft: var(--st-ativo-soft); }
+.pl-status[data-status="em_andamento"] { --st-color: var(--st-andamento); --st-soft: var(--st-andamento-soft); }
+.pl-status[data-status="pausado"] { --st-color: var(--st-pausado); --st-soft: var(--st-pausado-soft); }
+.pl-status[data-status="concluido"] { --st-color: var(--st-concluido); --st-soft: var(--st-concluido-soft); }
+
+/* --------------------------------------------------------------------------
+   Estado vazio
+   -------------------------------------------------------------------------- */
+.pl-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  text-align: center;
+  padding: 3.5rem 2rem;
+  background-color: var(--dash-surface);
+  border: 1px dashed var(--dash-border-strong);
+  border-radius: 20px;
+  color: var(--dash-text-muted);
+}
+.pl-empty__ico {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: var(--dash-accent-soft);
+  color: var(--dash-accent);
+}
+.pl-empty__ico svg {
+  width: 26px;
+  height: 26px;
+}
+.pl-empty__title {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: 1.2rem;
+  color: var(--dash-text);
+}
+.pl-empty__text {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  max-width: 36ch;
+  margin-bottom: 0.5rem;
+}
+
+/* --------------------------------------------------------------------------
+   Formulário do modal
+   -------------------------------------------------------------------------- */
+.pl-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.pl-form__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.1rem;
+}
+.pl-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.pl-field__label {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.9rem;
+  color: var(--dash-text);
+}
+.pl-field__hint {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--dash-text-faint);
+  margin-top: -0.15rem;
+}
+.pl-input {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  border-radius: 11px;
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  color: var(--dash-text);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.pl-input::placeholder {
+  color: var(--dash-text-faint);
+}
+.pl-input:focus {
+  outline: none;
+  border-color: var(--dash-accent);
+  box-shadow: 0 0 0 3px var(--dash-accent-soft);
+}
+.pl-textarea {
+  resize: vertical;
+  min-height: 92px;
+  line-height: 1.5;
+}
+.pl-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b92a6' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  background-size: 16px;
+  padding-right: 2.4rem;
+  cursor: pointer;
+}
+/* Campo com erro */
+.pl-field.is-error .pl-input {
+  border-color: var(--toast-error, #c0392b);
+  box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.15);
+}
+.pl-field__error {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--toast-error, #c0392b);
+  min-height: 0;
+}
+[data-theme="dark"] .pl-field__error {
+  color: var(--toast-error, #ff6b6b);
+}
+.pl-field:not(.is-error) .pl-field__error:empty {
+  display: none;
+}
+
+/* Ações do formulário */
+.pl-form__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--dash-border);
+}
+.pl-form__spacer {
+  flex: 1;
+}
+
+/* Botão de perigo (excluir) */
+.pl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.7rem 1.2rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.18s ease, filter 0.18s ease;
+}
+.pl-btn--danger {
+  color: var(--toast-error, #c0392b);
+  background-color: rgba(192, 57, 43, 0.1);
+}
+.pl-btn--danger:hover {
+  background-color: rgba(192, 57, 43, 0.18);
+}
+[data-theme="dark"] .pl-btn--danger {
+  color: #ff8a8a;
+  background-color: rgba(255, 107, 107, 0.14);
+}
+[data-theme="dark"] .pl-btn--danger:hover {
+  background-color: rgba(255, 107, 107, 0.22);
+}
+
+/* --------------------------------------------------------------------------
+   Confirmação de exclusão
+   -------------------------------------------------------------------------- */
+.pl-confirm__text {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--dash-text);
+  margin-bottom: 1.25rem;
+}
+.pl-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+/* Falha de gravação (rede/RLS) no formulário e na confirmação de exclusão.
+   Some quando vazio pra não abrir espaço à toa. */
+.pl-form__erro {
+  margin-top: 0.6rem;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  text-align: right;
+  color: var(--toast-error, #c0392b);
+}
+[data-theme="dark"] .pl-form__erro {
+  color: var(--toast-error, #ff6b6b);
+}
+.pl-form__erro:empty {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   Responsivo
+   -------------------------------------------------------------------------- */
+@media (max-width: 620px) {
+  .pl-card {
+    flex-wrap: wrap;
+  }
+  .pl-card__disc {
+    width: 56px;
+    height: 56px;
+  }
+  .pl-card__disc svg {
+    width: 28px;
+    height: 28px;
+  }
+  .pl-card__edit {
+    order: -1;
+    margin-left: auto;
+  }
+  .pl-form__grid {
+    grid-template-columns: 1fr;
+  }
+  .pl-form__actions {
+    flex-wrap: wrap;
+  }
+  .pl-form__spacer {
+    display: none;
+  }
+  .pl-form__actions .dash-btn,
+  .pl-form__actions .pl-btn {
+    flex: 1;
+  }
+}
+
+/* ==========================================================================
+   MESA DE ESTUDOS — as peças novas (ago/2026)
+   ========================================================================== */
+
+/* --- Cabeçalho: duas ações lado a lado ----------------------------------- */
+.mesa-acoes {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.mesa-acao {
+  white-space: nowrap;
+}
+
+/* --- Badge da aba "Para revisar" ----------------------------------------- */
+.pl-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+/* `display` explícito vence o `[hidden]` do navegador — sem esta linha, as abas
+   sem contador mostravam uma bolinha dourada sem número nenhum. */
+.pl-tab__badge[hidden] {
+  display: none;
+}
+.pl-tab__badge {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background-color: var(--st-rascunho);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+}
+.pl-tab.is-active .pl-tab__badge {
+  background-color: #fff;
+  color: var(--dash-navy);
+}
+[data-theme="dark"] .pl-tab.is-active .pl-tab__badge {
+  background-color: var(--brand-navy);
+  color: var(--brand-gold);
+}
+
+/* Bolinha de status compacta, para o seletor de planos. */
+.pl-status--mini {
+  padding: 0;
+  background: none;
+  border: 0;
+}
+
+/* --- Seletor de plano (só aparece com 2+ planos na aba) ------------------- */
+.mesa-seletor {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.4rem;
+  margin-bottom: 1rem;
+  scrollbar-width: thin;
+}
+.mesa-chip-plano {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  max-width: 260px;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-pill);
+  background-color: var(--dash-surface);
+  color: var(--dash-text-muted);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+}
+.mesa-chip-plano:hover {
+  color: var(--dash-text);
+  border-color: var(--dash-border-strong);
+}
+.mesa-chip-plano.is-active {
+  border-color: var(--dash-accent);
+  background-color: var(--dash-accent-soft);
+  color: var(--dash-text);
+  font-weight: var(--fw-semibold);
+}
+.mesa-chip-plano__ico {
+  display: grid;
+  place-items: center;
+  color: var(--dash-accent);
+}
+.mesa-chip-plano__ico svg {
+  width: 15px;
+  height: 15px;
+}
+.mesa-chip-plano__titulo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Card do plano selecionado ------------------------------------------- */
+.mesa-plano {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1.15rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+/* O plano que a Cogni está seguindo: borda dourada no card inteiro + a pílula
+   "seguindo agora". A pílula é o sinal principal — ela DIZ o que está acontecendo,
+   em vez de codificar a informação numa cor que só quem já sabe entende. */
+.mesa-plano.is-vigente {
+  border-color: var(--dash-accent);
+}
+.mesa-plano__selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--dash-accent-soft);
+  border: 1px solid var(--dash-accent);
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  font-weight: var(--fw-semibold);
+  color: var(--dash-text);
+  white-space: nowrap;
+}
+.mesa-plano__selo-ico {
+  display: grid;
+  place-items: center;
+  color: var(--dash-accent);
+}
+.mesa-plano__selo-ico svg {
+  width: 12px;
+  height: 12px;
+}
+.mesa-plano__metas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.1rem;
+  margin-top: 0.75rem;
+}
+.mesa-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  color: var(--dash-text-muted);
+}
+.mesa-meta__ico {
+  display: grid;
+  place-items: center;
+  color: var(--dash-accent);
+}
+.mesa-meta__ico svg {
+  width: 14px;
+  height: 14px;
+}
+.mesa-meta--foto {
+  font-style: italic;
+}
+.mesa-plano__acoes {
+  margin-top: 1rem;
+}
+
+/* Aviso de "a Cogni não está seguindo este plano agora": discreto de propósito —
+   é informação, não erro. Fica no laranja de "pausado", não em vermelho. */
+.mesa-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  background-color: var(--st-pausado-soft);
+  border: 1px solid var(--st-pausado);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--dash-text-muted);
+}
+.mesa-aviso__ico {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--st-pausado);
+}
+.mesa-aviso__ico svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* --- O quadro ------------------------------------------------------------ */
+.mesa-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.mesa-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--dash-border);
+  border-radius: 16px;
+  background-color: var(--dash-surface-2);
+}
+.mesa-col__head {
+  position: sticky;
+  /* O header do painel é sticky em top:0 — sem esta folga o cabeçalho da coluna
+     gruda ATRÁS dele e some. */
+  top: calc(var(--dash-header-h) + 8px);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.15rem 0.25rem 0.6rem;
+  background-color: var(--dash-surface-2);
+  border-radius: 10px;
+}
+.mesa-col__titulo {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: var(--fw-semibold);
+  color: var(--dash-text);
+}
+.mesa-col__contagem {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+  color: var(--dash-text-muted);
+}
+.mesa-col__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  /* Coluna vazia precisa de altura, senão não existe alvo pra soltar o card. */
+  min-height: 88px;
+  border-radius: 12px;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
+}
+.mesa-col__lista.is-alvo {
+  background-color: var(--dash-accent-soft);
+  box-shadow: inset 0 0 0 2px var(--dash-accent);
+}
+.mesa-col__vazio {
+  padding: 0.9rem 0.6rem;
+  font-family: var(--font-body);
+  font-size: 0.83rem;
+  line-height: 1.5;
+  color: var(--dash-text-faint);
+  text-align: center;
+}
+/* Some assim que existir card ou placeholder — evita o texto de "vazio"
+   convivendo com o buraco aberto durante o arraste. */
+.mesa-col__lista:has([data-dnd-card]) .mesa-col__vazio,
+.mesa-col__lista:has(.dnd-placeholder) .mesa-col__vazio {
+  display: none;
+}
+.mesa-col__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding: 0.5rem;
+  border: 1px dashed var(--dash-border-strong);
+  border-radius: 10px;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--dash-text-muted);
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+}
+.mesa-col__add:hover {
+  color: var(--dash-text);
+  border-color: var(--dash-accent);
+  background-color: var(--dash-accent-soft);
+}
+.mesa-col__add-ico {
+  display: grid;
+  place-items: center;
+}
+.mesa-col__add-ico svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* --- O card -------------------------------------------------------------- */
+.mesa-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  background-color: var(--dash-surface);
+  box-shadow: var(--dash-shadow-sm);
+  cursor: grab;
+  /* `manipulation` (e não `none`): mantém o toque simples funcionando pra abrir o
+     menu. O scroll durante o arraste é barrado por JS — `touch-action` é lido no
+     início do gesto, e trocar no meio não desfaz uma rolagem já iniciada. */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.mesa-card:hover {
+  border-color: var(--dash-border-strong);
+  box-shadow: var(--dash-shadow-card);
+}
+.mesa-card:focus-visible {
+  outline: 2px solid var(--dash-accent);
+  outline-offset: 2px;
+}
+.mesa-card__topo {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.mesa-card__titulo {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-body);
+  font-size: 0.94rem;
+  font-weight: var(--fw-semibold);
+  line-height: 1.35;
+  color: var(--dash-text);
+  /* Título de tarefa vem de foto e pode ser uma palavra sem espaço nenhum. */
+  overflow-wrap: anywhere;
+}
+.mesa-card__detalhe {
+  font-family: var(--font-body);
+  font-size: 0.83rem;
+  line-height: 1.45;
+  color: var(--dash-text-muted);
+  overflow-wrap: anywhere;
+}
+.mesa-card__menu {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--dash-text-faint);
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.mesa-card__menu:hover {
+  background-color: var(--dash-surface-2);
+  color: var(--dash-text);
+}
+.mesa-card__menu svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* --- Chips do card ------------------------------------------------------- */
+.mesa-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.mesa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--dash-text-muted);
+}
+.mesa-chip__ico {
+  display: grid;
+  place-items: center;
+}
+.mesa-chip__ico svg {
+  width: 12px;
+  height: 12px;
+}
+.mesa-chip--materia .mesa-chip__ico {
+  color: var(--dash-accent);
+}
+.mesa-chip--prazo.is-perto {
+  color: var(--st-pausado);
+  border-color: var(--st-pausado);
+  background-color: var(--st-pausado-soft);
+}
+.mesa-chip--prazo.is-atrasado {
+  color: #c0392b;
+  border-color: rgba(192, 57, 43, 0.4);
+  background-color: rgba(192, 57, 43, 0.1);
+  font-weight: var(--fw-semibold);
+}
+[data-theme="dark"] .mesa-chip--prazo.is-atrasado {
+  color: #ff8a7a;
+  border-color: rgba(255, 138, 122, 0.4);
+  background-color: rgba(255, 138, 122, 0.14);
+}
+.mesa-chip--confira {
+  color: var(--st-rascunho);
+  border-color: var(--st-rascunho);
+  background-color: var(--st-rascunho-soft);
+  font-weight: var(--fw-semibold);
+}
+
+/* --- A faixa da faísca (card movido pela Cogni) -------------------------- */
+.mesa-card__cogni {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.15rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--dash-border);
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  color: var(--dash-text-muted);
+}
+.mesa-card__faisca {
+  display: grid;
+  place-items: center;
+  color: var(--dash-accent);
+}
+.mesa-card__faisca svg {
+  width: 13px;
+  height: 13px;
+}
+.mesa-card__porque {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+.mesa-desfazer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--dash-border);
+  border-radius: var(--radius-pill);
+  background-color: var(--dash-surface-2);
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  color: var(--dash-text-muted);
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+.mesa-desfazer:hover:not(:disabled) {
+  color: var(--dash-text);
+  border-color: var(--dash-border-strong);
+}
+.mesa-desfazer:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.mesa-desfazer__ico {
+  display: grid;
+  place-items: center;
+}
+.mesa-desfazer__ico svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* O pulso de quando a Cogni move o card sozinha com a tela aberta. É o momento
+   "uau": sem ele o card apareceria noutra coluna e ninguém veria acontecer. */
+@keyframes mesa-pulso-cogni {
+  0% {
+    box-shadow: 0 0 0 0 var(--dash-accent-soft), var(--dash-shadow-card);
+  }
+  55% {
+    box-shadow: 0 0 0 8px rgba(240, 163, 21, 0), var(--dash-shadow-pop);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(240, 163, 21, 0), var(--dash-shadow-sm);
+  }
+}
+.mesa-card.is-cogni-move {
+  border-color: var(--dash-accent);
+  animation: mesa-pulso-cogni 0.9s ease-out;
+}
+
+/* --- Menu de ações do card ----------------------------------------------- */
+.mesa-menu {
+  position: absolute;
+  top: 30px;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 178px;
+  padding: 0.3rem;
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  background-color: var(--dash-surface);
+  box-shadow: var(--dash-shadow-pop);
+}
+.mesa-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--dash-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.mesa-menu__item:hover,
+.mesa-menu__item:focus-visible {
+  background-color: var(--dash-surface-2);
+}
+.mesa-menu__item--perigo {
+  color: #c0392b;
+}
+[data-theme="dark"] .mesa-menu__item--perigo {
+  color: #ff8a7a;
+}
+.mesa-menu__ico {
+  display: grid;
+  place-items: center;
+  color: var(--dash-text-faint);
+}
+.mesa-menu__ico svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* --- Selo "ao vivo" ------------------------------------------------------ */
+.mesa-selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1.25rem;
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  color: var(--dash-text-faint);
+}
+.mesa-selo::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--st-ativo);
+}
+.mesa-selo.is-degradado::before {
+  background-color: var(--dash-text-faint);
+}
+.mesa-selo:empty {
+  display: none;
+}
+
+/* --- Estado vazio geral -------------------------------------------------- */
+.mesa-empty__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+/* ==========================================================================
+   DRAG AND DROP (classes escritas por js/dashboard/dnd.js)
+   ========================================================================== */
+
+/* A camada vive no <body> porque `.dash-section` tem `animation: … both`, o que
+   deixa um `transform` permanente — e ancestral com transform vira bloco de
+   contenção pra `position: fixed`. Dentro da seção, o fantasma se posicionaria
+   relativo a ela e pintaria por baixo do header (z-index 110) e da tab bar (113). */
+.dnd-camada {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  pointer-events: none;
+}
+
+/* O card levantado: sombra funda, leve escala e ~2° de rotação. A rotação é o que
+   faz o card "sair da pilha" — só a sombra deixa o estado ambíguo. */
+.dnd-camada > .mesa-card,
+.mesa-card.is-arrastando {
+  pointer-events: none;
+  cursor: grabbing;
+  border-color: var(--dash-accent);
+  box-shadow: var(--dash-shadow-pop);
+  transform-origin: center;
+  will-change: transform;
+}
+.dnd-camada > .mesa-card {
+  animation: dnd-levantar 0.14s ease-out forwards;
+}
+@keyframes dnd-levantar {
+  to {
+    scale: 1.03;
+    rotate: 2deg;
+  }
+}
+/* Fora de qualquer coluna: o card avisa que soltar ali não vale. */
+.mesa-card.is-arrastando.is-fora {
+  opacity: 0.65;
+  border-color: var(--dash-border-strong);
+}
+
+/* Pego pelo teclado: o card fica no fluxo (não há fantasma), então o destaque
+   precisa vir da borda, não da sombra. */
+.mesa-card.is-pego {
+  border-color: var(--dash-accent);
+  box-shadow: 0 0 0 3px var(--dash-accent-soft), var(--dash-shadow-card);
+}
+
+.dnd-placeholder {
+  border: 2px dashed var(--dash-accent);
+  border-radius: 12px;
+  background-color: var(--dash-accent-soft);
+}
+
+body.dnd-arrastando {
+  user-select: none;
+  cursor: grabbing;
+}
+
+/* Região de anúncio e instruções: existe só pro leitor de tela. */
+.dnd-anuncio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   CAPTURA POR FOTO (modal)
+   ========================================================================== */
+
+.cap {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.cap__intro {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--dash-text-muted);
+}
+.cap__botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.cap__botao {
+  flex: 1 1 180px;
+}
+/* Os <input type="file"> ficam fora da tela, mas continuam no fluxo:
+   `display: none` impediria o `.click()` programático em alguns navegadores. */
+.cap__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.cap__previa {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.7rem;
+}
+.cap__item {
+  position: relative;
+  margin: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--dash-border);
+  background-color: var(--dash-surface-2);
+}
+.cap__thumb {
+  display: block;
+  width: 100%;
+  height: 130px;
+  object-fit: cover;
+}
+.cap__remover {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background-color: rgba(8, 12, 56, 0.72);
+  color: #fff;
+  cursor: pointer;
+}
+.cap__remover svg {
+  width: 14px;
+  height: 14px;
+}
+.cap__acoes {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+.cap__contagem {
+  margin-right: auto;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  color: var(--dash-text-faint);
+}
+.cap__lgpd {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--dash-text-faint);
+}
+.cap__carregando {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 2.5rem 1rem;
+}
+.cap__carregando-texto {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--dash-text-muted);
+}
+.cap__ruim {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+}
+.cap__ruim-ico {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background-color: var(--dash-surface-2);
+  color: var(--dash-text-faint);
+}
+.cap__ruim-ico svg {
+  width: 22px;
+  height: 22px;
+}
+.cap__ruim-titulo {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: var(--fw-semibold);
+  color: var(--dash-text);
+}
+.cap__ruim-dica {
+  max-width: 42ch;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--dash-text-muted);
+}
+.cap__bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.cap__subtitulo {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: var(--fw-semibold);
+  color: var(--dash-text);
+}
+.cap__tarefas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.cap__tarefa {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  background-color: var(--dash-surface-2);
+}
+.cap__tarefa.is-confira {
+  border-color: var(--st-rascunho);
+  background-color: var(--st-rascunho-soft);
+}
+.cap__tarefa-topo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cap__tarefa-ico {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--dash-accent);
+}
+.cap__tarefa-ico svg {
+  width: 16px;
+  height: 16px;
+}
+.cap__tarefa-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.cap__excluir {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--dash-text-faint);
+  cursor: pointer;
+}
+.cap__excluir:hover {
+  color: #c0392b;
+  background-color: rgba(192, 57, 43, 0.1);
+}
+.cap__excluir svg {
+  width: 15px;
+  height: 15px;
+}
+.cap__confira {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  align-self: flex-start;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--dash-surface);
+  border: 1px solid var(--st-rascunho);
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  font-weight: var(--fw-semibold);
+  color: var(--st-rascunho);
+}
+.cap__confira-ico {
+  display: grid;
+  place-items: center;
+}
+.cap__confira-ico svg {
+  width: 12px;
+  height: 12px;
+}
+.cap__adicionar {
+  align-self: flex-start;
+}
+.cap__vazio {
+  padding: 0.8rem;
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  color: var(--dash-text-faint);
+  text-align: center;
+}
+.cap__rodape {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--dash-border);
+}
+
+/* "Ver o que a Cogni leu": a auditoria que substitui guardar a foto. */
+.cap__leitura {
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  background-color: var(--dash-surface-2);
+}
+.cap__leitura > summary {
+  padding: 0.6rem 0.85rem;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: var(--fw-medium);
+  color: var(--dash-text-muted);
+  cursor: pointer;
+}
+.cap__leitura > summary:hover {
+  color: var(--dash-text);
+}
+.cap__leitura-texto {
+  margin: 0;
+  padding: 0 0.85rem 0.85rem;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--dash-text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ==========================================================================
+   MOBILE — as três colunas viram um carrossel
+   ========================================================================== */
+
+@media (max-width: 860px) {
+  .mesa-board {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    /* Uma coluna por vez, encaixando: rolar de lado é a navegação do quadro no
+       celular, e sem o snap ela para sempre no meio de duas colunas. */
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: 0.75rem;
+    padding-bottom: 0.5rem;
+    margin-inline: -0.25rem;
+    padding-inline: 0.25rem;
+  }
+  .mesa-col {
+    flex: 0 0 86%;
+    scroll-snap-align: center;
+  }
+  /* ⚠️ `overflow-x: auto` faz o `overflow-y` computar como `auto` — e com isso o
+     `.mesa-board` vira a referência do `sticky`, no lugar da página. O offset de
+     80px (a altura do header do painel) passava a contar a partir do topo do
+     QUADRO e jogava o cabeçalho da coluna em cima do primeiro card. Aqui o
+     quadro não rola na vertical, então o offset certo é zero. */
+  .mesa-col__head {
+    top: 0;
+  }
+  /* Durante o arraste o snap é DESLIGADO: com ele ligado o navegador re-encaixa a
+     cada frame e briga com o `scrollLeft` do auto-scroll. */
+  .mesa-board.is-arrastando {
+    scroll-snap-type: none;
+    scroll-behavior: auto;
+  }
+  .mesa-acoes {
+    width: 100%;
+  }
+  .mesa-acao {
+    flex: 1;
+  }
+  /* Quatro abas ("Para revisar" incluída) não cabem em 320px. A pílula rola por
+     dentro em vez de empurrar a página — estouro horizontal quebra TODAS as telas,
+     não só esta. */
+  .pl-tabs {
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .pl-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .pl-tab {
+    flex: 0 0 auto;
+  }
+  .cap__tarefa-meta {
+    grid-template-columns: 1fr;
+  }
+  .cap__rodape .dash-btn {
+    flex: 1 1 140px;
+  }
+}
+
+/* 320px: o menor aparelho que o painel precisa aguentar. */
+@media (max-width: 380px) {
+  .mesa-col {
+    flex-basis: 90%;
+  }
+  .mesa-chip-plano {
+    max-width: 200px;
+  }
+  .cap__botao {
+    flex-basis: 100%;
+  }
+  /* Aperta as abas pra caber mais texto antes de precisar rolar. */
+  .pl-tab {
+    padding: 0.45rem 0.7rem;
+    font-size: 0.85rem;
+  }
+}
+
+/* ==========================================================================
+   Movimento reduzido — desliga as transições, mantém os estados
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .mesa-card,
+  .mesa-col__lista,
+  .mesa-chip-plano,
+  .mesa-col__add,
+  .dnd-placeholder {
+    transition: none !important;
+  }
+  .dnd-camada > .mesa-card,
+  .mesa-card.is-cogni-move {
+    animation: none !important;
+  }
+  .dnd-camada > .mesa-card {
+    scale: 1;
+    rotate: 0deg;
+  }
+}

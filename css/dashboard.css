@@ -84,6 +84,10 @@
   --mat-outros-soft: rgba(100, 116, 139, 0.12);
 
   /* Cores por status de plano (usadas em Início e Planos) */
+  /* `rascunho`: plano que a IA montou de uma foto e o pai ainda não aprovou.
+     Dourado da marca de propósito — não é um estado de erro, é um convite. */
+  --st-rascunho: #b07607;
+  --st-rascunho-soft: rgba(240, 163, 21, 0.16);
   --st-ativo: #18a058;
   --st-ativo-soft: rgba(24, 160, 88, 0.12);
   --st-andamento: #2563eb;
@@ -157,6 +161,8 @@
   --mat-outros-soft: rgba(148, 163, 184, 0.18);
 
   /* Status no dark: cores mais claras + fundos mais presentes */
+  --st-rascunho: #f0a315;
+  --st-rascunho-soft: rgba(240, 163, 21, 0.2);
   --st-ativo: #4ed699;
   --st-ativo-soft: rgba(78, 214, 153, 0.18);
   --st-andamento: #6ea0ff;

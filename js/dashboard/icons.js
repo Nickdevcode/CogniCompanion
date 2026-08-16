@@ -64,6 +64,27 @@ export const ICON = {
   // Editor de rosto: a própria tela do robô (moldura + dois olhos), que é
   // literalmente o que a seção deixa a criança desenhar.
   face: stroke('<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><rect x="6.5" y="9.5" width="4.5" height="5" rx="2" fill="currentColor" stroke="none"/><rect x="13" y="9.5" width="4.5" height="5" rx="2" fill="currentColor" stroke="none"/>'),
+
+  /* --- Mesa de Estudos (ago/2026) --- */
+  // Quadro de colunas: o desenho da própria seção (as três colunas do Kanban).
+  columns: stroke('<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M9 4.5v15M15 4.5v15"/>'),
+  // Câmera: o botão "Da foto". A foto é o atalho que evita o pai digitar o plano
+  // inteiro — é a porta de entrada principal da tela, não um extra.
+  camera: stroke('<path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1.2-2h8.2l1.2 2h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5Z"/><circle cx="12" cy="12.5" r="3.4"/>'),
+  // Imagem/galeria: o botão "Escolher arquivo" (a foto que já está no celular).
+  image: stroke('<rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.5" cy="10" r="1.6"/><path d="m4 17 4.5-4.5 3 3L15.5 11l4.5 4.5"/>'),
+  // Faísca: marca o card que a COGNI moveu sozinha. Ícone, não o emoji ✨ — a
+  // regra do projeto é ícone na UI, e um emoji herda a fonte do sistema (muda de
+  // desenho e de cor entre Windows/Android e ignora o tema).
+  sparkle: stroke('<path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z"/><path d="M18.5 3.5v3M20 5h-3"/>', "1.7"),
+  // Menu "⋯" do card: o caminho equivalente a TODO movimento que o arraste faz.
+  // Ele não é um extra de conveniência — é o que garante que o quadro inteiro é
+  // operável sem arrastar (mouse, teclado e leitor de tela).
+  dots: stroke('<circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/>'),
+  // Desfazer: devolve pra coluna anterior o card que a Cogni moveu.
+  undo: stroke('<path d="M4 9h10a5 5 0 0 1 0 10h-4"/><path d="M8 5 4 9l4 4"/>'),
+  arrowLeft: stroke('<path d="M19 12H5M11 6l-6 6 6 6"/>', "2.1"),
+  arrowRight: stroke('<path d="M5 12h14M13 6l6 6-6 6"/>', "2.1"),
 };
 
 /* --------------------------------------------------------------------------

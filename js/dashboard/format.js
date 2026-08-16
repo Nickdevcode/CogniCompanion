@@ -144,11 +144,34 @@ export function serieLabel(valor) {
 
 /** Status de plano (planos_estudo.status) → rótulo legível. */
 const STATUS_LABELS = {
+  // `rascunho` é estado de SISTEMA, não escolha do pai: é como nasce o plano que a
+  // IA montou de uma foto e ele ainda não aprovou. Não entra no <select> do
+  // formulário — só aparece como badge e como a aba "Para revisar".
+  rascunho: "Rascunho",
   ativo: "Ativo",
   em_andamento: "Em andamento",
   pausado: "Pausado",
   concluido: "Concluído",
 };
+
+/**
+ * Status que fazem a Cogni SEGUIR o plano (= injetar no system prompt dela).
+ * Espelha `STATUS_VIGENTES` de `server/modules/planos.js`. Ver `planoVigente()`.
+ */
+export const STATUS_VIGENTES = ["ativo", "em_andamento"];
+
+/** Colunas do quadro da Mesa de Estudos (`plano_tarefas.coluna`), na ordem visual. */
+export const COLUNAS = [
+  { id: "a_fazer", titulo: "A fazer" },
+  { id: "fazendo", titulo: "Fazendo" },
+  { id: "feito", titulo: "Feito" },
+];
+
+/** @returns {string} rótulo legível da coluna (fallback: "A fazer", como o servidor). */
+export function colunaLabel(coluna) {
+  const c = COLUNAS.find((x) => x.id === coluna);
+  return (c || COLUNAS[0]).titulo;
+}
 
 /** Dias da semana (chave curta usada em horario.dias) → rótulo curto. */
 const DIA_LABELS = {
@@ -339,6 +362,109 @@ export function formatQuandoRevisar(value, now = new Date()) {
   if (d < 14) return "na semana que vem";
   if (d < 60) return `em ${Math.round(d / 7)} semanas`;
   return `em ${Math.round(d / 30)} meses`;
+}
+
+/**
+ * Prazo de uma tarefa do quadro (`plano_tarefas.prazo`, um `date` "YYYY-MM-DD").
+ *
+ * Diferente de `formatQuandoRevisar`, aqui a comparação é de CALENDÁRIO, não de
+ * relógio: `prazo` é um dia inteiro, não um instante. Uma tarefa com prazo hoje
+ * não está atrasada às 8h da manhã.
+ *
+ * @param {string|Date} value
+ * @param {Date} [now]
+ * @returns {{ texto: string, atrasado: boolean, perto: boolean }|null}
+ *   `null` se não há prazo ou a data é inválida — quem chama simplesmente não
+ *   desenha a linha (tarefa sem prazo é o caso comum, não uma falha).
+ */
+export function formatPrazo(value, now = new Date()) {
+  if (!value) return null;
+  const d = diffDias(now, value);
+  if (!Number.isFinite(d)) return null;
+  if (d < 0) {
+    const atraso = -d;
+    return {
+      texto: atraso === 1 ? "atrasado 1 dia" : `atrasado ${atraso} dias`,
+      atrasado: true,
+      perto: false,
+    };
+  }
+  if (d === 0) return { texto: "hoje", atrasado: false, perto: true };
+  if (d === 1) return { texto: "amanhã", atrasado: false, perto: true };
+  if (d < 7) return { texto: `em ${d} dias`, atrasado: false, perto: d <= 2 };
+  return { texto: `até ${_dayFmt.format(toDate(value))}`, atrasado: false, perto: false };
+}
+
+/* --------------------------------------------------------------------------
+   Planos — qual deles a Cogni está seguindo
+   -------------------------------------------------------------------------- */
+
+/**
+ * O plano venceu? `criado_em + duracao_dias` já passou.
+ *
+ * "1 dia dura 1 dia": um plano criado hoje com `duracao_dias: 1` vence amanhã.
+ * `duracao_dias` null/0 = sem prazo, nunca vence.
+ * @returns {boolean}
+ */
+export function planoVencido(plano, now = new Date()) {
+  const dias = Number(plano && plano.duracao_dias) || 0;
+  if (dias <= 0) return false;
+  const inicio = toDate(plano.criado_em);
+  if (Number.isNaN(inicio.getTime())) return false;
+  return inicio.getTime() + dias * DIA_MS <= toDate(now).getTime();
+}
+
+/**
+ * O plano que a Cogni está seguindo AGORA — a mesma regra de `obterPlanoAtivo()`
+ * em `server/modules/planos.js`.
+ *
+ * ⚠️ Isto é uma SEGUNDA CÓPIA de uma regra do servidor, o que o projeto evita por
+ * princípio (ver a nota das 14 matérias). Ela existe porque a tela precisa dizer
+ * ao pai *"a Cogni não está seguindo este plano agora"* quando ele abre o quadro
+ * de um plano pausado/concluído/rascunho/vencido — e o site não tem endpoint que
+ * responda isso. Se a regra do servidor mudar, esta função muda junto.
+ *
+ * @param {Array<object>} planos — linhas de `planos_estudo`
+ * @param {Date} [now]
+ * @returns {object|null} o plano vigente, ou `null` se nenhum está valendo
+ */
+export function planoVigente(planos, now = new Date()) {
+  const candidatos = (planos || []).filter(
+    (p) => STATUS_VIGENTES.includes(p.status) && !planoVencido(p, now)
+  );
+  if (!candidatos.length) return null;
+  // Desempate do servidor, na mesma ordem: atualizado_em → criado_em → id.
+  return candidatos.slice().sort((a, b) => {
+    const ta = toDate(a.atualizado_em || a.criado_em).getTime() || 0;
+    const tb = toDate(b.atualizado_em || b.criado_em).getTime() || 0;
+    if (tb !== ta) return tb - ta;
+    const ca = toDate(a.criado_em).getTime() || 0;
+    const cb = toDate(b.criado_em).getTime() || 0;
+    if (cb !== ca) return cb - ca;
+    return Number(b.id) - Number(a.id);
+  })[0];
+}
+
+/**
+ * Por que este plano NÃO é o que a Cogni segue — em linguagem de pai.
+ *
+ * Existe pra tela não se limitar a um aviso genérico: o pai que abre um plano
+ * pausado e arrasta cards esperando o robô reagir merece saber o motivo, não só
+ * o fato.
+ * @returns {string|null} `null` quando o plano É o vigente (nada a avisar)
+ */
+export function motivoNaoVigente(plano, planos, now = new Date()) {
+  if (!plano) return null;
+  const vigente = planoVigente(planos, now);
+  if (vigente && String(vigente.id) === String(plano.id)) return null;
+  if (plano.status === "rascunho") return "Este plano ainda está esperando sua aprovação.";
+  if (plano.status === "pausado") return "Este plano está pausado.";
+  if (plano.status === "concluido") return "Este plano já foi concluído.";
+  if (planoVencido(plano, now)) return "O prazo deste plano terminou.";
+  // Sobrou o caso de dois planos vigentes ao mesmo tempo: o servidor segue só o
+  // mais recente, e o pai precisa saber qual.
+  if (vigente) return `A Cogni está seguindo “${vigente.titulo}” no momento.`;
+  return "A Cogni não está seguindo nenhum plano agora.";
 }
 
 /* --------------------------------------------------------------------------

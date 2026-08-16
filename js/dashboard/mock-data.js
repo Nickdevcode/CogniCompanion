@@ -18,6 +18,7 @@
  *   - Todos os campos em snake_case (como o Postgres devolve).
  *   - Companion é SINGLE-CHILD: um responsável ↔ uma criança (a pareada).
  *   - `conversas` é read-only pelo site (a RLS bloqueia escrita; grava o servidor).
+ *   - `planos_estudo` e `plano_tarefas` são as DUAS tabelas em que o site escreve.
  *
  * No modo mock, nada escreve no banco: os formulários (Planos, perfil) operam
  * sobre cópias em memória só pra simular a experiência.
@@ -353,6 +354,210 @@ let planos = [
     status: "concluido",
     criado_em: "2026-04-01T08:00:00-03:00",
     atualizado_em: "2026-04-21T08:00:00-03:00",
+  },
+  {
+    // O plano que a IA montou de uma foto e o pai ainda NÃO aprovou. Nasce
+    // `rascunho` de propósito: o servidor já ignora tudo que não é ativo/em
+    // andamento, então a trava de aprovação custou zero linha no robô.
+    id: 25,
+    crianca_id: crianca.id,
+    responsavel_id: responsavel.id,
+    titulo: "Atividades da semana",
+    conteudo:
+      "Terminar a lista de frações e ler o capítulo do livro de português " +
+      "antes da entrega de sexta.",
+    foco: "matematica",
+    duracao_dias: 7,
+    status: "rascunho",
+    origem: "foto",
+    extraido_texto:
+      "AGENDA — 26/05\nMat: exercícios pág. 42 e 43 (frações equivalentes)\n" +
+      "Port: ler cap. 3 do livro e responder as 5 perguntas\nEntregar sexta",
+    criado_em: "2026-05-26T20:10:00-03:00",
+    atualizado_em: "2026-05-26T20:10:00-03:00",
+  },
+];
+
+/**
+ * Os cards do quadro — espelham `plano_tarefas` (Mesa de Estudos).
+ *
+ * O conjunto é escolhido pra exercitar a tela inteira sem banco: um card movido
+ * pela Cogni (selo ✨ + Desfazer + a evidência que explica o porquê), um com
+ * confiança baixa (chip "confira"), um prazo atrasado, um prazo "hoje", e as três
+ * colunas com conteúdo. `ordem` já nasce com o gap de 1000.
+ */
+let tarefas = [
+  {
+    id: 101,
+    plano_id: 22,
+    crianca_id: crianca.id,
+    titulo: "Tabuada do 7",
+    detalhe: "Do 7×1 ao 7×10, em voz alta com a Cogni",
+    materia: "matematica",
+    coluna: "a_fazer",
+    ordem: 1000,
+    prazo: "2026-05-29",
+    estimativa_min: 15,
+    origem: "pai",
+    movida_por: null,
+    movida_em: null,
+    evidencia: null,
+    confianca: null,
+    concluida_em: null,
+    criado_em: "2026-05-18T11:00:00-03:00",
+    atualizado_em: "2026-05-18T11:00:00-03:00",
+  },
+  {
+    id: 102,
+    plano_id: 22,
+    crianca_id: crianca.id,
+    titulo: "Ler o capítulo 3",
+    detalhe: "E contar pra Cogni a parte de que mais gostou",
+    materia: "portugues",
+    coluna: "a_fazer",
+    ordem: 2000,
+    prazo: "2026-05-25",
+    estimativa_min: 20,
+    origem: "ia_foto",
+    movida_por: null,
+    movida_em: null,
+    evidencia: null,
+    // Abaixo de 0.6 → a tela marca "confira". Letra de mão apagada na foto.
+    confianca: 0.42,
+    concluida_em: null,
+    criado_em: "2026-05-20T19:40:00-03:00",
+    atualizado_em: "2026-05-20T19:40:00-03:00",
+  },
+  {
+    id: 103,
+    plano_id: 22,
+    crianca_id: crianca.id,
+    titulo: "Desafio dos dobros",
+    detalhe: null,
+    materia: "matematica",
+    coluna: "a_fazer",
+    ordem: 3000,
+    prazo: null,
+    estimativa_min: 10,
+    origem: "pai",
+    movida_por: null,
+    movida_em: null,
+    evidencia: null,
+    confianca: null,
+    concluida_em: null,
+    criado_em: "2026-05-21T09:00:00-03:00",
+    atualizado_em: "2026-05-21T09:00:00-03:00",
+  },
+  {
+    // O card que a Cogni moveu sozinha enquanto a criança conversava.
+    id: 104,
+    plano_id: 22,
+    crianca_id: crianca.id,
+    titulo: "Frações página 42",
+    detalhe: "Páginas 42 e 43",
+    materia: "matematica",
+    coluna: "fazendo",
+    ordem: 1000,
+    prazo: "2026-05-27",
+    estimativa_min: 25,
+    origem: "ia_foto",
+    movida_por: "cogni",
+    movida_em: "2026-05-27T18:42:00-03:00",
+    evidencia: {
+      motivo: "conversa",
+      conceito: "fracoes equivalentes",
+      em: "2026-05-27T18:42:00-03:00",
+    },
+    confianca: 0.88,
+    concluida_em: null,
+    criado_em: "2026-05-20T19:40:00-03:00",
+    atualizado_em: "2026-05-27T18:42:00-03:00",
+  },
+  {
+    id: 105,
+    plano_id: 22,
+    crianca_id: crianca.id,
+    titulo: "Porcentagem no dia a dia",
+    detalhe: "Descontos da lista de compras",
+    materia: "matematica",
+    coluna: "feito",
+    ordem: 1000,
+    prazo: null,
+    estimativa_min: 15,
+    origem: "pai",
+    movida_por: "cogni",
+    movida_em: "2026-05-26T18:05:00-03:00",
+    evidencia: {
+      motivo: "pratica",
+      conceito: "porcentagem",
+      acertos: 2,
+      em: "2026-05-26T18:05:00-03:00",
+    },
+    confianca: null,
+    concluida_em: "2026-05-26T18:05:00-03:00",
+    criado_em: "2026-05-19T09:00:00-03:00",
+    atualizado_em: "2026-05-26T18:05:00-03:00",
+  },
+  {
+    id: 106,
+    plano_id: 22,
+    crianca_id: crianca.id,
+    titulo: "Lista de somas",
+    detalhe: null,
+    materia: "matematica",
+    coluna: "feito",
+    ordem: 2000,
+    prazo: null,
+    estimativa_min: null,
+    origem: "pai",
+    movida_por: null,
+    movida_em: null,
+    evidencia: null,
+    confianca: null,
+    concluida_em: "2026-05-24T17:20:00-03:00",
+    criado_em: "2026-05-18T11:00:00-03:00",
+    atualizado_em: "2026-05-24T17:20:00-03:00",
+  },
+  /* --- Cards do rascunho vindo de foto (plano 25) --- */
+  {
+    id: 107,
+    plano_id: 25,
+    crianca_id: crianca.id,
+    titulo: "Exercícios de frações",
+    detalhe: "Páginas 42 e 43",
+    materia: "matematica",
+    coluna: "a_fazer",
+    ordem: 1000,
+    prazo: "2026-05-29",
+    estimativa_min: 30,
+    origem: "ia_foto",
+    movida_por: null,
+    movida_em: null,
+    evidencia: null,
+    confianca: 0.91,
+    concluida_em: null,
+    criado_em: "2026-05-26T20:10:00-03:00",
+    atualizado_em: "2026-05-26T20:10:00-03:00",
+  },
+  {
+    id: 108,
+    plano_id: 25,
+    crianca_id: crianca.id,
+    titulo: "Ler o capítulo 3 e responder",
+    detalhe: "5 perguntas no fim do capítulo",
+    materia: "portugues",
+    coluna: "a_fazer",
+    ordem: 2000,
+    prazo: "2026-05-29",
+    estimativa_min: 40,
+    origem: "ia_foto",
+    movida_por: null,
+    movida_em: null,
+    evidencia: null,
+    confianca: 0.55,
+    concluida_em: null,
+    criado_em: "2026-05-26T20:10:00-03:00",
+    atualizado_em: "2026-05-26T20:10:00-03:00",
   },
 ];
 
@@ -811,6 +1016,10 @@ async function _mockCriarPlano(dados) {
     foco: dados.foco || "outros",
     duracao_dias: Number(dados.duracao_dias) || 0,
     status: dados.status || "ativo",
+    // Mesma regra do modo real: `origem` tem default no banco e o texto extraído
+    // só existe em plano vindo de foto.
+    origem: dados.origem || "manual",
+    extraido_texto: dados.extraido_texto || null,
     criado_em: agora,
     atualizado_em: agora,
   };
@@ -835,6 +1044,112 @@ async function _mockRemoverPlano(id) {
   const antes = planos.length;
   planos = planos.filter((p) => p.id !== id);
   return planos.length < antes;
+}
+
+/* --- Quadro da Mesa de Estudos (mock) ------------------------------------ */
+
+const COLUNAS_TAREFA = ["a_fazer", "fazendo", "feito"];
+
+function nextTarefaId() {
+  return tarefas.reduce((max, t) => Math.max(max, t.id), 100) + 1;
+}
+
+/** Mesma ordenação de três critérios do modo real (coluna, ordem, id). */
+function ordenarTarefas(lista) {
+  const peso = (t) => COLUNAS_TAREFA.indexOf(t.coluna);
+  return lista.slice().sort((a, b) => {
+    if (peso(a) !== peso(b)) return peso(a) - peso(b);
+    if (a.ordem !== b.ordem) return a.ordem - b.ordem;
+    return a.id - b.id;
+  });
+}
+
+async function _mockTarefas(planoId) {
+  await delay();
+  const lista = planoId == null ? tarefas : tarefas.filter((t) => t.plano_id === planoId);
+  return ordenarTarefas(lista).map((t) => ({ ...t }));
+}
+
+async function _mockCriarTarefa(dados) {
+  await delay(80);
+  const agora = MOCK_NOW.toISOString();
+  const tarefa = {
+    id: nextTarefaId(),
+    plano_id: dados.plano_id,
+    crianca_id: crianca.id,
+    titulo: dados.titulo || "Nova tarefa",
+    detalhe: dados.detalhe || null,
+    materia: dados.materia || null,
+    coluna: COLUNAS_TAREFA.includes(dados.coluna) ? dados.coluna : "a_fazer",
+    ordem: Number.isFinite(Number(dados.ordem)) ? Number(dados.ordem) : 1000,
+    prazo: dados.prazo || null,
+    estimativa_min: dados.estimativa_min == null ? null : Number(dados.estimativa_min),
+    origem: dados.origem || "pai",
+    movida_por: null,
+    movida_em: null,
+    evidencia: null,
+    confianca: dados.confianca == null ? null : Number(dados.confianca),
+    concluida_em: null,
+    criado_em: agora,
+    atualizado_em: agora,
+  };
+  tarefas.push(tarefa);
+  return { ...tarefa };
+}
+
+async function _mockAtualizarTarefa(id, patch) {
+  await delay(80);
+  const i = tarefas.findIndex((t) => t.id === id);
+  if (i === -1) return null;
+  tarefas[i] = { ...tarefas[i], ...patch, atualizado_em: MOCK_NOW.toISOString() };
+  return { ...tarefas[i] };
+}
+
+async function _mockMoverTarefa(id, { coluna, ordem } = {}) {
+  await delay(60);
+  const i = tarefas.findIndex((t) => t.id === id);
+  if (i === -1) return null;
+  const agora = MOCK_NOW.toISOString();
+  // Espelha o modo real: quem move pelo site é o PAI, então o selo ✨ da Cogni
+  // apaga, e `concluida_em` acompanha a coluna nos dois sentidos.
+  tarefas[i] = {
+    ...tarefas[i],
+    coluna,
+    ordem: Number(ordem),
+    movida_por: null,
+    movida_em: null,
+    concluida_em: coluna === "feito" ? agora : null,
+    atualizado_em: agora,
+  };
+  return { ...tarefas[i] };
+}
+
+async function _mockRemoverTarefa(id) {
+  await delay(80);
+  const antes = tarefas.length;
+  tarefas = tarefas.filter((t) => t.id !== id);
+  return tarefas.length < antes;
+}
+
+async function _mockCriarPlanoComTarefas(plano, lista) {
+  const criado = await _mockCriarPlano(plano);
+  // O mock não simula a falha do 2º insert (nem o rollback): a diferença é do
+  // banco, não da tela, e simular erro no modo de demonstração só atrapalharia.
+  const cards = [];
+  for (const [i, t] of (lista || []).entries()) {
+    cards.push(
+      await _mockCriarTarefa({
+        ...t,
+        plano_id: criado.id,
+        ordem: Number.isFinite(Number(t.ordem)) ? Number(t.ordem) : (i + 1) * 1000,
+      })
+    );
+  }
+  return { ...criado, tarefas: cards };
+}
+
+async function _mockAprovarPlano(id) {
+  return _mockAtualizarPlano(id, { status: "ativo" });
 }
 
 async function _mockAtualizarCrianca(patch) {
@@ -881,6 +1196,84 @@ export async function atualizarPlano(id, patch) {
  */
 export async function removerPlano(id) {
   return USAR_SUPABASE ? supa.removerPlano(id) : _mockRemoverPlano(id);
+}
+
+/* --- Quadro da Mesa de Estudos (`plano_tarefas`) ⭐ ago/2026 --------------
+   A segunda tabela em que o site escreve. Toda escrita daqui também avisa o
+   robô (`pingPlanosAtualizados`), mas isso mora na camada de dados real — o
+   modo mock não anuncia cards que só existem na memória do navegador. */
+
+/**
+ * Cards do quadro. Sem `planoId`, todos os da criança; com `planoId`, só os
+ * daquele plano — que é o quadro que a tela mostra.
+ * @param {number} [planoId]
+ * @returns {Promise<Array<object>>}
+ */
+export async function getTarefas(planoId) {
+  return USAR_SUPABASE ? supa.getTarefas(planoId) : _mockTarefas(planoId);
+}
+
+/**
+ * Cria um card. `ordem` é obrigatória no banco — sempre mande.
+ * @param {object} dados
+ * @returns {Promise<object>}
+ */
+export async function criarTarefa(dados) {
+  return USAR_SUPABASE ? supa.criarTarefa(dados) : _mockCriarTarefa(dados);
+}
+
+/**
+ * Edita texto/metadados de um card. Pra trocar de coluna, use `moverTarefa`.
+ * @param {number} id
+ * @param {object} patch
+ * @returns {Promise<object|null>}
+ */
+export async function atualizarTarefa(id, patch) {
+  return USAR_SUPABASE
+    ? supa.atualizarTarefa(id, patch)
+    : _mockAtualizarTarefa(id, patch);
+}
+
+/**
+ * Move um card de coluna/posição. Limpa `movida_por` (foi o pai, não a Cogni) e
+ * acerta `concluida_em` conforme a coluna.
+ * @param {number} id
+ * @param {{coluna: string, ordem: number}} destino
+ * @returns {Promise<object|null>}
+ */
+export async function moverTarefa(id, destino) {
+  return USAR_SUPABASE ? supa.moverTarefa(id, destino) : _mockMoverTarefa(id, destino);
+}
+
+/**
+ * Apaga um card.
+ * @param {number} id
+ * @returns {Promise<boolean>}
+ */
+export async function removerTarefa(id) {
+  return USAR_SUPABASE ? supa.removerTarefa(id) : _mockRemoverTarefa(id);
+}
+
+/**
+ * Cria um plano já com o quadro — o que a revisão da foto grava ao aprovar.
+ * @param {object} plano
+ * @param {Array<object>} tarefasNovas
+ * @returns {Promise<object>} o plano criado, com `tarefas` anexadas
+ */
+export async function criarPlanoComTarefas(plano, tarefasNovas) {
+  return USAR_SUPABASE
+    ? supa.criarPlanoComTarefas(plano, tarefasNovas)
+    : _mockCriarPlanoComTarefas(plano, tarefasNovas);
+}
+
+/**
+ * Aprova um plano vindo de foto: `rascunho` → `ativo`. É a trava de aprovação —
+ * nada que a IA leu chega ao robô sem o pai ver.
+ * @param {number} id
+ * @returns {Promise<object|null>}
+ */
+export async function aprovarPlano(id) {
+  return USAR_SUPABASE ? supa.aprovarPlano(id) : _mockAprovarPlano(id);
 }
 
 /**
