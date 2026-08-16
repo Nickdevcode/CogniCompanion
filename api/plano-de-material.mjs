@@ -47,12 +47,18 @@
  * A função conhece QUATRO tipos. **Vídeo não é um deles**, e isso é de propósito:
  * quem decompõe o vídeo em quadros + trilha é o navegador (`js/dashboard/material/
  * video.js`). O dia em que aceitarmos GIF ou gravação de tela não muda uma linha aqui.
+ *
+ * ⭐ 16/ago/2026 (rodada 3) — **link também não é um tipo daqui.** Uma videoaula do
+ * YouTube ou uma página da web viram texto em `/api/ler-link` e chegam como
+ * `{tipo:"texto", formato:"youtube"|"web"}`. O que muda nesta função é só o MODO do
+ * prompt: link é EXPLICAÇÃO, não lição atribuída (ver `regrasDaFonte` em `_lib/prompt`).
  */
 
 import { responder, ErroHttp } from "./_lib/http.mjs";
 import { validarSessao, criancaPareada, dentroDaCota } from "./_lib/auth.mjs";
 import { validarCorpo } from "./_lib/itens.mjs";
 import { transcrever, lerMaterial, FalhaSuave } from "./_lib/openai.mjs";
+import { ehItemDeLink } from "./_lib/prompt.mjs";
 import { sanear } from "./_lib/sanear.mjs";
 
 export default async function handler(req, res) {
@@ -149,6 +155,13 @@ export default async function handler(req, res) {
       crianca,
       pedido,
     });
+
+    /**
+     * Link não é material da escola — e a distinção decide os textos-padrão do
+     * `sanear` exatamente como decide o modo do prompt. Um plano que nasceu de uma
+     * videoaula e deu errado não pode responder "tente com a folha inteira no quadro".
+     */
+    const links = prontos.filter(ehItemDeLink).length;
     return responder(
       res,
       200,
@@ -158,7 +171,8 @@ export default async function handler(req, res) {
           (audioMudo
             ? "Não ouvi nada no áudio, então montei o plano só com o que você escreveu."
             : null),
-        temMaterial: prontos.length > 0,
+        temMaterial: prontos.length - links > 0,
+        temLink: links > 0,
       })
     );
   } catch (err) {

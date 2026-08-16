@@ -44,6 +44,18 @@ const PADROES = {
     titulo: "Atividades da escola",
     semTarefa: "Consegui ver o material, mas não achei nenhuma tarefa escrita nele.",
   },
+  /**
+   * ⭐ Rodada 3. O link precisa dos textos dele pelo mesmo motivo que o pedido precisou
+   * dos dele: a saída é outra. Quem colou uma videoaula não fotografou folha nenhuma —
+   * mandar "tente com boa luz" seria uma resposta ao que ele NÃO fez.
+   */
+  link: {
+    motivo:
+      "Não consegui montar um plano com esse conteúdo. Tente uma videoaula ou uma página que expliquem o assunto que ela precisa estudar.",
+    titulo: "Plano de estudos",
+    semTarefa:
+      "Li o conteúdo, mas não consegui virar isso em sessões de estudo. Tente outro link, ou escreva o que você quer que ela treine.",
+  },
   pedido: {
     motivo:
       "Não consegui montar um plano com esse pedido. Tente dizer o assunto e o que você quer que ela faça.",
@@ -55,11 +67,12 @@ const PADROES = {
 
 /**
  * @param {object} cru — o JSON que a IA devolveu
- * @param {{aviso?:string|null, temMaterial?:boolean}} [ctx]
+ * @param {{aviso?:string|null, temMaterial?:boolean, temLink?:boolean}} [ctx]
  * @returns {object} a resposta 200 final
  */
-export function sanear(cru, { aviso = null, temMaterial = true } = {}) {
-  const padrao = temMaterial ? PADROES.material : PADROES.pedido;
+export function sanear(cru, { aviso = null, temMaterial = true, temLink = false } = {}) {
+  // A precedência é a mesma do prompt: a escola manda, depois o link, depois o pedido.
+  const padrao = temMaterial ? PADROES.material : temLink ? PADROES.link : PADROES.pedido;
 
   if (!cru || cru.legivel === false) {
     return { legivel: false, motivo: cortar(cru?.motivo, 240) || padrao.motivo };

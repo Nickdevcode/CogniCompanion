@@ -8,7 +8,13 @@
  */
 
 import { buscar, TIMEOUT_IA_MS, TIMEOUT_TRANSCRICAO_MS } from "./http.mjs";
-import { systemPrompt, mensagemDoUsuario, dicasDeTranscricao, SCHEMA } from "./prompt.mjs";
+import {
+  systemPrompt,
+  mensagemDoUsuario,
+  dicasDeTranscricao,
+  ehItemDeLink,
+  SCHEMA,
+} from "./prompt.mjs";
 
 /**
  * O mesmo modelo que o robô usa (`CHAT_MODEL` em `Cogni/server/config.js`).
@@ -234,10 +240,18 @@ async function disparar(chave, modelo, conteudoUsuario, hoje, crianca, formato, 
  */
 async function tentarComModelo(chave, modelo, itens, hoje, crianca, pedido) {
   const conteudo = mensagemDoUsuario(itens, pedido);
-  // O modo do prompt segue os itens DESTA tentativa, não os da chamada: no degrau
-  // "seguindo sem o PDF" o material pode ter acabado, e aí a regra que vale é a do
-  // plano feito só de pedido.
-  const fonte = { pedido, temMaterial: itens.length > 0 };
+  /**
+   * O modo do prompt segue os itens DESTA tentativa, não os da chamada: no degrau
+   * "seguindo sem o PDF" o material pode ter acabado, e aí a regra que vale é a do
+   * plano feito só de pedido.
+   *
+   * ⭐ E link não conta como "material da escola": é a separação que liga o MODO LINK
+   * (`regrasDaFonte`). Sem ela, uma videoaula cairia na regra anti-invenção — que num
+   * vídeo, onde não existe tarefa nenhuma escrita, devolve `legivel:false` ou uma
+   * tarefa só, "assistir ao vídeo". Seria a feature inteira morrendo em silêncio.
+   */
+  const links = itens.filter(ehItemDeLink).length;
+  const fonte = { pedido, temMaterial: itens.length - links > 0, temLink: links > 0 };
   try {
     return await disparar(
       chave,
