@@ -13,6 +13,17 @@
  * inteira, tendo que escrever o plano na mão. Agora ela escreve a frase, a Cogni
  * monta as tarefas, e o material da escola entra junto **quando existe**.
  *
+ * ⭐ Rodada 3 (16/ago/2026) — **o material pode ser um LINK**: a videoaula que a
+ * professora mandou no grupo, ou a página onde a escola publicou a lista. Duas decisões
+ * de tela vieram junto, e as duas são de produto, não de código:
+ *
+ * 1. O separador *"e o que a escola mandou, se tiver"* SAIU. Ele sempre foi estreito, e
+ *    com link ficou errado: quem acha uma boa videoaula no domingo não recebeu nada de
+ *    escola nenhuma — e a frase **ensinava** o pai a achar que material que não veio da
+ *    escola não serve aqui.
+ * 2. O link **não ganha botão**. Material que se COLA não se escolhe num seletor, e um
+ *    botão que abre um campo pra colar é um toque a mais por nada.
+ *
  * Este arquivo é só o fluxo de AQUISIÇÃO:
  *   pedido e/ou material → [Montar o plano] → progresso → revisão (`revisao.js`)
  *
@@ -31,6 +42,7 @@ import { openModal } from "./modal.js";
 import { USAR_SUPABASE } from "./mock-data.js";
 import { montarRevisao } from "./revisao.js";
 import { prepararMaterial, MaterialNaoSuportado } from "./material/index.js";
+import { prepararLink, extrairUrl, ErroDeLink, MAX_LINKS } from "./material/link.js";
 import { novoOrcamento, MAX_ITENS, TETO, CORPO_MAX } from "./material/orcamento.js";
 import { criarGravador, suportaGravacao, ErroDeGravacao } from "./material/gravador.js";
 import { formatarBytes, formatarDuracao, tamanhoSerializado } from "./material/bytes.js";
@@ -302,6 +314,16 @@ function criarFluxo({ ctx, aoSalvar }) {
    * cópia, anexar uma foto apagaria a frase que a mãe acabou de escrever.
    */
   let pedido = "";
+  /**
+   * O que está escrito no campo de link, pela mesma razão do `pedido`: o palco é
+   * repintado a cada material, e um link digitado pela metade não pode sumir porque o
+   * pai anexou uma foto no meio do caminho.
+   */
+  let textoDoLink = "";
+  /** A URL sendo lida agora — é o que faz o card de "carregando" aparecer NA bandeja. */
+  let lendoLink = null;
+  /** Depois de repintar, devolve o foco pra onde o pai estava (só o link precisa). */
+  let devolverFocoAoLink = false;
   let orcamento = novoOrcamento();
   let preparando = false;
   let gravador = null;
@@ -332,10 +354,14 @@ function criarFluxo({ ctx, aoSalvar }) {
   function atualizarAcao() {
     if (!btnMontar) return;
     const temFonte = !!pedido.trim() || materiais.length > 0;
-    btnMontar.disabled = !temFonte;
-    btnMontar.title = temFonte
-      ? ""
-      : "Escreva o que você quer, ou mande o material da escola.";
+    // Montar o plano no meio da leitura de um link entregaria o plano SEM ele — e o
+    // pai só descobriria na revisão, procurando as tarefas da aula que ele colou.
+    btnMontar.disabled = !temFonte || !!lendoLink;
+    btnMontar.title = lendoLink
+      ? "Estou lendo o link que você colou."
+      : temFonte
+        ? ""
+        : "Escreva o que você quer, ou junte um material.";
   }
 
   function etapaEscolher(erro) {
@@ -349,9 +375,9 @@ function criarFluxo({ ctx, aoSalvar }) {
       el("p", {
         class: "cap__intro",
         text:
-          "Escreva o que você quer que a Cogni trabalhe com ela. Se a escola mandou " +
-          "alguma coisa, junte aqui também — ela lê e monta as tarefas; você confere " +
-          "antes de valer.",
+          "Escreva o que você quer que a Cogni trabalhe com ela. Se você tem um material " +
+          "— da escola ou não —, junte aqui também: ela lê e monta as tarefas; você " +
+          "confere antes de valer.",
       }),
       campoDoPedido()
     );
@@ -367,8 +393,18 @@ function criarFluxo({ ctx, aoSalvar }) {
     palco.append(
       el("p", {
         class: "cap__ou",
-        children: [el("span", { text: "e o que a escola mandou, se tiver" })],
+        children: [el("span", { text: "Junte um material, se quiser" })],
       }),
+      el("p", {
+        class: "cap__formatos",
+        text:
+          "Foto da agenda, PDF da lista, áudio da professora, videoaula do YouTube ou " +
+          "o link de uma página.",
+      }),
+      // O link vem ANTES dos botões de propósito: é a única entrada que se resolve
+      // colando, e quem chegou com um link na área de transferência já está com ele na
+      // mão. Os quatro botões continuam ali embaixo, na mesma ordem de sempre.
+      campoDoLink(),
       el("div", {
         class: "cap__botoes",
         children: [
@@ -390,7 +426,7 @@ function criarFluxo({ ctx, aoSalvar }) {
       );
     }
 
-    if (materiais.length) palco.append(bandeja());
+    if (materiais.length || lendoLink) palco.append(bandeja());
     palco.append(acoesDoPalco());
 
     palco.append(
@@ -409,6 +445,14 @@ function criarFluxo({ ctx, aoSalvar }) {
      * pra quem usa teclado ou leitor de tela.
      */
     palco.append(inputCamera, inputGaleria, inputArquivo);
+
+    // Depois de juntar (ou de errar) um link, o foco volta pro campo de link: repintar
+    // o palco joga o foco pro começo do modal, e quem estava colando links perderia o
+    // lugar a cada tentativa.
+    if (devolverFocoAoLink) {
+      devolverFocoAoLink = false;
+      palco.querySelector(".cap__link-campo")?.focus();
+    }
   }
 
   /**
@@ -433,6 +477,32 @@ function criarFluxo({ ctx, aoSalvar }) {
     campo.addEventListener("input", () => {
       pedido = campo.value;
       atualizarAcao();
+    });
+
+    /**
+     * Colar um link AQUI também funciona — quem chega com o link na mão cola no
+     * primeiro campo que vê, e recusar isso seria punir o comportamento mais natural
+     * que existe na tela.
+     *
+     * A URL é retirada do texto depois de virar card. Sem isso, o `https://…` cru iria
+     * junto no `pedido`, e a IA tentaria interpretar um endereço como instrução.
+     *
+     * É o evento `paste`, não o `input`: no `input`, a regex casaria com "https://a" no
+     * meio da digitação e a leitura dispararia com o endereço pela metade.
+     */
+    campo.addEventListener("paste", (evt) => {
+      const colado = evt.clipboardData?.getData("text") || "";
+      const url = extrairUrl(colado);
+      if (!url) return;
+
+      evt.preventDefault();
+      const resto = colado.replace(url, "").replace(/\s{2,}/g, " ").trim();
+      const antes = campo.value.slice(0, campo.selectionStart);
+      const depois = campo.value.slice(campo.selectionEnd);
+      campo.value = `${antes}${resto}${depois}`.slice(0, PEDIDO_MAX);
+      pedido = campo.value;
+      atualizarAcao();
+      juntarLink(url);
     });
 
     const exemplos = el("div", {
@@ -466,6 +536,119 @@ function criarFluxo({ ctx, aoSalvar }) {
         exemplos,
       ],
     });
+  }
+
+  /* ---- O link ------------------------------------------------------------ */
+
+  /**
+   * O campo de link + o botão "Juntar".
+   *
+   * `type="url"` seria o correto no papel e é errado na prática: ele liga a validação
+   * nativa do navegador, que recusa "youtube.com/watch?v=…" sem `https://` — que é
+   * exatamente como metade das pessoas cola. A validação de verdade acontece no
+   * `extrairUrl`, que aceita o endereço com frase em volta.
+   */
+  function campoDoLink() {
+    const id = "cap-link";
+    const campo = el("input", {
+      class: "pl-input cap__link-campo",
+      attrs: {
+        id,
+        type: "text",
+        inputmode: "url",
+        autocomplete: "off",
+        spellcheck: "false",
+        placeholder: "Cole um link do YouTube ou de um site",
+      },
+    });
+    campo.value = textoDoLink;
+    campo.addEventListener("input", () => (textoDoLink = campo.value));
+    campo.addEventListener("keydown", (evt) => {
+      // Enter dentro de um campo de uma linha significa "manda" em qualquer formulário
+      // do mundo — e aqui ele evita o pulo até o botão no celular.
+      if (evt.key !== "Enter") return;
+      evt.preventDefault();
+      juntarLink(campo.value);
+    });
+
+    const juntar = el("button", {
+      class: "dash-btn dash-btn--ghost cap__link-botao",
+      attrs: { type: "button" },
+      text: lendoLink ? "Lendo…" : "Juntar",
+    });
+    juntar.disabled = !!lendoLink || preparando;
+    juntar.addEventListener("click", () => juntarLink(campo.value));
+
+    return el("div", {
+      class: "cap__link",
+      children: [
+        el("label", { class: "sr-only", attrs: { for: id }, text: "Link do material" }),
+        el("span", { class: "cap__link-ico", svg: ICON.link, attrs: { "aria-hidden": "true" } }),
+        campo,
+        juntar,
+      ],
+    });
+  }
+
+  /**
+   * Lê um link e põe o resultado na bandeja.
+   *
+   * O estado de carregando fica NA BANDEJA, e não no palco inteiro: ler um link é I/O
+   * de rede (o servidor é que espera o YouTube), diferente de foto e vídeo, que são CPU
+   * do aparelho e travam a tela de qualquer jeito. Cobrir o modal por 8 segundos aqui
+   * impediria o pai de continuar escrevendo o pedido enquanto espera.
+   */
+  async function juntarLink(bruto) {
+    if (lendoLink || preparando) return;
+
+    const url = extrairUrl(bruto);
+    devolverFocoAoLink = true;
+    if (!url) {
+      textoDoLink = bruto || "";
+      etapaEscolher(
+        "Não achei um link aí. Copie o endereço do vídeo ou da página e cole de novo."
+      );
+      return;
+    }
+    if (materiais.length >= MAX_ITENS) {
+      etapaEscolher(`Você já tem ${MAX_ITENS} materiais. Remova um pra adicionar outro.`);
+      return;
+    }
+    if (materiais.filter((m) => m.origem === "link").length >= MAX_LINKS) {
+      etapaEscolher(
+        `Dá pra juntar ${MAX_LINKS} links por plano. Remova um da lista pra colar outro.`
+      );
+      return;
+    }
+
+    textoDoLink = "";
+    lendoLink = url;
+    etapaEscolher();
+    anunciar("Lendo o link. Isso leva alguns segundos.");
+
+    try {
+      const material = await prepararLink(url, orcamento, {
+        signal: controle.signal,
+        jaNaBandeja: materiais.map((m) => m.chave).filter(Boolean),
+      });
+      if (controle.signal.aborted) return;
+      materiais.push(material);
+      lendoLink = null;
+      etapaEscolher();
+      anunciar(`${material.rotulo} adicionado.`);
+    } catch (err) {
+      lendoLink = null;
+      if (controle.signal.aborted) return;
+      if (!(err instanceof ErroDeLink)) {
+        console.error("[Companion] Falha ao ler o link:", err);
+      }
+      // O texto volta pro campo: o erro mais comum é link errado, e reescrever o
+      // endereço do zero por causa disso seria punir o pai duas vezes.
+      textoDoLink = url;
+      etapaEscolher(
+        err instanceof ErroDeLink ? err.message : "Não consegui abrir esse link agora."
+      );
+    }
   }
 
   /** Botão do grid de entradas. */
@@ -584,6 +767,18 @@ function criarFluxo({ ctx, aoSalvar }) {
           class: "cap__item-texto",
           children: [
             el("span", { class: "cap__item-nome", text: m.rotulo }),
+            /**
+             * O SELO é obrigatório no material de link, e é a peça que faz a
+             * degradação ser honesta: "sem legenda, o plano vai sair mais genérico"
+             * dito AQUI custa um olhar; descoberto depois, custa um plano ruim que o
+             * pai aprovou achando que a Cogni tinha assistido à aula.
+             */
+            m.selo
+              ? el("span", {
+                  class: `cap__selo cap__selo--${m.selo.tom}`,
+                  text: m.selo.texto,
+                })
+              : null,
             m.aviso ? el("span", { class: "cap__item-aviso", text: m.aviso }) : null,
           ].filter(Boolean),
         }),
@@ -593,12 +788,26 @@ function criarFluxo({ ctx, aoSalvar }) {
       const linha = el("li", { class: "cap__item", children: corpo });
 
       if (m.miniatura) {
-        linha.prepend(
-          el("img", {
-            class: "cap__thumb",
-            attrs: { src: m.miniatura, alt: `Prévia de ${m.nome}` },
-          })
-        );
+        const thumb = el("img", {
+          // A miniatura do YouTube é 16:9; a de foto é quadrada. Recortar a capa do
+          // vídeo num quadrado corta justamente o quadro com o assunto escrito.
+          class: m.ehVideo ? "cap__thumb cap__thumb--video" : "cap__thumb",
+          attrs: {
+            src: m.miniatura,
+            alt: `Prévia de ${m.nome}`,
+            loading: "lazy",
+            referrerpolicy: "no-referrer",
+          },
+        });
+        // A capa do vídeo vem do i.ytimg.com — rede de terceiro. Se ela não carregar,
+        // o card some com a imagem e mostra o ícone: melhor que um retângulo quebrado
+        // ao lado de um título perfeitamente legível.
+        thumb.addEventListener("error", () => {
+          thumb.replaceWith(
+            el("span", { class: "cap__item-ico", svg: origemIcon(m.origem) || ICON.file })
+          );
+        });
+        linha.prepend(thumb);
       }
       if (m.reproduzivel) {
         // Player nativo: acessível de graça, e é o que evita o pai mandar (e pagar)
@@ -611,7 +820,40 @@ function criarFluxo({ ctx, aoSalvar }) {
       lista.append(linha);
     });
 
+    /**
+     * O link sendo lido ocupa o LUGAR do card que vai nascer ali. É a diferença entre
+     * "o site travou" e "estou indo buscar": o resto da tela continua vivo, e o pai
+     * pode escrever o pedido enquanto o YouTube responde.
+     */
+    if (lendoLink) {
+      lista.append(
+        el("li", {
+          class: "cap__item is-lendo",
+          attrs: { role: "status", "aria-live": "polite" },
+          children: [
+            el("span", {
+              class: "dash-loading__spinner cap__item-spinner",
+              attrs: { "aria-hidden": "true" },
+            }),
+            el("span", {
+              class: "cap__item-texto",
+              children: [
+                el("span", { class: "cap__item-nome", text: "lendo o link…" }),
+                el("span", { class: "cap__item-aviso", text: encurtarUrl(lendoLink) }),
+              ],
+            }),
+          ],
+        })
+      );
+    }
+
     return lista;
+  }
+
+  /** URL curta o bastante pra caber no card sem virar parágrafo. */
+  function encurtarUrl(url) {
+    const limpo = String(url).replace(/^https?:\/\//, "").replace(/^www\./, "");
+    return limpo.length > 52 ? `${limpo.slice(0, 52)}…` : limpo;
   }
 
   /**
@@ -932,6 +1174,9 @@ function criarFluxo({ ctx, aoSalvar }) {
       dica =
         "Diga o assunto e o que você quer que ela faça — por exemplo: “revisar frações, " +
         "meia hora por dia até sexta”.";
+    } else if (origens.has("link")) {
+      dica =
+        "Tente uma videoaula ou uma página que expliquem o assunto — ou escreva no pedido o que você quer que ela treine.";
     } else if (origens.has("foto")) {
       dica =
         "Tente de novo com a folha inteira no quadro, o celular parado e boa luz — sem sombra por cima do papel.";
@@ -1030,6 +1275,8 @@ function criarFluxo({ ctx, aoSalvar }) {
       pararGravador();
       materiais = [];
       pedido = "";
+      textoDoLink = "";
+      lendoLink = null;
     },
   };
 }

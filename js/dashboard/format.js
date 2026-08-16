@@ -197,7 +197,7 @@ export function statusLabel(status) {
 /**
  * De onde o plano nasceu, em português, pro selo do card.
  *
- * ⚠️ `planos_estudo.origem` guarda quatro valores e não guarda o FORMATO exato — um
+ * ⚠️ `planos_estudo.origem` guarda UM valor por plano e não guarda o FORMATO exato — um
  * plano feito de PDF e um feito de `.docx` são os dois `arquivo`. Dizer "criado a
  * partir de um PDF" exigiria uma coluna nova, e a rodada 2 decidiu não criar nenhuma.
  * O formato exato fica visível nos cabeçalhos do `extraido_texto` ("ver o que a Cogni
@@ -214,6 +214,13 @@ export function origemLabel(origem) {
     // ⭐ 16/ago/2026 — o plano que a Cogni montou do que o responsável pediu por
     // escrito, sem material nenhum da escola.
     pedido: "criado a partir do seu pedido",
+    /**
+     * ⭐ Rodada 3 — a videoaula ou a página que o responsável colou. O rótulo NÃO diz
+     * "vídeo" nem "site": `origem` guarda um valor só, e os dois casos caem aqui. Qual
+     * era fica no `extraido_texto` ("ver o que a Cogni entendeu"), que é onde o pai
+     * olha quando a pergunta importa.
+     */
+    link: "criado a partir de um link",
   };
   return rotulos[origem] || null;
 }

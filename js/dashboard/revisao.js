@@ -252,16 +252,32 @@ export function montarRevisao({ proposta, materiais, pedido = "", ctx, close, ao
     txtExtraido.value = estado.extraido_texto;
     txtExtraido.addEventListener("input", () => (estado.extraido_texto = txtExtraido.value));
 
+    /**
+     * ⭐ Rodada 3: quando tudo que chegou veio de link, este campo tem outro conteúdo e
+     * outra função. Ali dentro não está a transcrição de uma lição — está o RESUMO do
+     * que a aula ensina (ver a regra 3 do modo link em `api/_lib/prompt.mjs`). Chamar
+     * isso de "o material" e prometer "ajudar a fazer a lição" mandaria o pai procurar
+     * uma lição que ninguém passou.
+     */
+    const soLink = materiais.every((m) => m.origem === "link");
+
     raiz.append(
       el("details", {
         class: "cap__leitura",
         children: [
-          el("summary", { text: "Ver o que a Cogni entendeu do material" }),
+          el("summary", {
+            text: soLink
+              ? "Ver o que a Cogni entendeu desse conteúdo"
+              : "Ver o que a Cogni entendeu do material",
+          }),
           el("p", {
             class: "pl-field__hint",
-            text:
-              "Esse texto vai junto pro robô: é com ele que a Cogni consegue ajudar a FAZER a lição, " +
-              "e não só lembrar que ela existe. Se ela entendeu algo errado, corrija ou apague aqui.",
+            text: soLink
+              ? "Esse é o resumo do que o vídeo (ou a página) ensina, e ele vai junto pro robô: " +
+                "é com ele que a Cogni ensina o mesmo caminho depois. Se ela entendeu algo errado, " +
+                "corrija ou apague aqui."
+              : "Esse texto vai junto pro robô: é com ele que a Cogni consegue ajudar a FAZER a lição, " +
+                "e não só lembrar que ela existe. Se ela entendeu algo errado, corrija ou apague aqui.",
           }),
           txtExtraido,
         ],

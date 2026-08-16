@@ -310,13 +310,19 @@ export async function prepararMaterial(file, orcamento, ctx = {}) {
  * ali dentro tem o que a escola mandou. `manual` continua sendo só o plano digitado
  * à mão, sem IA nenhuma no meio.
  *
+ * ⭐ `link` (rodada 3) fica no TOPO, e é a única origem que não segue a régua "material
+ * mais distintivo primeiro": ela segue a INTENÇÃO. Foto, PDF e áudio são o que a escola
+ * mandou; o link foi o responsável que escolheu aquele conteúdo de propósito, e é isso
+ * que o robô precisa saber pra não chamar uma videoaula de domingo de "sua lição da
+ * escola" (ver `procedenciaDoMaterial()` no `brain/prompt.js` do robô).
+ *
  * @param {Array<{origem:string}>} materiais
  * @param {{pedido?:boolean}} [fonte] — houve pedido escrito?
- * @returns {"video"|"audio"|"arquivo"|"foto"|"pedido"|"manual"}
+ * @returns {"link"|"video"|"audio"|"arquivo"|"foto"|"pedido"|"manual"}
  */
 export function origemDoPlano(materiais, fonte = {}) {
   const origens = new Set(materiais.map((m) => m.origem));
-  for (const candidata of ["video", "audio", "arquivo", "foto"]) {
+  for (const candidata of ["link", "video", "audio", "arquivo", "foto"]) {
     if (origens.has(candidata)) return candidata;
   }
   return fonte.pedido ? "pedido" : "manual";

@@ -83,6 +83,11 @@ export const ICON = {
   video: stroke('<rect x="3" y="6" width="12.5" height="12" rx="2.5"/><path d="m15.5 10.8 4.6-2.6a.6.6 0 0 1 .9.5v6.6a.6.6 0 0 1-.9.5l-4.6-2.6Z"/>'),
   // Quadrado: parar a gravação. O par universal do círculo de gravar.
   stop: stroke('<rect x="6.5" y="6.5" width="11" height="11" rx="2.5"/>'),
+  /* --- Rodada 3 (ago/2026): o material pode ser um link --- */
+  // Dois elos de corrente: o desenho universal de "link". Não é um globo (que diria
+  // "internet", e o material não é a internet — é aquele endereço) nem um "play" (que
+  // valeria só pro YouTube, e metade dos links é página).
+  link: stroke('<path d="M10 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1.2 1.2"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l1.2-1.2"/>'),
   // Faísca: marca o card que a COGNI moveu sozinha. Ícone, não o emoji ✨ — a
   // regra do projeto é ícone na UI, e um emoji herda a fonte do sistema (muda de
   // desenho e de cor entre Windows/Android e ignora o tema).
@@ -146,6 +151,8 @@ const ORIGEM_ICONS = {
   // O plano pedido por escrito: balão de conversa, porque foi o pai FALANDO com a
   // Cogni — não tem arquivo nenhum por trás dele.
   pedido: ICON.chat,
+  // Videoaula ou página que o responsável colou (rodada 3).
+  link: ICON.link,
 };
 
 /** @returns {string|null} ícone da origem, ou null se o plano foi digitado. */
