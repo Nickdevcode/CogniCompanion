@@ -1265,9 +1265,18 @@ Cobertura: **`npm run teste:perfil`** (45 casos, offline) — inclusive o caso q
 
 ## 🔗 Rodada 3 (16/ago/2026) — link externo vira material
 
-> [!important] 🔴 **Quase tudo aqui é tarefa do SITE.** O lado do robô já está **feito** (16/ago/2026) — ver "🤖 O que o robô já fez nesta rodada" no fim da seção. O site constrói: a função `/api/ler-link`, o campo de link na Mesa, o card na bandeja, e as duas regras novas do prompt da IA.
+> [!important] ✅ **Feito no site (16/ago/2026).** O lado do robô também está feito — ver "🤖 O que o robô já fez nesta rodada" no fim da seção.
+>
+> O que nasceu: **`api/ler-link.mjs`** + **`api/_lib/link/`** (3 módulos — `rede` com as travas de SSRF, `youtube` com a InnerTube, `pagina` com charset/HTML/anti-bot/PDF), **`js/dashboard/material/link.js`** (a resposta virando item de bandeja, com a chave de duplicata e o selo), e as mudanças em `captura.js` (campo de link, colagem no campo do pedido, card com miniatura e selo), `_lib/prompt.mjs` (o MODO LINK), `_lib/sanear.mjs` (textos-padrão de link), `_lib/auth.mjs` (`link` na cota), `material/index.js` (`origemDoPlano`), `revisao.js`, `format.js`, `icons.js` e `css/dashboard-mesa.css`. **Zero dependência npm, zero variável de ambiente nova.**
 >
 > ⚠️ **Pré-requisito de deploy:** o SQL que abre o `CHECK` de `planos_estudo.origem` pra aceitar `link` roda **antes**. A rede do `23514` (regravar como `manual`) continua valendo, então o pai não perde o trabalho — mas perde o selo.
+>
+> 🔎 **O que mudou do plano pra implementação** (medido em 16/ago, ver os detalhes nas subseções):
+> 1. **`&tlang=pt` é MUITO mais restrito que o download cru** — mesma track, mesmo segundo, deste PC: **200 crua e 429 traduzida**. O degrau 3 da escada virou uma *tentativa*, e a queda é pra legenda no idioma original (o cabeçalho do texto avisa o modelo em que língua ela veio, e manda escrever o plano em português).
+> 2. **A lista de legendas vem em ordem ALFABÉTICA do nome traduzido** — "a primeira manual" era *Alemão* num vídeo em inglês da Khan Academy. Quem aponta a track do idioma falado é **`defaultTranslationSourceTrackIndices`**.
+> 3. **A resposta ganhou o campo `chave`** (`yt:<id>` ou `web:<host><path><query>`): é a duplicata vista **depois** do redirect, que o cliente sozinho não enxerga.
+> 4. **`extrairUrl` também aceita endereço sem `https://` e sem `www.`** (`todamateria.com.br/fracoes`), mas só quando o campo tem **só isso** — dentro de frase, o mesmo padrão faria "dia 5.md" virar site.
+> 5. **Não havia CSP nenhum no site** (nem `<meta>`, nem `vercel.json`), então não houve o que liberar pro `i.ytimg.com`. Se um dia entrar CSP, `img-src https://i.ytimg.com` precisa entrar junto — e o card já degrada sozinho: `onerror` troca a miniatura pelo ícone.
 
 ### Por que link, e por que agora
 
@@ -1294,6 +1303,8 @@ Então a fonte `link` entra num **modo próprio**, mais perto do modo "só pedid
 | qualquer coisa **+** pedido | o pedido é o **recorte** (como já era) |
 
 A regra do modo link, escrita pro prompt: *"Este material é uma EXPLICAÇÃO (aula em vídeo ou página da web), não uma lição atribuída. Monte de 3 a 8 sessões de estudo que ensinem o que esse conteúdo ensina — na ordem, da mais simples pra mais difícil — como um bom professor particular montaria depois de assistir a essa aula. Fique dentro do assunto do material: não amplie pra matéria que ele não toca."*
+
+✅ **Onde isso vive (implementação):** `regrasDaFonte()` em `api/_lib/prompt.mjs` passou a receber `(pedido, temMaterial, temLink)`, e quem separa os dois é `ehItemDeLink()` — um item é de link quando `tipo:"texto"` e `formato` é `youtube` ou `web`. A precedência está em UM lugar só e vale nos três: o prompt, os textos-padrão do `sanear.mjs` (um plano de link que dá errado **não** pode responder *"tente com a folha inteira no quadro e boa luz"*) e o `origemDoPlano()` do cliente.
 
 ### 🎬 YouTube: de onde sai o conteúdo (medido, não suposto)
 
@@ -1330,10 +1341,16 @@ Ou seja: **~700 caracteres por minuto de aula**, e mesmo uma aula de 49 minutos 
 
 1. `ANDROID` → legenda `pt` manual (a melhor: tem pontuação e nomes certos);
 2. → legenda `pt` automática (`kind: "asr"` — erra número, nome e data, então **confiança mais baixa**, igual à transcrição de áudio);
-3. → legenda de outro idioma, pedindo tradução com `&tlang=pt` no `baseUrl`;
+3. → legenda do **idioma original do vídeo**, com uma tentativa de tradução (`&tlang=pt`);
 4. → **só metadados**: título + canal + descrição + keywords. Sai um plano mais genérico, e **a tela diz isso** (ver o aviso abaixo);
 5. → `oembed` (`https://www.youtube.com/oembed?url=…&format=json`) — leve, sem chave, responde de qualquer IP: título e canal;
 6. → `ok:false` com motivo executável.
+
+> 🔴 **Dois achados da implementação (16/ago), os dois medidos:**
+>
+> **(a) `&tlang=pt` é rate-limitado com muito mais força que o download cru.** Mesma track, mesmo IP, no mesmo segundo: **200** sem `tlang` e **429** ("Sorry… unusual traffic") com `tlang`. Repetido depois de 8 s de espera, o 429 se manteve. Por isso o degrau 3 **não** é "traduz"; é "tenta traduzir e, falhando, usa o idioma original" — o modelo lê inglês e espanhol sem dificuldade, e o cabeçalho do texto diz em que língua a legenda veio e que **o plano sai em português**.
+>
+> **(b) `captionTracks` vem em ordem ALFABÉTICA do nome traduzido pro `hl` pedido.** Num vídeo em inglês da Khan Academy com 9 legendas, a primeira manual da lista é **Alemão** — e "pegue a primeira manual" montaria o plano lendo a aula em alemão, sem erro nenhum na tela. A track do idioma falado está em **`renderer.defaultTranslationSourceTrackIndices[0]`** (medido: índice 5 = `en`).
 
 > ⚠️ **O risco que o Nicolas aceitou de olho aberto:** o YouTube pune reputação de **IP de datacenter** no `timedtext`, e a Vercel é datacenter. Além disso, desde 2025 alguns vídeos exigem **PoToken** — o `baseUrl` vem com `&exp=xpe` e a resposta é **corpo vazio com status 200**. Trate corpo vazio como "sem legenda" e **caia pro degrau 4**; nunca deixe virar 502. Se na prática o degrau 4 virar o caso comum em produção, a saída é uma API paga de transcript (Supadata e similares, ~US$ 9-25/mês) — decisão nova, não faça sozinho.
 
@@ -1378,16 +1395,19 @@ POST /api/ler-link
   body:    { url: "https://…" }        ← aceite texto com link no meio: extraia a 1ª URL
                                           (o pai cola direto do WhatsApp)
 
-  → 200 { ok:true, fonte:"youtube", formato:"youtube", nome, titulo, canal,
-          duracao_s, miniatura, texto, grau:"transcricao"|"metadados",
-          idiomaLegenda, legendaAutomatica, cortado, aviso? }
-  → 200 { ok:true, fonte:"pagina",  formato:"web", nome, titulo, dominio,
-          texto, cortado, aviso? }
-  → 200 { ok:true, fonte:"pdf",     nome, titulo, dados:"data:application/pdf;base64,…", bytes }
+  → 200 { ok:true, fonte:"youtube", formato:"youtube", chave:"yt:<id>", nome, titulo,
+          canal, duracao_s, miniatura, texto, grau:"transcricao"|"metadados",
+          idiomaLegenda, legendaAutomatica, cortado, aviso }
+  → 200 { ok:true, fonte:"pagina",  formato:"web", chave:"web:<host><path><query>",
+          nome, titulo, dominio, texto, cortado, aviso }
+  → 200 { ok:true, fonte:"pdf",     chave, nome, titulo,
+          dados:"data:application/pdf;base64,…", bytes }
   → 200 { ok:false, motivo:"…" }    ← link ruim NÃO é erro HTTP (mesma regra do material)
   → 400 forma · 401 sem sessão · 403 sem criança · 405 método · 415 content-type
   → 429 cota do dia · 502 falha nossa · 503 função sem env vars
 ```
+
+⭐ **`chave` (acrescentada na implementação):** é a identidade do material **depois** do redirect, e é ela que faz a duplicata funcionar de verdade — o cliente calcula uma chave local antes de chamar (pra não gastar rede à toa com `youtu.be/X` × `watch?v=X`), mas só a função sabe que um encurtador apontava pro mesmo vídeo. `aviso` vem sempre no corpo (`null` quando não há), pra a tela não precisar checar existência de campo.
 
 O cliente converte a resposta em item da bandeja e **nada mais muda no `plano-de-material`**:
 
@@ -1452,11 +1472,21 @@ O layout resolve os 5 formatos sem virar parede de botão. O link **não** ganha
   └──────────────────────────────────────────┘
 ```
 
-- **Colar link no campo do pedido também funciona.** É barato de implementar (uma regex no `input`/`paste`), cobre quem cola sem ler a tela, e o texto colado é limpo da URL depois de virar card — senão a URL crua vai pro `pedido` e a IA tenta interpretar `https://` como instrução.
-- **Card do YouTube mostra a miniatura** (`https://i.ytimg.com/vi/<id>/mqdefault.jpg`). 🔴 **Isso exige liberar `img-src https://i.ytimg.com` no CSP do site** — sem isso a imagem some sem erro visível no lugar, e só o console reclama.
+- **Colar link no campo do pedido também funciona.** Implementado no evento **`paste`**, não no `input`: no `input` a regex casa com `https://a` no meio da digitação e a leitura dispararia com o endereço pela metade. O texto colado é limpo da URL depois de virar card — senão a URL crua vai pro `pedido` e a IA tenta interpretar `https://` como instrução.
+- **Card do YouTube mostra a miniatura** (`https://i.ytimg.com/vi/<id>/mqdefault.jpg`). ✅ **Não havia CSP no site** (nem `<meta http-equiv>`, nem `vercel.json` com headers), então não houve o que liberar — mas se um dia entrar CSP, `img-src https://i.ytimg.com` entra junto. O card não depende disso pra ser legível: um `onerror` na `<img>` troca a miniatura pelo ícone de link.
 - **O selo de grau é obrigatório no card.** Com transcrição: *"legenda automática — confira os números"*. Sem: *"sem legenda: li só o título e a descrição, o plano vai ficar mais genérico"*. É a diferença entre uma degradação honesta e uma que o pai só descobre olhando as tarefas ruins.
 - Enquanto o link carrega, o card entra em estado de carregando **na bandeja** (não no palco inteiro): diferente de foto e vídeo, a leitura de link é I/O de rede, e travar a tela por 8 s pra isso não se justifica.
 - A ordem dos botões e o `<input type="file">` no fim do DOM continuam como estão (foco inicial do modal).
+
+**O que nasceu além do previsto (16/ago):**
+
+- **"Montar o plano" fica desabilitado enquanto um link está sendo lido.** Sem isso, clicar no meio da leitura entregaria o plano **sem** a aula — e o pai só descobriria na revisão, procurando as tarefas do vídeo que ele colou.
+- **O foco volta pro campo de link** depois de juntar (ou de errar): a etapa é repintada inteira a cada material, e quem está colando links perderia o lugar a cada tentativa. O texto do link **volta pro campo quando dá erro** — link errado é o erro mais comum, e reescrever o endereço do zero puniria o pai duas vezes.
+- **Enter no campo junta**, além do botão.
+- **`type="text"`, não `type="url"`**: a validação nativa recusa `youtube.com/watch?v=…` sem `https://`, que é exatamente como metade das pessoas cola.
+- **Selo por caso**: legenda do canal (verde) · legenda automática — confira os números (âmbar) · legenda em outro idioma (âmbar) · sem legenda (âmbar) · domínio, no caso de página · "PDF aberto direto do link".
+- **A tela em 320px**: o botão "Juntar" desce pra linha inteira embaixo do campo (com os dois lado a lado sobrariam ~120px pro endereço). Verificado sem estouro horizontal, no claro e no escuro.
+- **`ORIGENS_DE_IA` em `_lib/auth.mjs` ganhou `link`** — é o mesmo erro silencioso que a rodada 2 quase cometeu: fora da lista, a cota diária não valeria justo pra fonte que também gasta a nossa saída de rede.
 
 ### 🤖 O que o robô já fez nesta rodada — ✅ **feito (16/ago/2026)**
 

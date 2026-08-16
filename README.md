@@ -293,6 +293,7 @@ Agora é a **Mesa de Estudos** (`#/mesa`), e ela faz três coisas:
 | --- | --- | --- |
 | 💬 | **Pedido → plano** | O pai escreve o que quer (*"revisar a tabuada do 7, 20 min por dia"*) e a IA monta as tarefas. **Não depende de a escola ter mandado nada** |
 | 📎 | **Material → plano** | E quando a escola mandou, ele junta — foto, PDF, Word, slides, planilha, áudio da professora ou vídeo da lousa — e a IA extrai as tarefas de lá, com matéria e prazo. Ele revisa e aprova |
+| 🔗 | **Link → plano** | Cola a **videoaula do YouTube** ou o **link de uma página** e a Cogni monta as sessões de estudo do que aquele conteúdo ensina |
 | 🗂️ | **Quadro Kanban** | `A fazer` · `Fazendo` · `Feito`, com arraste de mouse, de dedo **e de teclado** |
 | ✨ | **O quadro é vivo** | A Cogni move os cards sozinha enquanto conversa com a criança — e com a tela aberta o pai **vê acontecer** |
 
@@ -307,6 +308,53 @@ Agora é a **Mesa de Estudos** (`#/mesa`), e ela faz três coisas:
 > 🔗 O link velho `#/planos` continua funcionando: `main.js` tem um alias explícito que reescreve
 > pra `#/mesa`. Cair no fallback do router seria pior que 404 — ele mandaria o pai pro Início sem
 > avisar.
+
+#### 🔗 Colar um link também é mandar material (16/ago/2026)
+
+Boa parte do reforço escolar de 2026 **não é arquivo nenhum** — é um link. A professora manda a
+videoaula no grupo, o pai acha um vídeo bom no domingo à noite, a escola publica a lista num site em
+vez de mandar o PDF. Antes disso as saídas eram baixar o vídeo (ninguém faz), tirar print da página
+(perde o texto) ou digitar o plano na mão. Agora ele **cola o link** — no campo próprio ou direto no
+campo do pedido, que reconhece a URL, vira card e limpa o endereço do texto.
+
+E aqui está a decisão que decide a feature: **link é FONTE, não lição.** A regra número 1 do prompt
+de material é anti-invenção (*"se o material tem duas tarefas, devolva duas"*), e aplicá-la a uma
+videoaula **mataria** a feature — um vídeo de 12 minutos sobre frações contém *zero* tarefas, contém
+**conteúdo**. Então o link entra num modo próprio: *"monte de 3 a 8 sessões que ensinem o que esse
+conteúdo ensina, na ordem, como um bom professor particular montaria depois de assistir a essa
+aula"*. Se vier material da escola junto, **a escola ganha** — ela é a lição de verdade, e o link
+vira apoio.
+
+| Como chega | O que a Cogni lê | O card mostra |
+| --- | --- | --- |
+| 🎬 **YouTube** com legenda | a fala da aula (legenda do canal ou automática) | miniatura, título, canal, duração e o **selo de grau** |
+| 🎬 **YouTube** sem legenda | só título, canal e descrição | o selo diz: *"sem legenda: li só o título e a descrição, o plano vai ficar mais genérico"* |
+| 🌐 **Página** | o texto limpo (sem menu, sem rodapé) | título + domínio |
+| 📄 **Link que aponta pra PDF** | o PDF, pelo caminho de PDF que já existia | nome do arquivo + tamanho |
+
+> 🎬 **YouTube é best-effort grátis** — sem chave nova, sem API paga, sem dependência npm: o caminho
+> é a **InnerTube**, o mesmo endpoint que o app do YouTube usa. Dois achados que custaram medição
+> real: o cliente **`WEB` não devolve legenda** (responde `UNPLAYABLE` com a lista de legendas vazia,
+> mas devolve os metadados normalmente — a falha é silenciosa; `ANDROID` e `IOS` devolvem os dois), e
+> as legendas vêm **em ordem alfabética do nome traduzido**, então "a primeira manual" pode ser a
+> *alemã* num vídeo em inglês (quem aponta a certa é `defaultTranslationSourceTrackIndices`). Quando
+> a legenda não vem, a leitura **degrada e a tela diz que degradou** — é o selo do card.
+
+> 🔒 **`/api/ler-link` é a função mais perigosa do projeto**, porque busca uma URL escolhida por quem
+> chama. Sem trava seria um proxy SSRF público: a sessão do responsável vem primeiro (nada de rede
+> sem login e criança pareada), só `http`/`https` nas portas 80/443, o DNS é resolvido e IP privado é
+> barrado (`10.*`, `127.*`, `169.254.*` — onde mora o metadata das nuvens —, `::1`, `fc00::/7`…), o
+> **redirect é seguido na mão e cada salto é revalidado** (um domínio público que responde `302` pra
+> `169.254.169.254` passaria por qualquer checagem feita só na URL inicial), e o corpo é lido **com
+> teto contando os bytes que chegam**, nunca pelo `content-length` que o outro lado declarou.
+
+> 🇧🇷 **UTF-8 não é seguro como padrão no Brasil.** `planalto.gov.br` serve `text/html` sem charset,
+> sem `<meta charset>`, e o conteúdo é latin1 — decodificar como UTF-8 devolve *"Presid�ncia da
+> Rep�blica"* e o plano nasce em cima de texto corrompido, sem ninguém reclamar. A saída não é
+> heurística: UTF-8 é autovalidante, então `TextDecoder("utf-8", { fatal: true })` **lança** em bytes
+> latin1 e o `catch` cai pra `windows-1252`. E anti-bot devolve **200 com uma página de verdade** (a
+> Khan Academy responde *"Client Challenge"* em 227 caracteres): sem uma checagem específica, a Cogni
+> montaria um plano de estudo em cima do texto do Cloudflare.
 
 **Nada que a IA propôs chega ao robô sem o pai ver.** O plano vindo de material (ou de pedido) nasce com
 `status = 'rascunho'`, e o servidor já ignora tudo que não é `ativo`/`em_andamento` — a trava
@@ -331,9 +379,15 @@ A Vercel corta o corpo da requisição em **4,5 MB antes do nosso código rodar*
 | 🔤 TXT / MD / CSV | **Navegador** — `file.text()` | trivial |
 | 🎙️ Áudio | **A OpenAI** — transcrição, que entra no mesmo pipeline de texto | um caminho só, um schema só |
 | 🎬 Vídeo | **Navegador** — vira quadros + a trilha de áudio | um MP4 de 1 min tem 60-100 MB e jamais caberia |
+| 🔗 Link | **A função `/api/ler-link`** — e volta como item de texto (ou de PDF) | o navegador **não pode**: o site da escola não manda `Access-Control-Allow-Origin` pra gente (CORS) |
 
 A sacada do vídeo: **o cliente decompõe e a função nunca sabe o que é vídeo.** Um vídeo vira
 `imagem × N` + `audio`, então a função conhece quatro tipos e continua conhecendo quatro tipos.
+(**O link segue a mesma sacada**: quem lê é uma função separada, e o que chega na
+`plano-de-material` é `{tipo:"texto", formato:"youtube"|"web"}` — ela nunca soube que link existe.
+A função ser separada também põe o erro de link **na bandeja**, junto com os outros erros de
+material, e mostra o título do vídeo **antes** de montar o plano: colar o link errado é o erro mais
+comum que existe, e é o único que o pai corrige sozinho.)
 E num vídeo de aula **a fala tem prioridade sobre a imagem** — quem carrega a tarefa é o que a
 professora *diz*; os quadros só confirmam o assunto. Por isso o áudio é reservado primeiro (até
 1min30) e os quadros preenchem o que sobra, de 4 até 1. Vídeo longo não perde o áudio: ele é
@@ -363,16 +417,19 @@ gap acaba, e aí a coluna é reindexada de uma vez.
 
 #### ⚙️ O que o Nicolas precisa configurar
 
-A leitura do material é a **única** parte do Companion que roda fora do navegador — uma Vercel
-Function (`api/plano-de-material.mjs`, com os módulos em `api/_lib/`), porque o servidor da Cogni
-é `127.0.0.1` e do celular do pai ele simplesmente não existe. Em *Settings → Environment
-Variables* do projeto na Vercel:
+A leitura do material é a **única** parte do Companion que roda fora do navegador — duas Vercel
+Functions (`api/plano-de-material.mjs` e `api/ler-link.mjs`, com os módulos em `api/_lib/`), porque
+o servidor da Cogni é `127.0.0.1` e do celular do pai ele simplesmente não existe. Em *Settings →
+Environment Variables* do projeto na Vercel:
 
 | Variável | Pra quê |
 | --- | --- |
 | `OPENAI_API_KEY` | a leitura do material **e** a transcrição do áudio |
 | `SUPABASE_URL` | validar o login do pai e ler a criança pareada |
 | `SUPABASE_ANON_KEY` | idem (é a chave pública; quem protege é a RLS) |
+
+> 🆓 A leitura de link **não pediu nada novo**: nem variável de ambiente, nem dependência npm.
+> `fetch` e `node:dns` já vêm no runtime, e o YouTube é lido sem chave.
 
 Faltando qualquer uma, a função responde **503** com mensagem clara em vez de quebrar. E ela
 **nunca escreve no banco**: devolve a proposta, e quem grava é o site com a sessão do pai.
@@ -381,16 +438,20 @@ Faltando qualquer uma, a função responde **503** com mensagem clara em vez de 
 > com `_` dentro de `api/`, então os módulos compartilhados não viram rotas públicas nem
 > consomem funções do plano Hobby.
 
-> 🗄️ **Uma coisa manual, e ela vem antes do deploy:** o SQL que abre os dois `CHECK` de `origem`
-> (`planos_estudo.origem` passa a aceitar `arquivo`/`audio`/`video`, e `plano_tarefas.origem`
-> aceita `ia`). Se o site subir antes do SQL, salvar um plano de PDF viola a constraint e o pai
-> perde o trabalho. A ordem é **SQL → função → site**.
+> 🗄️ **Uma coisa manual, e ela vem antes do deploy:** o SQL que abre os `CHECK` de `origem`
+> (`planos_estudo.origem` aceitando `arquivo`/`audio`/`video`, depois `pedido` e agora **`link`**;
+> e `plano_tarefas.origem` aceitando `ia`). Se o site subir antes do SQL, salvar um plano de PDF (ou
+> de link) viola a constraint. A ordem é **SQL → função → site** — e existe uma rede: o
+> `criarPlanoComTarefas` detecta o `23514` e regrava como `manual`, então o pai perde o **selo** da
+> origem, não o trabalho.
 
 > 🧪 **Testar sem OpenAI, sem deploy e sem login:** vire `USAR_SUPABASE = false` e "Criar com a
 > Cogni" devolve uma proposta de exemplo local. Só a **rede** é falsa — toda a extração roda de
 > verdade: o unzip do `.docx`, a decomposição do vídeo em quadros, a gravação do microfone. Dá
 > pra percorrer o fluxo inteiro offline, inclusive a revisão (editar tarefa, apagar, o chip
-> "confira", corrigir o texto extraído, rascunho × aprovar).
+> "confira", corrigir o texto extraído, rascunho × aprovar). **Link também**: colar um endereço
+> devolve um card de exemplo com miniatura e selo — e um link de `/shorts/` cai de propósito no
+> degrau "sem legenda", que é o caminho mais curto pra ver como a degradação honesta aparece na tela.
 
 ### 🗃️ Arquivos do painel
 
@@ -409,11 +470,13 @@ Faltando qualquer uma, a função responde **503** com mensagem clara em vez de 
 | `js/dashboard/mapa-timeline.js` | A linha do tempo da aula (marcadores em HTML/CSS, cada um um `<button>`) |
 | `js/dashboard/dnd.js` | **Drag and drop do quadro** (Pointer Events à mão, com teclado e `aria-live`) |
 | `js/dashboard/mesa-realtime.js` | **O quadro ao vivo**: canal do Supabase, fila durante o arraste, degradação |
-| `js/dashboard/captura.js` | **Pedido/material → plano**: o campo do pedido, as quatro entradas de material, a bandeja e o orçamento |
+| `js/dashboard/captura.js` | **Pedido/material → plano**: o campo do pedido, o campo de link, as quatro entradas de material, a bandeja e o orçamento |
 | `js/dashboard/revisao.js` | A tela de revisão (o pai confere e edita antes de qualquer coisa valer) |
-| `js/dashboard/material/` | Cada formato virando item: `index` (dispatcher), `orcamento`, `imagem`, `zip`, `ooxml`, `texto`, `audio`, `gravador`, `video`, `wav`, `bytes` |
+| `js/dashboard/material/` | Cada formato virando item: `index` (dispatcher), `orcamento`, `imagem`, `zip`, `ooxml`, `texto`, `audio`, `gravador`, `video`, `wav`, `bytes`, **`link`** |
 | `api/plano-de-material.mjs` | **Vercel Function** que lê o material com IA (a única coisa fora do navegador) |
-| `api/_lib/` | As peças dela: `auth` (as travas), `itens` (tetos), `openai`, `prompt`, `sanear`, `http` |
+| `api/ler-link.mjs` | **Vercel Function** que lê a videoaula ou a página de um link colado |
+| `api/_lib/` | As peças delas: `auth` (as travas), `itens` (tetos), `openai`, `prompt`, `sanear`, `http` |
+| `api/_lib/link/` | A leitura de link: `rede` (SSRF, redirect, tetos), `youtube` (InnerTube + legenda), `pagina` (charset, HTML→texto, anti-bot, PDF) |
 | `js/dashboard/sections/*.js` | As 7 seções: Início, Conversas, Aprendizado, **Mapa da aula**, **Mesa de Estudos**, **Rosto da Cogni**, Configurações |
 | `css/dashboard-onboarding.css` | Estilos do onboarding |
 | `css/dashboard-rosto.css` | Estilos do editor de rosto (estética infantil, escopada em `.dash-rosto`) |
@@ -496,10 +559,12 @@ Cogni Software/
 ├── cadastro.html           # Cadastro
 ├── dashboard.html          # Painel Companion (app dos pais)
 │
-├── api/                    # Vercel Functions (site estático + 1 função)
+├── api/                    # Vercel Functions (site estático + 2 funções)
 │   ├── plano-de-material.mjs # Pedido do pai e/ou material da escola → plano, por IA
-│   └── _lib/               # Peças dela (o "_" impede virar rota): auth, itens,
+│   ├── ler-link.mjs        # Videoaula do YouTube ou página da web → material
+│   └── _lib/               # Peças delas (o "_" impede virar rota): auth, itens,
 │                           #   openai, prompt, sanear, http
+│                           #   link/ → rede (SSRF), youtube, pagina
 │
 ├── css/                    # Estilos (tokens → base → componentes)
 │   ├── tokens.css          # Design tokens (cor, tipografia, espaçamento)
@@ -527,11 +592,11 @@ Cogni Software/
 │   │   ├── mapa-timeline.js# A linha do tempo da aula (marcadores acessíveis)
 │   │   ├── dnd.js          # Drag and drop do quadro (Pointer Events + teclado)
 │   │   ├── mesa-realtime.js# O quadro ao vivo (canal do Supabase + fila)
-│   │   ├── captura.js      # Material → plano (as 4 entradas, bandeja, orçamento)
+│   │   ├── captura.js      # Pedido/material/link → plano (entradas, bandeja, orçamento)
 │   │   ├── revisao.js      # A revisão do plano (o pai confere e edita)
 │   │   ├── material/       # Cada formato virando item, sem biblioteca:
 │   │   │                   #   index, orcamento, imagem, zip, ooxml, texto,
-│   │   │                   #   audio, gravador, video, wav, bytes
+│   │   │                   #   audio, gravador, video, wav, bytes, link
 │   │   ├── router.js       # Roteamento por hash
 │   │   └── sections/       # Início, Conversas, Aprendizado, Mapa, Mesa, Rosto, Config
 │   └── ...
