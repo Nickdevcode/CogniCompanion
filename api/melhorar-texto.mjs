@@ -81,10 +81,16 @@ export default async function handler(req, res) {
   const env = { SUPABASE_URL, SUPABASE_ANON_KEY };
 
   try {
-    /* Trava 2 — quem é o pai (validado no servidor, nunca no corpo). */
+    /**
+     * Trava 2 — quem é o pai (validado no servidor, nunca no corpo).
+     *
+     * O "pra que" é passado porque aqui ninguém está criando plano: quem clicou no ✨
+     * pra melhorar uma frase e recebesse *"entre na sua conta pra criar um plano"*
+     * teria a resposta a uma ação que ele não fez.
+     */
     const auth = req.headers.authorization || "";
     const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-    const uid = await validarSessao(token, env);
+    const uid = await validarSessao(token, env, "escrever com a Cogni");
 
     /* A forma do corpo. */
     if (!String(req.headers["content-type"] || "").includes("application/json")) {
@@ -123,7 +129,7 @@ export default async function handler(req, res) {
     const contexto = normalizarContexto(corpo?.contexto);
 
     /* Trava 3 — tem criança pareada? (quem responde é a RLS) */
-    const crianca = await criancaPareada(token, uid, env);
+    const crianca = await criancaPareada(token, uid, env, "escrever com a Cogni");
 
     /**
      * A criança do banco manda no contexto: `idade` e `serie` decidem o TOM do texto,

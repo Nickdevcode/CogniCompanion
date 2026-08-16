@@ -37,17 +37,28 @@ const MAX_POR_DIA = 20;
 const ORIGENS_DE_IA = ["foto", "arquivo", "audio", "video", "pedido", "link"];
 
 /**
+ * O que o responsável estava tentando fazer, pras mensagens de 401/403.
+ *
+ * Elas diziam "criar um plano" fixo, e isso passou a mentir quando apareceu um
+ * endpoint que não cria plano nenhum: quem clicou no ✨ pra melhorar uma frase e
+ * levou *"entre na sua conta pra criar um plano"* recebe uma resposta a uma ação que
+ * ele não fez — o mesmo defeito que os textos-padrão do `sanear.mjs` já evitavam.
+ */
+const PARA_QUE_PADRAO = "criar um plano com a Cogni";
+
+/**
  * Trava 2 — valida o token do pai contra o Supabase.
  *
  * Nunca confiar num user id vindo no corpo: ele é escrito por quem chama.
  *
  * @param {string} token
  * @param {{SUPABASE_URL:string, SUPABASE_ANON_KEY:string}} env
+ * @param {string} [paraQue] — completa "Entre na sua conta pra …"
  * @returns {Promise<string>} o `auth.uid()`
  */
-export async function validarSessao(token, env) {
+export async function validarSessao(token, env, paraQue = PARA_QUE_PADRAO) {
   if (!token) {
-    throw new ErroHttp(401, "Entre na sua conta pra criar um plano com a Cogni.");
+    throw new ErroHttp(401, `Entre na sua conta pra ${paraQue}.`);
   }
 
   let uid;
@@ -73,9 +84,10 @@ export async function validarSessao(token, env) {
  * A consulta usa o token DELE, então é a RLS que faz o trabalho: um responsável não
  * consegue ler a criança de outra família nem que queira.
  *
+ * @param {string} [paraQue] — completa "Pareie o robô … antes de …"
  * @returns {Promise<{id:string, nome:string, idade:number|null, serie:string|null}>}
  */
-export async function criancaPareada(token, uid, env) {
+export async function criancaPareada(token, uid, env, paraQue = "criar um plano") {
   let crianca;
   try {
     const r = await buscar(
@@ -92,7 +104,7 @@ export async function criancaPareada(token, uid, env) {
   if (!crianca) {
     throw new ErroHttp(
       403,
-      "Pareie o robô com o perfil da criança antes de criar um plano."
+      `Pareie o robô com o perfil da criança antes de ${paraQue}.`
     );
   }
   return crianca;
