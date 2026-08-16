@@ -296,6 +296,7 @@ Agora é a **Mesa de Estudos** (`#/mesa`), e ela faz três coisas:
 | 🔗 | **Link → plano** | Cola a **videoaula do YouTube** ou o **link de uma página** e a Cogni monta as sessões de estudo do que aquele conteúdo ensina |
 | 🗂️ | **Quadro Kanban** | `A fazer` · `Fazendo` · `Feito`, com arraste de mouse, de dedo **e de teclado** |
 | ✨ | **O quadro é vivo** | A Cogni move os cards sozinha enquanto conversa com a criança — e com a tela aberta o pai **vê acontecer** |
+| 🖊️ | **A IA dentro dos campos** | Quem prefere escrever o plano na mão não fica sozinho: um ✨ em cada campo melhora, encurta ou detalha o que ele digitou — com **desfazer** do lado |
 
 > 💬 **Por que o pedido virou a entrada principal (16/ago/2026).** A primeira versão perguntava
 > *"o que a escola mandou?"* e só isso — o que assume uma escola organizada mandando PDF e áudio no
@@ -366,6 +367,70 @@ já sabia fazer.
 entendeu do material") e é descartado. Vale pra foto, PDF, Word, slides, planilha, áudio e vídeo.
 É material de criança — decisão de LGPD, não detalhe de implementação.
 
+#### 🖊️ A IA saiu do botão e entrou nos campos (16/ago/2026)
+
+A IA da Mesa era **tudo ou nada**: ou o pai clicava em "Criar com a Cogni" e recebia um plano
+inteiro pronto, ou clicava em "Escrever eu mesmo" e ficava **sozinho com um campo em branco**. Quem
+quer escrever o próprio plano perdia a IA justamente onde ela mais ajudaria — virar *"revisar aquilo
+de fração que ela errou na prova"* num texto que a Cogni consegue seguir.
+
+Agora tem um ✨ embaixo de **quatro campos**, com as ações que fazem sentido em cada um:
+
+| Campo | Teto | Vazio | Com texto |
+| --- | --- | --- | --- |
+| Plano · **título** | 80 | precisa de contexto | Melhorar |
+| Plano · **conteúdo** | 600 | Gerar do título + foco | Melhorar · Encurtar · Detalhar |
+| Tarefa · **título** | 120 | precisa de contexto | Melhorar |
+| Tarefa · **detalhe** | 240 | Gerar do título da tarefa | Melhorar · Encurtar · Detalhar |
+
+**A regra do título é a mais importante daqui:** gerar um título do nada não dá — não há de onde
+tirar, e a IA inventaria. Com *alguma coisa* escrita (*"fração prova sexta"*) ela tem contexto e
+devolve *"Frações pra prova de sexta"*. Então o botão de um título vazio, sem nada em volta, já
+nasce **apagado com a dica do porquê** — nunca um erro depois do clique. (Ele fica apagado por
+`aria-disabled`, e não pelo atributo `disabled`: botão `disabled` some do teclado e não mostra dica
+nenhuma no celular, e o pai ficaria olhando um ✨ apagado sem descobrir o motivo.)
+
+E três regras que fazem ou quebram a feature:
+
+1. **Desfazer é obrigatório.** A IA **substitui** o texto do pai. Sem um desfazer ao lado do campo
+   — que volta o original e some quando ele digita de novo — a feature é hostil: a pessoa perde o
+   próprio texto num clique.
+2. **O corte é da função, não do `maxlength`.** Se a IA devolver 300 caracteres num campo de 80, o
+   atributo do `<input>` corta em silêncio e o pai vê uma frase mutilada que ele lê como defeito do
+   site. A resposta chega **já cortada**, e o corte não parte palavra no meio.
+3. **Nunca inventar fato.** É a regra anti-invenção da casa, no grau máximo: a IA não acrescenta
+   página, data de entrega, capítulo nem nome de professor que não estejam no que ele escreveu. Ela
+   melhora a **redação**; o **fato** é dele. Um *"entregar terça"* inventado vira card com prazo
+   errado — e prazo errado vira a Cogni cobrando a criança no dia errado.
+
+> 🔒 O texto não é guardado em lugar nenhum, nem em log: vai, volta e some. O que sobra é o que o
+> pai salvar. E a **`origem` do plano não muda** — plano digitado à mão com o título polido pela IA
+> continua `manual`, porque `origem` diz de onde o plano **nasceu**, não quem passou o corretor.
+
+> ⏱️ O modelo é o mesmo `gpt-5.4-mini` do resto, mas com `reasoning_effort: 'low'`: isto é um
+> **botão**, não um pipeline — o pai está olhando o campo esperando, e raciocínio alto aqui compra
+> latência sem comprar qualidade de redação. A cota diária de 20 planos **não enxerga** este
+> endpoint (melhorar texto não cria plano), então ele tem trava própria: 40 por hora por
+> responsável, em memória da função.
+
+#### 🧮 A Cogni segue vários planos ao mesmo tempo
+
+O site **sempre** deixou criar quantos planos quisesse, e a vida pede isso mesmo (o reforço de
+matemática da semana **e** o inglês do mês). Só que o servidor do robô seguia **um** — e a tela
+tinha uma cópia dessa regra, dizendo *"A Cogni não está seguindo este plano agora"* no segundo plano
+ativo. Do lado do robô isso acabou (até **5 planos** por criança); do lado do site, aquela frase
+tinha virado **mentira**, e mentira pequena dita com segurança é a pior que existe num painel de
+pai.
+
+Agora o selo *"a Cogni está seguindo"* aparece em **todos** os vigentes — inclusive como um ✨ no
+chip de cada plano da faixa, que é onde a pergunta *"quais ela está seguindo?"* realmente aparece. O
+aviso de "não está seguindo" ficou valendo só pra quem merece: `rascunho`, `pausado`, `concluido`,
+vencido e o **6º plano em diante** (aí o aviso diz que o limite é 5, em vez de deixar o pai achar
+que a tela quebrou).
+
+> 📐 A expiração é **por plano**: um plano de 1 dia criado anteontem perde o selo, e o de 30 dias do
+> lado dele continua valendo.
+
 #### 📎 Quem lê o quê, e por que isso decide a arquitetura
 
 A Vercel corta o corpo da requisição em **4,5 MB antes do nosso código rodar**. A resposta não é
@@ -417,19 +482,20 @@ gap acaba, e aí a coluna é reindexada de uma vez.
 
 #### ⚙️ O que o Nicolas precisa configurar
 
-A leitura do material é a **única** parte do Companion que roda fora do navegador — duas Vercel
-Functions (`api/plano-de-material.mjs` e `api/ler-link.mjs`, com os módulos em `api/_lib/`), porque
-o servidor da Cogni é `127.0.0.1` e do celular do pai ele simplesmente não existe. Em *Settings →
-Environment Variables* do projeto na Vercel:
+O que fala com a IA é a **única** parte do Companion que roda fora do navegador — três Vercel
+Functions (`api/plano-de-material.mjs`, `api/ler-link.mjs` e `api/melhorar-texto.mjs`, com os
+módulos em `api/_lib/`), porque o servidor da Cogni é `127.0.0.1` e do celular do pai ele
+simplesmente não existe. Em *Settings → Environment Variables* do projeto na Vercel:
 
 | Variável | Pra quê |
 | --- | --- |
-| `OPENAI_API_KEY` | a leitura do material **e** a transcrição do áudio |
+| `OPENAI_API_KEY` | a leitura do material, a transcrição do áudio **e** o ✨ dos campos |
 | `SUPABASE_URL` | validar o login do pai e ler a criança pareada |
 | `SUPABASE_ANON_KEY` | idem (é a chave pública; quem protege é a RLS) |
 
-> 🆓 A leitura de link **não pediu nada novo**: nem variável de ambiente, nem dependência npm.
-> `fetch` e `node:dns` já vêm no runtime, e o YouTube é lido sem chave.
+> 🆓 Nem a leitura de link nem o ✨ dos campos **pediram nada novo**: nenhuma variável de ambiente,
+> nenhuma dependência npm. `fetch` e `node:dns` já vêm no runtime, o YouTube é lido sem chave, e o
+> botão de melhorar texto usa a mesma `OPENAI_API_KEY` que já estava lá.
 
 Faltando qualquer uma, a função responde **503** com mensagem clara em vez de quebrar. E ela
 **nunca escreve no banco**: devolve a proposta, e quem grava é o site com a sessão do pai.
@@ -452,6 +518,8 @@ Faltando qualquer uma, a função responde **503** com mensagem clara em vez de 
 > "confira", corrigir o texto extraído, rascunho × aprovar). **Link também**: colar um endereço
 > devolve um card de exemplo com miniatura e selo — e um link de `/shorts/` cai de propósito no
 > degrau "sem legenda", que é o caminho mais curto pra ver como a degradação honesta aparece na tela.
+> **O ✨ dos campos também**: no modo de demonstração ele devolve um texto de exemplo local, o que
+> já basta pra conferir o desfazer, o corte no teto, o botão apagado sem contexto e o "escrevendo…".
 
 ### 🗃️ Arquivos do painel
 
@@ -472,10 +540,12 @@ Faltando qualquer uma, a função responde **503** com mensagem clara em vez de 
 | `js/dashboard/mesa-realtime.js` | **O quadro ao vivo**: canal do Supabase, fila durante o arraste, degradação |
 | `js/dashboard/captura.js` | **Pedido/material → plano**: o campo do pedido, o campo de link, as quatro entradas de material, a bandeja e o orçamento |
 | `js/dashboard/revisao.js` | A tela de revisão (o pai confere e edita antes de qualquer coisa valer) |
+| `js/dashboard/campo-ia.js` | **O ✨ dentro do campo**: o botão, o desfazer, o corte no teto e a chamada da função |
 | `js/dashboard/material/` | Cada formato virando item: `index` (dispatcher), `orcamento`, `imagem`, `zip`, `ooxml`, `texto`, `audio`, `gravador`, `video`, `wav`, `bytes`, **`link`** |
 | `api/plano-de-material.mjs` | **Vercel Function** que lê o material com IA (a única coisa fora do navegador) |
 | `api/ler-link.mjs` | **Vercel Function** que lê a videoaula ou a página de um link colado |
-| `api/_lib/` | As peças delas: `auth` (as travas), `itens` (tetos), `openai`, `prompt`, `sanear`, `http` |
+| `api/melhorar-texto.mjs` | **Vercel Function** do ✨: uma frase entra, uma frase sai (não escreve no banco) |
+| `api/_lib/` | As peças delas: `auth` (as travas), `itens` (tetos), `openai`, `prompt`, `melhorar`, `sanear`, `http` |
 | `api/_lib/link/` | A leitura de link: `rede` (SSRF, redirect, tetos), `youtube` (InnerTube + legenda), `pagina` (charset, HTML→texto, anti-bot, PDF) |
 | `js/dashboard/sections/*.js` | As 7 seções: Início, Conversas, Aprendizado, **Mapa da aula**, **Mesa de Estudos**, **Rosto da Cogni**, Configurações |
 | `css/dashboard-onboarding.css` | Estilos do onboarding |

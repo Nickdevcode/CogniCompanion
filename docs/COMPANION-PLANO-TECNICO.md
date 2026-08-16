@@ -159,7 +159,7 @@ Um dado, três coelhos. 🎯
 | `conteudo` | text | texto livre injetado no system prompt |
 | `foco` | text | matéria (mesma lista de `conversas.materia` — agora **14** valores) |
 | `duracao_dias` | int | |
-| `status` | text | `rascunho` \| `ativo` \| `em_andamento` \| `pausado` \| `concluido`. A Cogni **segue** (injeta no prompt) só os planos `ativo` **ou** `em_andamento`; os outros ela ignora. ⭐ `rascunho` (ago/2026) é o plano que a IA montou de uma foto e o pai **ainda não aprovou** — ver "🧩 Mesa de Estudos" |
+| `status` | text | `rascunho` \| `ativo` \| `em_andamento` \| `pausado` \| `concluido`. A Cogni **segue** (injeta no prompt) só os planos `ativo` **ou** `em_andamento`; os outros ela ignora. ⭐ **ATUALIZADO (16/ago/2026 · rodada 4): ela segue TODOS os que passarem nesse filtro**, não só o mais recente — até 5 por criança. ⭐ `rascunho` (ago/2026) é o plano que a IA montou de uma foto e o pai **ainda não aprovou** — ver "🧩 Mesa de Estudos" |
 | `origem` | text | ⭐ ATUALIZADA (16/ago/2026 · rodada 3) `manual` (default) \| `foto` \| `arquivo` \| `audio` \| `video` \| **`pedido`** \| **`link`**. Diz **de onde o plano nasceu** — a tela mostra o selo certo ("criado a partir de um PDF") e o rate limit conta todas as origens de IA, não só `foto`. `pedido` é o plano que a IA montou do que o responsável escreveu, **sem material nenhum**; `manual` continua sendo só o plano digitado à mão. Quando vieram os dois, ganha a origem do MATERIAL — foi ele que virou as tarefas. **`link` (rodada 3) fica no TOPO da precedência**: quando o pai junta um link, foi ele que escolheu aquele conteúdo de propósito, e é o selo que mais diz alguma coisa pra quem revisa depois |
 | `extraido_texto` | text | ⭐ ATUALIZADA (16/ago/2026) o que a IA leu no material. Duas funções: **auditoria** — o pai confere o que ela entendeu sem precisar do arquivo, que não é guardado em lugar nenhum — e, desde 15/ago, **conteúdo pro robô**: entra no system prompt pra Cogni conseguir ajudar a FAZER a lição, não só lembrar que ela existe (ver "🧠 O material da escola chega na Cogni"). ⚠️ O formato **depende da origem**: material de arquivo é **transcrição literal**; material de `link` é um **resumo denso do que o conteúdo ensina** — os primeiros 900 caracteres de uma videoaula literal são a vinheta do canal, e 900 é exatamente o que o robô injeta (ver "🔗 Rodada 3") |
 | `criado_em` / `atualizado_em` | timestamptz | `criado_em` define a expiração: um plano vence quando `criado_em + duracao_dias` já passou (1 dia dura 1 dia). Plano vencido a Cogni para de cobrar, mesmo que o status ainda esteja `ativo`. `duracao_dias` null/0 = sem prazo |
@@ -399,7 +399,7 @@ Cada função: **eu (backend) → atualizo o contrato → Claude do site (tela) 
 - **Marcar sensível:** ✅ **feito.** A **IA** pós-resposta (`brain/memoria-ai.js`, a mesma chamada que extrai memória/tópico) devolve `sensivel` (entende nuance: bullying, tristeza, medo, sem precisar de palavra-chave). O `pipelinePosResposta` grava `sensivel = IA || verificarEntrada()` (regex do `safety.js` como rede de segurança). Sensível **marca pro pai**, não bloqueia (o bloqueio é só pro conteúdo realmente impróprio).
 - **Classificar matéria:** ✅ **feito.** A **IA** pós-resposta também classifica a `materia` (mais precisa que regex). O `brain/materia.js` (regex) é só fallback quando a IA não classifica. Grava no insert (regex) e a IA enriquece via UPDATE (`atualizarConversaPosIA` em `supabase.js`).
 - **Onboarding inteligente:** ✅ **feito.** `brain/memoria-ai.js` → `camposEssenciaisFaltantes(usuario)`/`temEssenciais(usuario)` (idade, série, hobbies, comoAprende). Se o pai preencheu tudo no site, o `verificarOnboarding` fecha a flag na hora e o `blocoOnboarding` (prompt.js) vira no-op — a Cogni **não refaz** as perguntas nem sobrescreve. Se faltam campos, ela pergunta **só os que faltam**.
-- **Injetar plano no prompt:** ✅ **feito.** `server/modules/planos.js` faz cache RAM do plano ativo por criança — `obterPlanoAtivo(id)` é leitura **síncrona** (robô não trava), `hidratarPlanos()` pré-carrega no boot. O `blocoPlanoEstudo(usuario, plano, gancho)` em `prompt.js` injeta título+foco+conteúdo (tom roteiro-não-prisão) via `extras.plano`, só pro estudante. Conta `status` `ativo` **ou** `em_andamento`; **expira** por `criado_em + duracao_dias` (1 dia dura 1 dia → para de cobrar). **1 plano vigente por criança** (single-child); se houver vários, vale o mais recente por `atualizado_em`. **Propagação e proatividade foram refeitas em ago/2026 — ver a seção própria abaixo.** ⭐ Desde 15/ago o plano vem com o **quadro** (`plano_tarefas`) embutido na mesma query, `obterTarefas(id)` lê do mesmo cache síncrono, e `moverTarefa()` é a **única escrita** do servidor nessa área — ver "🧩 Mesa de Estudos".
+- **Injetar plano no prompt:** ✅ **feito.** `server/modules/planos.js` faz cache RAM do plano ativo por criança — `obterPlanoAtivo(id)` é leitura **síncrona** (robô não trava), `hidratarPlanos()` pré-carrega no boot. O `blocoPlanoEstudo(usuario, plano, gancho)` em `prompt.js` injeta título+foco+conteúdo (tom roteiro-não-prisão) via `extras.plano`, só pro estudante. Conta `status` `ativo` **ou** `em_andamento`; **expira** por `criado_em + duracao_dias` (1 dia dura 1 dia → para de cobrar). ⭐ **ATUALIZADO (16/ago/2026 · rodada 4): a Cogni segue TODOS os planos vigentes** (até 5, os mais recentes por `atualizado_em`) — era 1 só, e o segundo plano ativo simplesmente não existia pra ela. A leitura síncrona nova é `obterPlanosVigentes(id)`, e o bloco do prompt traz **um plano completo + os outros resumidos**. Ver a seção da rodada 4. **Propagação e proatividade foram refeitas em ago/2026 — ver a seção própria abaixo.** ⭐ Desde 15/ago o plano vem com o **quadro** (`plano_tarefas`) embutido na mesma query, `obterTarefas(id)` lê do mesmo cache síncrono, e `moverTarefa()` é a **única escrita** do servidor nessa área — ver "🧩 Mesa de Estudos".
 - **Dica do Cogni:** ✅ **feito.** `server/modules/brain/dica.js` (novo) → `gerarDicaDoCogni({openai, modelo}, criancaId)`, exposto em `GET /api/dica?criancaId=`. IA gera uma dica curta e acionável pros pais com base em memórias + tópicos recentes. **Cache RAM curto de 1h** por criança (antes era 1 dia, dava "delay" — agora reflete a conversa recente sem regerar a cada reload); `?forcar=1` ignora o cache. Cada dica gerada é guardada na tabela `dicas` (só se diferente da última).
 - **Personalização do responsável:** ✅ **feito (ago/2026).** `blocoPromptPersonalizado()` em `brain/prompt.js` injeta `prompt_personalizado` no system prompt (bloco delimitado + ponteiro no recap final), e `brain/perfil-campos.js` é o dicionário único de série/matéria entre o site e a IA do robô. Ver "✍️ A ponte do perfil". Antes disto o campo era gravado e **nunca lido**.
 - **Camada de dados:** `server/modules/memoria.js` (cache + fila por usuário `filasPorUsuario` + `atualizarUsuario` async já existem — reaproveitar pro merge robô↔pai).
@@ -721,7 +721,7 @@ POST {SERVIDOR}/api/planos/refrescar
 - **Best-effort no front:** se o servidor local estiver desligado (o robô nem sempre está ligado quando o pai edita), o `fetch` falha — **engula o erro e siga**. O plano já está salvo no Supabase e o robô o pega no boot/Realtime. Não mostre erro pro pai por causa disso.
 - `{SERVIDOR}` = o mesmo `SERVIDOR_URL` que as telas de Rosto e Pareamento já usam.
 
-**Recomendado (não obrigatório):** mandar `atualizado_em: new Date().toISOString()` no `atualizarPlano`. O servidor desempata planos vigentes por `atualizado_em`, e hoje o site não escreve essa coluna — se não houver trigger `moddatetime` no banco, ela fica parada e o desempate cai nos critérios de reserva (`criado_em`, depois `id`). Com o vínculo 1:1 e um plano ativo por criança isso quase nunca aparece, mas é barato de acertar.
+**Recomendado (não obrigatório):** mandar `atualizado_em: new Date().toISOString()` no `atualizarPlano`. O servidor desempata planos vigentes por `atualizado_em`, e hoje o site não escreve essa coluna — se não houver trigger `moddatetime` no banco, ela fica parada e o desempate cai nos critérios de reserva (`criado_em`, depois `id`). ⭐ Desde a rodada 4 (vários planos vigentes) isso deixou de ser detalhe: `atualizado_em` é o que decide **quais** planos entram quando o teto de 5 estoura, e qual deles vem primeiro no prompt.
 
 ---
 
@@ -1505,6 +1505,191 @@ Cobertura: **`npm run teste:perfil`** (48 casos, offline) — 3 casos novos: a p
 
 ---
 
+## 🧮 Rodada 4 (16/ago/2026) — vários planos ao mesmo tempo, e a IA dentro dos campos
+
+> [!important] Esta rodada tem **duas metades independentes**, e elas podem ser feitas em qualquer ordem:
+>
+> 1. **Vários planos vigentes** — o lado do robô está **✅ feito**; o lado do site (a frase que virou mentira) também está **✅ feito**.
+> 2. **A IA dentro dos campos de texto** — **✅ feito**, e foi 100% do site: um endpoint novo e um botão nos quatro campos. O robô não participa.
+
+### Metade 1 — a Cogni passa a seguir TODOS os planos vigentes
+
+#### O bug que ninguém via
+
+O site **sempre** deixou o pai criar quantos planos quisesse, e nunca teve trava: `criarPlano`, `atualizarPlano` e `aprovarPlano` não desativam os outros. Dois planos `ativo` ao mesmo tempo é um estado perfeitamente alcançável — e comum, porque é o que a vida pede (o reforço de matemática da semana **e** o inglês do mês).
+
+Do outro lado, o servidor tinha um `limit(1)` e um cache `Map<criancaId, plano>`. O segundo plano existia pro banco, existia pra tela, tinha quadro, tinha cards, tinha material lido por IA — **e não existia pra Cogni.** Nada avisava. O plano simplesmente nunca virava conversa.
+
+O mais desconfortável: aquele `limit(1)` nunca foi decisão de produto. Estava documentado como *"regra de produto (single-child): UMA criança tem no máximo UM plano ativo"*, mas single-child é sobre **criança**, não sobre plano. Era o caminho mais curto virando regra por escrito.
+
+#### O que mudou no servidor (✅ feito, `Cogni/`)
+
+| O quê | Onde |
+| --- | --- |
+| O cache virou `Map<criancaId, plano[]>`; a consulta perdeu o `limit(1)` | `modules/planos.js` |
+| `obterPlanosVigentes(criancaId)` — a leitura síncrona nova (devolve lista) | `modules/planos.js` |
+| `obterTarefas()` junta os cards de **todos** os planos; cada card carrega `planoId` | `modules/planos.js` |
+| `moverTarefa()` acha o card em qualquer um dos planos e espelha no cache | `modules/planos.js` |
+| Teto de **5 planos** vigentes por criança (`MAX_PLANOS_VIGENTES`) — os mais recentes por `atualizado_em` | `modules/planos.js` |
+| **Expiração passou a ser por plano**: o de 1 dia vence sexta e o de 30 dias continua | `obterPlanosVigentes()` |
+| `escolherPlanoEmFoco()` — qual plano é o assunto **deste turno** | `brain/plano-gancho.js` |
+| O gancho olha os planos como um conjunto: chaves e carimbo são a **união** | `brain/plano-gancho.js` |
+| O bloco do prompt: **um plano completo + os outros resumidos** | `blocoPlanoEstudo()` em `brain/prompt.js` |
+| Falha de rede **não apaga mais** o plano do cache (era `cache.set(null)` no `catch`) | `refrescarPlanos()` |
+| Renomeados: `refrescarPlanoAtivo` → `refrescarPlanos`, `garantirPlanoFresco` → `garantirPlanosFrescos` | `modules/planos.js` |
+
+**`obterPlanoAtivo()` continua existindo** e devolve o mais recente — só o endpoint de refresh usa.
+
+#### O orçamento de tokens (o que decide o desenho)
+
+O bloco do plano vive no **sufixo volátil** do system prompt: tudo ali é pago em **todo turno**, sem desconto de cache. Três planos com roteiro (600) + quadro (600) + material (900) seriam ~3.200 tokens por turno em lição que a criança talvez nem toque hoje.
+
+Então **um** plano entra completo — o **em foco** — e os outros entram só como cabeçalho + o que ainda falta (2 cards por coluna, sem `feito`, sem roteiro, **sem material**). Medido neste PC:
+
+| Cenário | Bloco do plano | Custo do plano extra |
+| --- | --- | --- |
+| 1 plano | +1.064 tokens | — |
+| 2 planos | +1.225 tokens | **+161** |
+| 3 planos | +1.261 tokens | **+36** |
+
+Sem o corte, cada plano a mais custaria +1.064.
+
+#### Como o foco é escolhido (`escolherPlanoEmFoco`)
+
+Na ordem do que é mais **verdade sobre o agora**:
+
+1. **o que a criança acabou de falar** — chegou perguntando de fração, o plano de fração é o assunto, não importa o que esteja aberto em outro quadro;
+2. **o plano com card em `fazendo`** — trabalho começado se termina;
+3. **o mais recente** (a lista já chega ordenada por `atualizado_em`).
+
+O **card alvo** do turno sai de dentro do plano em foco, nunca de outro: mirar um card de inglês enquanto o prompt traz o roteiro de matemática faria a ordem do turno contradizer o próprio bloco.
+
+#### Duas travas que **não** foram afrouxadas
+
+- **Teto de iniciativa (`MAX_PUXOES = 3`) é da SESSÃO, não do plano.** Três planos ativos não dão à Cogni três vezes o direito de insistir — isso transformaria a amiga que puxa coisas legais numa agenda cobrando pauta atrás de pauta.
+- **`MAX_CONCLUSOES_POR_SESSAO = 1` continua 1.** A trava não protege *um quadro*, protege a confiança do pai na tela. Três planos triplicam os cards e triplicam o estrago de uma detecção errada — é exatamente o motivo pra não mexer.
+
+#### ✅ O que o SITE corrigiu (pequeno, mas obrigatório)
+
+`js/dashboard/format.js` tinha `planoVigente(planos, now)` — uma **segunda cópia** da regra do servidor, e o comentário no arquivo admitia isso. Ela escolhia **um** plano; com a mudança do robô ela ficou errada, e o erro era visível pro pai:
+
+- **`motivoNaoVigente()`** fazia a tela dizer *"A Cogni não está seguindo este plano agora"* no segundo plano ativo. **Isso virou mentira** — ela está seguindo.
+- **o selo "a Cogni está seguindo"** aparecia em um plano só; tem que aparecer em **todos** os vigentes.
+
+A regra nova: *vigente = `status ∈ {ativo, em_andamento}` **e** não vencido (`criado_em + duracao_dias`). **Todos** os que passarem nesse filtro estão sendo seguidos, até o teto de **5**; passando disso, ganham os mais recentes por `atualizado_em → criado_em → id`.* O aviso de "não está seguindo" continua valendo — e só — para: `rascunho`, `pausado`, `concluido`, vencido, **e o 6º plano em diante**.
+
+| O quê | Onde |
+| --- | --- |
+| `planoVigente()` (singular) virou **`planosVigentes()`** (lista, já cortada no teto de 5) | `js/dashboard/format.js` |
+| **`ehVigente(plano, planos, now)`** — "este plano está na lista?" | `js/dashboard/format.js` |
+| `motivoNaoVigente()` perdeu o *"ela está seguindo «Fulano» no momento"* e ganhou o caso do **6º em diante** | `js/dashboard/format.js` |
+| O selo e a classe `is-vigente` passaram a olhar `ehVigente`, não "quem ganhou" | `pintarPlano()` em `sections/mesa.js` |
+| "Que plano abrir primeiro" = `planosVigentes()[0]` (o mais recente) | `melhorDaAba`/`carregarPlanos`/`aplicarPlano` |
+| ⭐ **O ✨ no chip** de cada plano vigente — com dois ativos e um pausado na faixa, "quais ela segue?" virou pergunta de verdade | `chipDePlano()` |
+
+O **Kanban não precisou de mudança estrutural**: os cards já têm `plano_id`, `getTarefas(planoId)` já filtra, e a faixa de chips já trocava de plano. Isso estava certo desde o começo — mudou só o **estado visual**.
+
+#### Contrato: `POST {SERVIDOR}/api/planos/refrescar`
+
+A resposta ganhou campos (os antigos continuam, nada quebra):
+
+```json
+{ "ok": true,
+  "temPlanoAtivo": true,
+  "titulo": "Frações no dia a dia",
+  "total": 2,
+  "planos": [ { "id": 12, "titulo": "Frações no dia a dia", "foco": "matematica", "tarefas": 4 },
+              { "id": 13, "titulo": "Verbo to be", "foco": "ingles", "tarefas": 3 } ] }
+```
+
+Com `planos[]`, a tela consegue confirmar que **aquele** plano que o pai acabou de salvar entrou — antes só dava pra saber que *algum* tinha entrado. Continua best-effort: servidor desligado, engula o erro e siga.
+
+#### Cobertura
+
+`npm run teste` → **266/266** (eram 227). Novos: **`npm run teste:planos`** (13 casos — suíte nova, com um cliente Supabase de mentira, cobrindo agrupamento por criança, teto, expiração por plano, junção dos quadros, `moverTarefa` no segundo plano e as duas regras que protegem a conversa em andamento), mais 11 em `teste:plano`, 5 em `teste:tarefas` e 5 em `teste:contexto`.
+
+---
+
+### Metade 2 — a IA dentro dos campos (✅ **feito, tudo do site**)
+
+#### O buraco
+
+Hoje a IA da Mesa é **tudo ou nada**: ou o pai usa "Criar com a Cogni" e recebe um plano inteiro pronto, ou clica em "Escrever eu mesmo" e fica **sozinho com um `<textarea>` em branco**. Quem quer escrever o próprio plano perde a IA por completo — inclusive na hora em que ela ajudaria mais, que é transformar *"revisar aquilo de fração que ela errou na prova"* num roteiro que a Cogni consegue seguir.
+
+Mesma coisa no card do Kanban: o formulário de tarefa (título 120, detalhe 240) é digitação pura.
+
+#### O botão
+
+Um botão **inline** no canto de cada campo de texto, ícone `sparkle` (o mesmo de "Criar com a Cogni" — é a mesma promessa visual), em **4 campos**:
+
+| Campo | Teto | Ação com campo vazio | Ação com texto |
+| --- | --- | --- | --- |
+| Plano · **título** | 80 | precisa de contexto (ver abaixo) | Melhorar |
+| Plano · **conteúdo/objetivo** | 600 | Gerar a partir do título + foco | Melhorar · Encurtar · Detalhar |
+| Tarefa · **título** | 120 | precisa de contexto | Melhorar |
+| Tarefa · **detalhe** | 240 | Gerar a partir do título da tarefa | Melhorar · Encurtar · Detalhar |
+
+**A regra do título, que o Nicolas levantou e é a mais importante da metade 2:** gerar título do nada não dá — não há de onde tirar. Com **alguma coisa escrita** (*"fração prova sexta"*), aí sim: a IA tem contexto e devolve *"Frações pra prova de sexta"*. Então, campo de título vazio e sem nada em volta: o botão fica **desabilitado**, com dica dizendo o porquê (*"escreva umas palavras e eu melhoro"*) — nunca um erro depois do clique.
+
+Ordem de contexto pro título do plano: o que o pai digitou → o `conteudo` → o `foco`. Pro título da tarefa: o que ele digitou → título/foco do plano → os outros cards do quadro.
+
+#### 🔴 Três regras que fazem ou quebram isso
+
+1. **DESFAZER é obrigatório.** A IA **substitui** o que o pai escreveu. Sem um "desfazer" ao lado do campo (que devolve o texto original, e some quando ele digita de novo), a feature é hostil — a pessoa perde o próprio texto num clique. Guarde o valor anterior em memória, não precisa de banco.
+2. **Cortar no teto, na função — não no `<input>`.** Se a IA devolver 300 caracteres num campo de 80, o `maxlength` corta em silêncio e o pai vê a frase mutilada. A função devolve **já cortado**, e o corte não parte palavra no meio.
+3. **Nunca inventar fato específico.** É a regra anti-invenção da casa, aplicada aqui: a IA **não** pode acrescentar número de página, data de entrega, capítulo ou nome de professor que não estejam no que o pai escreveu. Ela melhora a **redação**; o **fato** é dele. Um "entregar terça" inventado vira card com prazo errado, e o prazo errado vira a Cogni cobrando a criança no dia errado.
+
+#### `POST /api/melhorar-texto` (função nova, `api/melhorar-texto.mjs`)
+
+Reaproveita tudo que já existe em `api/_lib/`: `validarSessao` + `criancaPareada` (`auth.mjs`) e o saneamento (`sanear.mjs`).
+
+> 🔧 **`criarChat` não existia** — o plano citava um helper que nunca tinha sido escrito. Ele foi extraído de `openai.mjs`: é o POST em `/chat/completions` e **nada mais** (sem prompt, sem schema, sem interpretar a resposta). A leitura de material passou a usá-lo também, então a chamada de chat vive num lugar só. Quem decide o que fazer com `finish_reason` continua sendo cada chamador — pro material é *"esse PDF é grande demais"*, pro botão é *"não consegui agora"*.
+
+Os arquivos novos: **`api/melhorar-texto.mjs`** (o handler e as travas), **`api/_lib/melhorar.mjs`** (os 4 campos, as 4 ações, `temFonte()` e o prompt) e **`js/dashboard/campo-ia.js`** (o botão, o desfazer e a chamada). Em `sanear.mjs` entraram `cortarSemPartirPalavra()` e `descascarTexto()`.
+
+```
+POST /api/melhorar-texto
+Authorization: Bearer <access_token do Supabase>
+{
+  "campo":  "plano.titulo" | "plano.conteudo" | "tarefa.titulo" | "tarefa.detalhe",
+  "acao":   "gerar" | "melhorar" | "encurtar" | "detalhar",
+  "texto":  "revisar aquilo de fração que ela errou na prova",
+  "contexto": {
+    "tituloDoPlano": "…", "conteudoDoPlano": "…", "foco": "matematica",
+    "tituloDaTarefa": "…", "materia": "matematica",
+    "cards": ["Exercícios da página 42", "Ler o capítulo 3"],
+    "idade": 9, "serie": "4º ano"
+  }
+}
+
+200 → { "ok": true, "texto": "Frações pra prova de sexta" }
+    → { "ok": false, "motivo": "sem_contexto" }   // não dá pra gerar do nada
+```
+
+Erros iguais aos das outras duas funções: **400** forma · **401** sem sessão · **403** sem criança pareada · **405** método · **415** content-type · **429** limite · **502** IA fora · **503** sem env vars.
+
+Notas de implementação:
+
+- **Modelo:** o `gpt-5.4-mini` que já está lá, com **`reasoning_effort: 'low'`**. Isto é um **botão**, não um pipeline: o pai está olhando o campo esperando. Raciocínio alto aqui compra latência e não compra qualidade de redação.
+- **Saída = só o texto.** Sem markdown, sem aspas em volta, sem "Aqui está:". Modelo pequeno adora envelopar — vale um `.trim()` que descasca aspas e prefixo, igual ao que o servidor do robô já faz na saída de voz.
+- **`idade`/`serie` no contexto** existem por um motivo só: o texto vai virar prompt de uma tutora de criança de 9 anos, não briefing corporativo.
+- **Cota:** a de 20/dia (`dentroDaCota`) conta linhas de `planos_estudo` por `origem` — ela **não enxerga** este endpoint, porque melhorar texto não cria plano. Daí a trava **4-B** em `auth.mjs`: `dentroDoLimiteDeTexto(uid)`, 40 por hora por responsável, num `Map` em memória da instância (com faxina e teto de sessões, pra não virar vazamento). Ela é honestamente **fraca** — o teto real é "40 por instância" —, e isso é aceito: o que ela protege é o acidente (clique repetido, laço na tela), não um atacante determinado, que já esbarra em login + criança pareada. O que **não** dava era ficar sem limite: é chamada de IA autenticada exposta na internet.
+- **`sem_contexto` vem antes do limitador.** Ele conta chamadas de IA, e essa não chega a ser uma — gastar um ponto do pai por uma resposta que a própria função deu seria cobrar por trabalho que ninguém fez.
+- **A `origem` do plano NÃO muda.** Plano digitado à mão com o título polido pela IA continua **`manual`**. `origem` diz de onde o plano **nasceu**, não quem passou o corretor — marcar `pedido` faria a tela exibir "criado a partir do que você pediu" sobre um plano que o pai escreveu inteiro.
+
+#### Acessibilidade (não é enfeite: o texto muda sozinho embaixo do cursor)
+
+- Botão com `aria-label` explícito (*"Melhorar este texto com a Cogni"*), nunca só o ícone.
+- Enquanto processa: `aria-busy="true"` no campo e os botões desabilitados de verdade (evita clique duplo, que é chamada de IA duplicada) — o rótulo vira *"Escrevendo…"*.
+- Ao voltar: anunciar num `role="status"`/`aria-live="polite"` colado no campo (*"Texto atualizado — dá pra desfazer aqui do lado"*) e devolver o foco ao campo, com o cursor no fim.
+- Falhou: a mensagem entra **nessa mesma região, perto do campo**, não num toast que some — e o texto do pai fica **intacto**.
+
+> ⚠️ **Uma decisão que foge da letra do plano, de propósito.** O botão sem contexto ficou desabilitado por **`aria-disabled="true"`**, não pelo atributo `disabled`. Um botão `disabled` some do teclado e não hospeda `title` nenhum no celular: o pai ficaria olhando um ✨ apagado sem nunca descobrir o porquê. Com `aria-disabled` ele continua alcançável, o leitor de tela anuncia "indisponível", e o clique mostra a dica (*"Escreva umas palavras aqui e eu melhoro"*) **sem chamar a IA**. Continua valendo a regra: nunca um erro depois do clique — o que aparece é a dica, e ela também está no `title` pra quem usa mouse.
+
+> 📐 **E a barra ficou ABAIXO do campo, alinhada à direita**, em vez de flutuando no canto de dentro. Conteúdo e detalhe têm três ações; três botões dentro de um `<input>` de 240 caracteres cobririam justamente o texto que o pai está lendo. Um lugar só pros quatro campos também evita a tela em que metade dos botões está por dentro e a outra metade por fora.
+
+---
+
 ## ✅ Como testar (ponta a ponta)
 
 - **Servidor sem credenciais** → robô/voz idênticos a hoje (fallback JSON).
@@ -1519,6 +1704,10 @@ Cobertura: **`npm run teste:perfil`** (48 casos, offline) — 3 casos novos: a p
 - **O material chega na Cogni** → com um plano ativo criado por foto/arquivo, conversar e perguntar sobre uma questão que **só** existe no material ("como faz a 2?"). Ela tem que saber do que se trata e ensinar o caminho **sem** entregar a resposta. Sem rede: `npm run teste:perfil` (48 casos, offline).
 - **Link → plano** (rodada 3) → uma videoaula real do YouTube **com legenda** (o card tem que mostrar título, canal, duração e o selo de legenda; as tarefas têm que falar do que a aula ensina, não "assistir ao vídeo"); uma **sem legenda** (o plano sai mais genérico e o card **diz isso**); um artigo do Brasil Escola; uma página `.gov.br` (é o teste do **charset latin1** — se aparecer `Presid�ncia` em qualquer lugar, a decodificação está errada); a Khan Academy (tem que dar *"esse site bloqueia leitura automática"*, **nunca** um plano montado em cima da página do Cloudflare); um link direto pra PDF; e um link de **playlist** (mensagem própria pedindo o link do vídeo). Depois os torcidos: `http://169.254.169.254/`, `http://localhost/`, um encurtador que redireciona, o **mesmo vídeo colado duas vezes** (`youtu.be/X` e `watch?v=X` = mesmo material), e um link colado **dentro** do campo de pedido.
 - **A conduta de link no robô** → com um plano de origem `link` ativo, conversar: a Cogni ensina o conteúdo com as palavras dela e **não** procura "questão do material". E, sobretudo, ela **nunca** chama aquilo de lição da escola.
+- **Dois planos ao mesmo tempo** (rodada 4) → criar dois planos `ativo` na mesma criança, um de matemática e um de inglês, cada um com 2-3 cards. Esperado: (1) o boot do servidor loga `2 plano(s) vigente(s) em 1 crianca(s)`; (2) conversar sobre **fração** → ela puxa o card de matemática; falar *"como fala isso em inglês?"* → **no mesmo papo** ela vira pro outro plano, sem anunciar a troca; (3) dizer *"já terminei as frases do verbo to be"* → o card **do plano de inglês** vai pra Feito, e o de matemática **não se mexe**; (4) `POST /api/planos/refrescar` devolve `total: 2` e os dois em `planos[]`.
+- **A tela não pode mais dizer que ela não está seguindo** → com dois planos `ativo`, abrir cada um: os **dois** mostram o selo "a Cogni está seguindo", e o aviso *"A Cogni não está seguindo este plano agora"* **não aparece em nenhum**. Ele volta a aparecer em: rascunho, pausado, concluído, vencido e no 6º plano em diante.
+- **O plano que vence sozinho** → dois planos ativos, um com `duracao_dias: 1` criado anteontem → o vencido some do prompt (e perde o selo na tela) e **o outro continua**.
+- **A IA nos campos** (rodada 4) → no formulário manual, escrever *"fração prova sexta"* no título e clicar no sparkle → vira uma frase legível **e o desfazer volta ao original**. Campo de título **vazio** → botão desabilitado com a dica, nunca erro depois do clique. Pedir pra melhorar um detalhe que diz "páginas 42 e 43" → a IA **não pode** inventar uma data de entrega que não estava lá. Resposta longa demais → chega **já cortada** no teto do campo, sem `maxlength` mutilando frase. Sem login → **401**.
 - **Drag and drop** → mouse no desktop; toque no celular (arrastar **não** pode rolar a página, e rolar a página **não** pode arrastar); e o quadro inteiro operável **só pelo teclado**, com o leitor de tela anunciando cada movimento.
 - **Internet cai com servidor no ar** → robô continua conversando (cache RAM).
 - **Site** → logar → badge → Dashboard → dados da criança vinculada aparecem; criança de outra família **não** aparece (RLS).
