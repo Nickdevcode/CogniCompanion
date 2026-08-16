@@ -67,7 +67,7 @@ Sidebar: **Início · Conversas · Aprendizado · Mapa da aula · Mesa de Estudo
 | 🏠 **Início** | Tempo de uso do dia, última conversa, próximo plano, resumo da semana (**sem conquistas**), Dica do Cogni (IA) | Tempo de uso = soma da duração das conversas. Dica = IA 1×/dia com base em memórias + tópicos recentes |
 | 🗣️ **Conversas** | Timeline por dia; cada conversa com **matéria** + **horário**; balões criança/Cogni; filtro de **tópicos sensíveis**; busca + filtro por matéria | Gravado a cada turno (ver Diário). Sensível = a **IA** marca (bullying, tristeza, medo… mesmo sem palavra-chave) + `verificarEntrada()` do `safety.js` como rede de segurança |
 | 📚 **Aprendizado** | Tempo por matéria, **Trilha de aprendizado** (praticando × já domina), tópicos explorados, gráfico de evolução (min/dia), **Dicas da Cogni** (era "Curiosidades da criança"), contadores (**sem conquistas**) | Tempo por matéria/gráfico = soma das durações por matéria. Trilha = `criancas.progresso` (ver seção própria; read-only pro site). Tópicos = extraídos das conversas. **Dicas da Cogni** = dica atual (`/api/dica`) + histórico (tabela `dicas`). As "curiosidades da criança" (frases tipo "perguntou 4× sobre X") foram **aposentadas** (jun/2026) — a seção virou Dicas da Cogni |
-| 🗒️ **Mesa de Estudos** (era "Planos") ⭐ | Plano (título, conteúdo, foco, duração, status) **+ quadro Kanban** com drag and drop **+ criar plano a partir de uma FOTO** da agenda/atividade | Três fontes: o pai **digita**, a **IA lê a foto** (e o pai aprova), e a **Cogni move os cards** conversando. O plano ativo e o quadro são injetados no system prompt |
+| 🗒️ **Mesa de Estudos** (era "Planos") ⭐ | Plano (título, conteúdo, foco, duração, status) **+ quadro Kanban** com drag and drop **+ criar plano com a Cogni**: o pai escreve o que quer e/ou junta material — foto, PDF, Word, slides, planilha, áudio, vídeo e **link (YouTube/web)** | Três fontes: o pai **digita ou pede**, a **IA lê o material** (e o pai aprova), e a **Cogni move os cards** conversando. O plano ativo e o quadro são injetados no system prompt |
 | ⚙️ **Configurações** (inclui "Família") | Perfil da criança pareada → detalhe (ver/editar infos + prompt personalizado); conta; tema; status da conexão do robô | Edição bidirecional do perfil (pai edita no site, robô capta por voz — os dois mexem no mesmo registro). O pai pode preencher infos antes mesmo do robô captar. **Editar o perfil no site já conta como onboarding feito**: a Cogni não refaz as perguntas de apresentação (ver instrumentação). Desde ago/2026 bastam **idade e série** pra isso — os demais campos a Cogni aprende conversando, sem perguntar |
 | 📬 **Resumo Semanal** | Bilhete carinhoso por IA | IA resume as conversas da semana (depende do Diário; feito por último) |
 
@@ -160,8 +160,8 @@ Um dado, três coelhos. 🎯
 | `foco` | text | matéria (mesma lista de `conversas.materia` — agora **14** valores) |
 | `duracao_dias` | int | |
 | `status` | text | `rascunho` \| `ativo` \| `em_andamento` \| `pausado` \| `concluido`. A Cogni **segue** (injeta no prompt) só os planos `ativo` **ou** `em_andamento`; os outros ela ignora. ⭐ `rascunho` (ago/2026) é o plano que a IA montou de uma foto e o pai **ainda não aprovou** — ver "🧩 Mesa de Estudos" |
-| `origem` | text | ⭐ ATUALIZADA (16/ago/2026) `manual` (default) \| `foto` \| `arquivo` \| `audio` \| `video` \| **`pedido`**. Diz **de onde o plano nasceu** — a tela mostra o selo certo ("criado a partir de um PDF") e o rate limit conta todas as origens de IA, não só `foto`. `pedido` é o plano que a IA montou do que o responsável escreveu, **sem material nenhum**; `manual` continua sendo só o plano digitado à mão. Quando vieram os dois, ganha a origem do MATERIAL — foi ele que virou as tarefas |
-| `extraido_texto` | text | ⭐ ATUALIZADA (15/ago/2026) a transcrição literal do que a IA leu no material (foto, PDF, Word, slides, planilha, áudio, vídeo). Duas funções: **auditoria** — o pai confere o que ela entendeu sem precisar do arquivo, que não é guardado em lugar nenhum — e, desde 15/ago, **conteúdo pro robô**: entra no system prompt pra Cogni conseguir ajudar a FAZER a lição, não só lembrar que ela existe (ver "🧠 O material da escola chega na Cogni") |
+| `origem` | text | ⭐ ATUALIZADA (16/ago/2026 · rodada 3) `manual` (default) \| `foto` \| `arquivo` \| `audio` \| `video` \| **`pedido`** \| **`link`**. Diz **de onde o plano nasceu** — a tela mostra o selo certo ("criado a partir de um PDF") e o rate limit conta todas as origens de IA, não só `foto`. `pedido` é o plano que a IA montou do que o responsável escreveu, **sem material nenhum**; `manual` continua sendo só o plano digitado à mão. Quando vieram os dois, ganha a origem do MATERIAL — foi ele que virou as tarefas. **`link` (rodada 3) fica no TOPO da precedência**: quando o pai junta um link, foi ele que escolheu aquele conteúdo de propósito, e é o selo que mais diz alguma coisa pra quem revisa depois |
+| `extraido_texto` | text | ⭐ ATUALIZADA (16/ago/2026) o que a IA leu no material. Duas funções: **auditoria** — o pai confere o que ela entendeu sem precisar do arquivo, que não é guardado em lugar nenhum — e, desde 15/ago, **conteúdo pro robô**: entra no system prompt pra Cogni conseguir ajudar a FAZER a lição, não só lembrar que ela existe (ver "🧠 O material da escola chega na Cogni"). ⚠️ O formato **depende da origem**: material de arquivo é **transcrição literal**; material de `link` é um **resumo denso do que o conteúdo ensina** — os primeiros 900 caracteres de uma videoaula literal são a vinheta do canal, e 900 é exatamente o que o robô injeta (ver "🔗 Rodada 3") |
 | `criado_em` / `atualizado_em` | timestamptz | `criado_em` define a expiração: um plano vence quando `criado_em + duracao_dias` já passou (1 dia dura 1 dia). Plano vencido a Cogni para de cobrar, mesmo que o status ainda esteja `ativo`. `duracao_dias` null/0 = sem prazo |
 
 Índice parcial: `(crianca_id) where status = 'ativo'`.
@@ -320,7 +320,7 @@ O site lê/escreve via `@supabase/supabase-js` (anon key, já carregado nos HTML
 - **Aprendizado:** derivar do `select` de `conversas` (somar `duracao_ms` por `materia` e por dia) + ler `idiomas_estudando`/`memorias` do perfil. **Tópicos explorados:** usar a coluna `topico` (preenchida pelo servidor; `null` = papo sem assunto) → lista de `topico` distintos. As **"curiosidades da criança"** (agrupar `topico` e contar, ex: "perguntou 4× sobre dinossauros") foram **aposentadas** (jun/2026): aquela seção da tela Aprendizado virou **"Dicas da Cogni"** (ver Dica do Cogni / Histórico de dicas acima). O `topico` continua alimentando "Tópicos explorados" e o Resumo Semanal.
 - **Planos:** CRUD em `planos_estudo` (o pai escreve direto; RLS protege).
 - **Quadro da Mesa de Estudos** ⭐ (ago/2026): CRUD em `plano_tarefas`, mesma forma. `from('plano_tarefas').select('*').eq('crianca_id', id).order('coluna').order('ordem')`. Duas regras que não estão em código: (1) toda escrita aqui também chama `pingPlanosAtualizados()` — o plano B do Realtime vale igual pros cards; (2) **assine o Realtime desta tabela** enquanto a tela estiver montada, senão o pai não vê a Cogni mover os cards (é a parte que impressiona).
-- **Gerar plano a partir do material da escola** ⭐ (ago/2026): **não** é o servidor local — é uma **Vercel Function do próprio site** (`POST /api/plano-de-material`). O servidor da Cogni é `127.0.0.1`, ou seja, do celular do pai ele não existe; a feature morreria fora de casa. Ver "🧩 Mesa de Estudos" para o contrato e as travas de segurança.
+- **Gerar plano a partir do material** ⭐ (ago/2026): **não** é o servidor local — são **Vercel Functions do próprio site** (`POST /api/plano-de-material` e, desde a rodada 3, `POST /api/ler-link`). O servidor da Cogni é `127.0.0.1`, ou seja, do celular do pai ele não existe; a feature morreria fora de casa. Ver "🧩 Mesa de Estudos" e "🔗 Rodada 3" para os contratos e as travas de segurança.
 - **Resumo Semanal:** **não** é Supabase — é um endpoint do servidor (a chave da OpenAI vive só lá). O site faz `GET {SERVIDOR}/api/resumo-semanal?criancaId=<id>` e recebe `{ resumo, periodoDias, totalConversas, materias, topicos, vazio }`. O servidor lê as conversas dos últimos 7 dias e gera o bilhete com IA, sob demanda (quando o pai abre a tela). `vazio: true` = sem conversas na semana (o `resumo` já vem com uma mensagem amigável). `{SERVIDOR}` = a URL do servidor local da Cogni (ex: `http://localhost:3000`).
 - **Dica do Cogni (tela Início):** endpoint do servidor (IA + chave da OpenAI). O site faz `GET {SERVIDOR}/api/dica?criancaId=<id>` e recebe `{ dica, deCache, vazio }`. A IA gera **uma** dica curta e acionável pros pais, com base nas memórias + tópicos recentes da criança. **Cache curto de 1h** no servidor (reflete a conversa recente sem gerar a cada reload — antes era 1 dia, dava "delay"). `deCache: true` = veio do cache; `vazio: true` = perfil sem dados ainda (dica genérica amigável). `?forcar=1` ignora o cache. Cada dica gerada é **guardada na tabela `dicas`** (só se diferente da última).
 - **Histórico de dicas (tela "Dicas da Cogni", em Aprendizado):** o site **lê direto do Supabase** (RLS), igual conversas: `from('dicas').select('*').eq('crianca_id', id).order('criado_em', { ascending: false })`. A dica **atual** (destaque) vem do `GET /api/dica`; o **histórico** (lista) vem desse select. Essa tela é a antiga "Curiosidades da criança", renomeada pra **"Dicas da Cogni"**.
@@ -1263,6 +1263,218 @@ Cobertura: **`npm run teste:perfil`** (45 casos, offline) — inclusive o caso q
 
 ---
 
+## 🔗 Rodada 3 (16/ago/2026) — link externo vira material
+
+> [!important] 🔴 **Quase tudo aqui é tarefa do SITE.** O lado do robô já está **feito** (16/ago/2026) — ver "🤖 O que o robô já fez nesta rodada" no fim da seção. O site constrói: a função `/api/ler-link`, o campo de link na Mesa, o card na bandeja, e as duas regras novas do prompt da IA.
+>
+> ⚠️ **Pré-requisito de deploy:** o SQL que abre o `CHECK` de `planos_estudo.origem` pra aceitar `link` roda **antes**. A rede do `23514` (regravar como `manual`) continua valendo, então o pai não perde o trabalho — mas perde o selo.
+
+### Por que link, e por que agora
+
+O material da rodada 2 tinha um pressuposto embutido: **alguém entregou um arquivo**. Foto da agenda, PDF da lista, áudio no grupo do WhatsApp. Só que boa parte do reforço escolar de 2026 não é arquivo nenhum — é **um link**. A professora manda a videoaula no grupo; o pai acha um vídeo bom no domingo à noite; a escola publica a lista num site em vez de mandar o PDF.
+
+Nesses casos o pai tinha três saídas, todas ruins: baixar o vídeo (ninguém faz), tirar print da página (perde o texto), ou digitar o plano na mão (que é o buraco que a feature inteira existe pra tapar).
+
+### 🧠 A decisão que decide a feature: link é FONTE, não lição
+
+Esta é a parte que mais importa, e é o erro mais fácil de cometer nesta rodada.
+
+A regra número 1 do prompt de material é **anti-invenção**: *"o material é o conteúdo: extraia o que está nele. Se o material tem duas tarefas, devolva duas — nunca cinco pra ficar mais completo."* Ela existe porque inventar tarefa em cima de uma foto de agenda é alucinação pura.
+
+**Aplicar essa regra a uma videoaula mata a feature.** Um vídeo de 12 minutos sobre comparação de frações contém **zero tarefas** — ele contém *conteúdo*. Sob a regra anti-invenção, a IA devolveria `legivel:false` ("não achei tarefa nenhuma") ou uma única tarefa boba ("assistir ao vídeo"). O pai mandou o vídeo justamente pra que a Cogni **trabalhasse aquilo** com a filha.
+
+Então a fonte `link` entra num **modo próprio**, mais perto do modo "só pedido" que do modo "material":
+
+| Chegou | Quem manda no conteúdo |
+| --- | --- |
+| material da escola (foto/PDF/Word/slides/planilha/áudio/vídeo) | o material — regra anti-invenção original |
+| **link (vídeo ou página)** | **o conteúdo é a FONTE; montar as sessões de estudo É o trabalho** |
+| só pedido | o pedido — criar é o trabalho |
+| material da escola **+** link | **a escola ganha** — ela é a lição de verdade, o link é apoio |
+| qualquer coisa **+** pedido | o pedido é o **recorte** (como já era) |
+
+A regra do modo link, escrita pro prompt: *"Este material é uma EXPLICAÇÃO (aula em vídeo ou página da web), não uma lição atribuída. Monte de 3 a 8 sessões de estudo que ensinem o que esse conteúdo ensina — na ordem, da mais simples pra mais difícil — como um bom professor particular montaria depois de assistir a essa aula. Fique dentro do assunto do material: não amplie pra matéria que ele não toca."*
+
+### 🎬 YouTube: de onde sai o conteúdo (medido, não suposto)
+
+Decisão do Nicolas (16/ago): **best-effort grátis**. Sem chave nova, sem dependência npm, sem serviço pago.
+
+O caminho é a **InnerTube API** — o mesmo endpoint que o app do YouTube usa:
+
+```
+POST https://www.youtube.com/youtubei/v1/player?prettyPrint=false
+  Content-Type: application/json
+  User-Agent: <um UA de navegador>
+  { "context": { "client": { "clientName": "ANDROID", "clientVersion": "20.10.38",
+                             "androidSdkVersion": 30, "hl": "pt", "gl": "BR" } },
+    "videoId": "<id>" }
+```
+
+De lá saem `videoDetails` (título, canal, duração, `shortDescription`, `keywords`) e `captions.playerCaptionsTracklistRenderer.captionTracks[]`. Cada track tem `baseUrl`; **acrescente `&fmt=json3`** e faça um GET pra receber `{ events: [{ segs: [{ utf8 }] }] }`.
+
+> 🔴 **`clientName: "WEB"` NÃO devolve legenda.** Ele responde `playabilityStatus: UNPLAYABLE` e **`captionTracks` vazio** — mas continua devolvendo `videoDetails` normalmente, então a falha é silenciosa: você acha que o vídeo não tem legenda quando o problema é o cliente. **`ANDROID` e `IOS` devolvem os dois.** Quase todo tutorial de 2024-2025 na internet usa `WEB`. Medido em 16/ago/2026.
+
+**Medição real (deste PC, 6 videoaulas brasileiras):**
+
+| Vídeo | Duração | Legenda | Caracteres |
+| --- | --- | --- | --- |
+| Gis com Giz — comparação de frações | 12min52 | `pt` manual | 9.683 |
+| Estúdio Conexão Escola — conceito de fração | 8min58 | `pt` automática | 5.154 |
+| Canal Futura — divisão de frações | 10min46 | `pt` automática | 7.617 |
+| MultiRio — exercícios sobre frações | 15min27 | `pt` automática | 10.494 |
+| Aula Paraná — frações equivalentes | **49min26** | `pt` automática | 17.998 |
+
+Ou seja: **~700 caracteres por minuto de aula**, e mesmo uma aula de 49 minutos cabe folgada no teto de 30 k de um item de texto.
+
+**A escada de degradação (é ela que faz "best-effort" ser honesto):**
+
+1. `ANDROID` → legenda `pt` manual (a melhor: tem pontuação e nomes certos);
+2. → legenda `pt` automática (`kind: "asr"` — erra número, nome e data, então **confiança mais baixa**, igual à transcrição de áudio);
+3. → legenda de outro idioma, pedindo tradução com `&tlang=pt` no `baseUrl`;
+4. → **só metadados**: título + canal + descrição + keywords. Sai um plano mais genérico, e **a tela diz isso** (ver o aviso abaixo);
+5. → `oembed` (`https://www.youtube.com/oembed?url=…&format=json`) — leve, sem chave, responde de qualquer IP: título e canal;
+6. → `ok:false` com motivo executável.
+
+> ⚠️ **O risco que o Nicolas aceitou de olho aberto:** o YouTube pune reputação de **IP de datacenter** no `timedtext`, e a Vercel é datacenter. Além disso, desde 2025 alguns vídeos exigem **PoToken** — o `baseUrl` vem com `&exp=xpe` e a resposta é **corpo vazio com status 200**. Trate corpo vazio como "sem legenda" e **caia pro degrau 4**; nunca deixe virar 502. Se na prática o degrau 4 virar o caso comum em produção, a saída é uma API paga de transcript (Supadata e similares, ~US$ 9-25/mês) — decisão nova, não faça sozinho.
+
+**Casos de URL que precisam de resposta própria** (todos verificados):
+
+| Link | O que fazer |
+| --- | --- |
+| `youtu.be/ID`, `/shorts/ID`, `/embed/ID`, `/live/ID`, `m.youtube.com`, `?t=30`, `&feature=share` | ✅ todos viram o mesmo id de 11 caracteres |
+| `/playlist?list=…` ou link de canal | ❌ *"Esse link é de uma playlist inteira. Abra o vídeo que interessa e copie o link dele."* |
+| vídeo privado, removido ou inexistente | `playabilityStatus` = `ERROR`/`LOGIN_REQUIRED` → *"Não consegui abrir esse vídeo — ele pode estar privado ou ter sido removido."* |
+
+### 🌐 Página da web: o que dá pra ler, e o que não dá
+
+Busca na função (o navegador não pode: CORS), converte HTML em texto e devolve como item de texto. **Cinco coisas que a implementação tem que ter** — as três primeiras foram descobertas testando com sites reais e falham em silêncio:
+
+1. 🔴 **UTF-8 não é seguro como padrão no Brasil.** `planalto.gov.br` serve `Content-Type: text/html` **sem charset**, **sem `<meta charset>`**, e o conteúdo é latin1. Decodificar como UTF-8 devolve *"Presid�ncia da Rep�blica"* — a página **inteira** vira texto corrompido, e o modelo monta o plano em cima disso sem reclamar. Material escolar público brasileiro é cheio disso. A solução que funciona: usar o charset declarado (header, depois `<meta>`) e, **quando não houver nenhum**, tentar `new TextDecoder("utf-8", { fatal: true })` — UTF-8 é autovalidante, então ele **lança** em bytes latin1 — e cair pra `windows-1252` no catch. Verificado: "Presidência da República" volta correto e as páginas UTF-8 continuam intactas.
+2. 🔴 **Anti-bot devolve `200` com uma página de verdade.** A Khan Academy responde *"Client Challenge"* em **227 caracteres** — passa em qualquer teste de "tem texto?". Sem uma checagem específica, a Cogni monta um plano de estudo **em cima do texto do Cloudflare**. Regra: texto curto (< ~1.200 chars) **e** batendo em `client challenge | just a moment | attention required | checking your browser | verify you are human | enable javascript | acesso negado` → *"Esse site bloqueia leitura automática. Copie o trecho que interessa e cole no seu pedido."* As **duas** condições, porque "just a moment" aparece legitimamente dentro de texto longo.
+3. **Tirar a casca SEMPRE, e só então procurar `<article>`/`<main>`.** Vários sites (Toda Matéria, por exemplo) põem o cabeçalho **dentro** do `<main>`: confiar só no seletor entrega o menu inteiro como se fosse a lição. Ordem: remove `script/style/noscript/svg/iframe/template` → remove `nav/header/footer/aside` → **aí** tenta `<article>`, senão `<main>`, senão o body.
+4. **Página que carrega por JavaScript não tem conserto aqui** (não roda navegador na função). Texto < 250 caracteres → mensagem que ensina: *"Essa página quase não tem texto pra ler. Copie o trecho que interessa e cole no seu pedido."*
+5. **Link que aponta pra PDF vira o item PDF que já existe** — não vira texto. Baixa (teto de ~2,2 MB de arquivo ≈ 3 MB em base64), manda como `{tipo:"pdf"}` e a OpenAI faz o resto, inclusive OCR de página escaneada. Acima do teto: *"Esse PDF é grande demais pra eu baixar de uma vez. Salve só as páginas da lição e mande pelo botão de arquivo."*
+
+**Bônus barato:** `docs.google.com/document|presentation|spreadsheets/d/<ID>` tem export direto (`/export?format=txt`, `/export/txt`, `/export?format=csv`). A escola manda link do Drive o tempo todo. Se o arquivo não for público, o export responde 401/403 → *"Esse link pede login pra abrir. Copie o texto e cole no seu pedido."*
+
+### 🔒 Segurança: esta função é a mais perigosa do projeto
+
+`/api/ler-link` busca **uma URL escolhida por quem chama**. Sem trava, é um proxy SSRF público hospedado no nosso projeto. O que é **obrigatório**:
+
+- **A sessão vem primeiro** — mesmo `validarSessao` + `criancaPareada` do `plano-de-material`. Sem sessão válida e criança pareada, nada de rede. É o que amarra qualquer abuso a uma conta real de responsável.
+- **Só `http`/`https`, só portas 80/443.** `file:`, `gopher:`, `data:` fora.
+- **Resolver o DNS e barrar IP privado**: `10.*`, `127.*`, `192.168.*`, `172.16-31.*`, `0.*`, **`169.254.*` (é onde mora o metadata endpoint das nuvens)**, `::1`, `fc00::/7`, `fe80::/10`, e `::ffff:` mapeado. Barrar também `localhost` e `*.internal` por nome.
+- 🔴 **Seguir redirect NA MÃO** (`redirect: "manual"`, no máximo 3 saltos) e **revalidar cada salto**. Um domínio público que responde `302` pra `http://169.254.169.254/` passa por qualquer validação feita só na URL inicial — é assim que SSRF entra.
+- **Teto de bytes lendo o stream** (nunca confiar no `content-length` declarado) e **timeout de ~12 s** por requisição.
+- **Cota**: reaproveite o `dentroDaCota` que já existe. Não é um contador de links dedicado — é o teto diário de planos daquela criança — mas basta pra impedir que uma conta válida vire scraper, e não custa infra nova. Se um dia virar problema, aí sim vale um contador próprio.
+
+### 📎 Contrato: `POST /api/ler-link` (função nova)
+
+**Por que uma função separada, e não um `{tipo:"link"}` dentro do `plano-de-material`:** a bandeja é onde os erros de material aparecem hoje (foto grande demais, `.docx` corrompido) — link ruim tem que falhar **ali**, com a mesma cara. E o pai precisa ver o **título do vídeo no card antes de montar o plano**: colar o link errado é o erro mais comum que existe, e é o único erro que ele consegue corrigir sozinho. Bônus: `plano-de-material` continua conhecendo **quatro tipos**, sem uma linha de mudança — a mesma sacada do vídeo, que ela também nunca soube que existia.
+
+```
+POST /api/ler-link
+  headers: Authorization: Bearer <supabase access_token>
+  body:    { url: "https://…" }        ← aceite texto com link no meio: extraia a 1ª URL
+                                          (o pai cola direto do WhatsApp)
+
+  → 200 { ok:true, fonte:"youtube", formato:"youtube", nome, titulo, canal,
+          duracao_s, miniatura, texto, grau:"transcricao"|"metadados",
+          idiomaLegenda, legendaAutomatica, cortado, aviso? }
+  → 200 { ok:true, fonte:"pagina",  formato:"web", nome, titulo, dominio,
+          texto, cortado, aviso? }
+  → 200 { ok:true, fonte:"pdf",     nome, titulo, dados:"data:application/pdf;base64,…", bytes }
+  → 200 { ok:false, motivo:"…" }    ← link ruim NÃO é erro HTTP (mesma regra do material)
+  → 400 forma · 401 sem sessão · 403 sem criança · 405 método · 415 content-type
+  → 429 cota do dia · 502 falha nossa · 503 função sem env vars
+```
+
+O cliente converte a resposta em item da bandeja e **nada mais muda no `plano-de-material`**:
+
+| `fonte` | vira | na bandeja |
+| --- | --- | --- |
+| `youtube` | `{tipo:"texto", nome, formato:"youtube", texto}` | miniatura do vídeo + título + canal + duração |
+| `pagina` | `{tipo:"texto", nome, formato:"web", texto}` | ícone de link + título + domínio |
+| `pdf` | `{tipo:"pdf", nome, dados}` | igual ao PDF de arquivo |
+
+### Tetos e regras de bandeja
+
+| | Teto | Por quê |
+| --- | --- | --- |
+| links por plano | **2** | acima disso o corpo estoura e a bandeja vira lista |
+| texto por link | **30 k chars** | mesmo teto de item de texto que já existe |
+| PDF por link | **~2,2 MB de arquivo** | ≈ 3 MB em base64, o teto de PDF que já existe |
+| timeout por requisição | **12 s** | a função inteira tem que fechar bem antes do limite |
+
+- **Link repetido na bandeja é recusado** com mensagem própria (comparar pela URL normalizada — e, no YouTube, pelo **id do vídeo**: `youtu.be/X` e `watch?v=X` são o mesmo material).
+- O texto do link **conta no orçamento de 4,0 MB** como qualquer item de texto. Na prática é irrelevante (30 k chars ≈ 30 KB), mas a contabilidade tem que ser a mesma — teto que tem exceção é teto que não protege.
+
+### ⭐ `extraido_texto` de link é RESUMO, não transcrição literal
+
+Regra 3 do prompt de material manda `extraido_texto` ser *"a transcrição LITERAL do que você conseguiu ler"*. **Para link, isso é a pior escolha possível**, e a aritmética mostra por quê:
+
+- a transcrição de uma aula de 13 min tem **~9.700 caracteres**;
+- `sanear.mjs` corta em **4.000** antes de gravar;
+- o robô injeta no máximo **900** (`MAX_EXTRAIDO_TEXTO`);
+- os primeiros 900 caracteres de uma videoaula são **"oi gente, sejam bem-vindos ao meu canal, não esqueçam de se inscrever…"**.
+
+Ou seja: a Cogni receberia a vinheta e nada do conteúdo. Então, quando a fonte é link, `extraido_texto` passa a ser um **resumo denso do que o conteúdo ENSINA** — conceitos na ordem em que aparecem, o passo a passo, os exemplos e os números —, sem saudação, sem pedido de inscrição, sem menu de site. Continua servindo pra auditoria (o pai confere o que a Cogni entendeu) e passa a servir pro robô, que é o outro motivo do campo existir.
+
+### 🎨 A tela: o material deixa de ser "o que a escola mandou"
+
+Decisão do Nicolas (16/ago): **reformular o enquadramento inteiro da seção**, não só encaixar um botão a mais. O separador atual — *"e o que a escola mandou, se tiver"* — sempre foi estreito, e com link fica errado: o pai que acha uma videoaula boa no domingo não recebeu nada de escola nenhuma. Pior: a frase **ensina** o pai a achar que material que não veio da escola não serve ali.
+
+O layout resolve os 5 formatos sem virar parede de botão. O link **não** ganha botão: material que se **cola** não se escolhe num seletor, e um botão que abre um campo pra colar é um toque a mais por nada.
+
+```
+  Seu pedido pra Cogni
+  ┌─────────────────────────────────────────┐
+  │ Ex.: revisar a tabuada do 7 e do 8…     │
+  └─────────────────────────────────────────┘
+  (Reforçar divisão) (Prova de ciências) …
+
+  ──────── Junte um material, se quiser ────────
+  Foto da agenda, PDF da lista, áudio da professora,
+  videoaula do YouTube ou o link de uma página.
+
+  ┌──────────────────────────────┐ ┌────────┐
+  │ 🔗 Cole um link do YouTube   │ │ Juntar │
+  │    ou de um site             │ └────────┘
+  └──────────────────────────────┘
+
+  ┌────────┐┌────────┐┌────────┐┌────────┐
+  │📷 Foto ││🖼 Galer.││📄 Arqu.││🎤 Áudio│
+  └────────┘└────────┘└────────┘└────────┘
+
+  ┌─ bandeja ────────────────────────────────┐
+  │ ▶ Fração — Aula 3 · 12min52 · Gis com Giz│
+  │   legenda automática · confira os números│
+  └──────────────────────────────────────────┘
+```
+
+- **Colar link no campo do pedido também funciona.** É barato de implementar (uma regex no `input`/`paste`), cobre quem cola sem ler a tela, e o texto colado é limpo da URL depois de virar card — senão a URL crua vai pro `pedido` e a IA tenta interpretar `https://` como instrução.
+- **Card do YouTube mostra a miniatura** (`https://i.ytimg.com/vi/<id>/mqdefault.jpg`). 🔴 **Isso exige liberar `img-src https://i.ytimg.com` no CSP do site** — sem isso a imagem some sem erro visível no lugar, e só o console reclama.
+- **O selo de grau é obrigatório no card.** Com transcrição: *"legenda automática — confira os números"*. Sem: *"sem legenda: li só o título e a descrição, o plano vai ficar mais genérico"*. É a diferença entre uma degradação honesta e uma que o pai só descobre olhando as tarefas ruins.
+- Enquanto o link carrega, o card entra em estado de carregando **na bandeja** (não no palco inteiro): diferente de foto e vídeo, a leitura de link é I/O de rede, e travar a tela por 8 s pra isso não se justifica.
+- A ordem dos botões e o `<input type="file">` no fim do DOM continuam como estão (foco inicial do modal).
+
+### 🤖 O que o robô já fez nesta rodada — ✅ **feito (16/ago/2026)**
+
+Nada disto é tarefa do site; está no ar em `Cogni/`:
+
+| O quê | Onde |
+| --- | --- |
+| `planos_estudo.origem` sobrevive do banco até o cache RAM (`plano.origem`) | `linhaParaPlano()` em `modules/planos.js` |
+| O bloco do prompt virou **`O MATERIAL DE ESTUDO`** (era `O MATERIAL DA ESCOLA`), com a procedência dita conforme a origem | `procedenciaDoMaterial()` em `brain/prompt.js` |
+| Conduta própria pra material de link: é **explicação**, não lista de questões — a Cogni ensina o mesmo caminho e o mesmo vocabulário, sem entregar o final pra quem ainda não viu | `blocoDoPlano()` em `brain/prompt.js` |
+| Plano antigo (sem `origem`) continua caindo no texto histórico | default `'manual'` no cache |
+
+**Por que o rótulo importa:** com `O MATERIAL DA ESCOLA` fixo, uma videoaula que o pai escolheu no domingo faria a Cogni dizer *"na sua lição da escola…"* — uma mentira pequena, dita com segurança, pra uma criança que acredita nela. E a linha de conduta antiga (*"se ela travar numa questão que está no material"*) mandaria a Cogni procurar questões num texto que só tem explicação.
+
+Cobertura: **`npm run teste:perfil`** (48 casos, offline) — 3 casos novos: a procedência de link não cita escola, as duas condutas são exclusivas, e plano sem `origem` cai no caminho histórico. Bateria completa em **227/227**.
+
+---
+
 ## ✅ Como testar (ponta a ponta)
 
 - **Servidor sem credenciais** → robô/voz idênticos a hoje (fallback JSON).
@@ -1274,7 +1486,9 @@ Cobertura: **`npm run teste:perfil`** (45 casos, offline) — inclusive o caso q
 - **Os dois falsos positivos** → dizer *"já terminei a lição de fração"* **conclui**; dizer só *"terminei"* **não conclui**; dizer *"não terminei a lição de fração"* **não conclui**. Sem rede: `npm run teste:tarefas` (34 casos, offline).
 - **Foto → plano** (no site) → fotografar uma agenda/folha real, revisar, aprovar. Testar também foto tremida (mensagem clara com dica de enquadramento, não erro genérico), sem login (**401**) e a 21ª geração do dia (**429**).
 - **Material → plano** (rodada 2) → um PDF real de lista de exercícios, um `.docx`, um `.pptx`, um áudio gravado ali na hora pelo botão, um áudio de arquivo (o que a professora mandou no WhatsApp) e um vídeo curto da lousa. Depois os caminhos tortos: `.doc` antigo ou `.pages` (mensagem que ensina o que fazer), PDF de 6 MB (aviso **antes** de subir, não 413 da plataforma), gravação sem dar permissão do microfone, e vídeo mudo (tem que virar plano só com os frames). No celular de verdade — iPhone e Android —, porque é lá que MediaRecorder e extração de frame divergem.
-- **O material chega na Cogni** → com um plano ativo criado por foto/arquivo, conversar e perguntar sobre uma questão que **só** existe no material ("como faz a 2?"). Ela tem que saber do que se trata e ensinar o caminho **sem** entregar a resposta. Sem rede: `npm run teste:perfil` (45 casos, offline).
+- **O material chega na Cogni** → com um plano ativo criado por foto/arquivo, conversar e perguntar sobre uma questão que **só** existe no material ("como faz a 2?"). Ela tem que saber do que se trata e ensinar o caminho **sem** entregar a resposta. Sem rede: `npm run teste:perfil` (48 casos, offline).
+- **Link → plano** (rodada 3) → uma videoaula real do YouTube **com legenda** (o card tem que mostrar título, canal, duração e o selo de legenda; as tarefas têm que falar do que a aula ensina, não "assistir ao vídeo"); uma **sem legenda** (o plano sai mais genérico e o card **diz isso**); um artigo do Brasil Escola; uma página `.gov.br` (é o teste do **charset latin1** — se aparecer `Presid�ncia` em qualquer lugar, a decodificação está errada); a Khan Academy (tem que dar *"esse site bloqueia leitura automática"*, **nunca** um plano montado em cima da página do Cloudflare); um link direto pra PDF; e um link de **playlist** (mensagem própria pedindo o link do vídeo). Depois os torcidos: `http://169.254.169.254/`, `http://localhost/`, um encurtador que redireciona, o **mesmo vídeo colado duas vezes** (`youtu.be/X` e `watch?v=X` = mesmo material), e um link colado **dentro** do campo de pedido.
+- **A conduta de link no robô** → com um plano de origem `link` ativo, conversar: a Cogni ensina o conteúdo com as palavras dela e **não** procura "questão do material". E, sobretudo, ela **nunca** chama aquilo de lição da escola.
 - **Drag and drop** → mouse no desktop; toque no celular (arrastar **não** pode rolar a página, e rolar a página **não** pode arrastar); e o quadro inteiro operável **só pelo teclado**, com o leitor de tela anunciando cada movimento.
 - **Internet cai com servidor no ar** → robô continua conversando (cache RAM).
 - **Site** → logar → badge → Dashboard → dados da criança vinculada aparecem; criança de outra família **não** aparece (RLS).
@@ -1299,6 +1513,8 @@ Cobertura: **`npm run teste:perfil`** (45 casos, offline) — inclusive o caso q
 4. ⭐ **Rodada 2 — material → plano (15/ago/2026)**, uma coisa manual só: o **SQL** que abre os dois `CHECK` de `origem` (entregue no chat). `planos_estudo.origem` passa a aceitar `arquivo`/`audio`/`video` e `plano_tarefas.origem` passa a aceitar `ia`. Escrito de forma idempotente (`drop constraint if exists` + `add constraint`), então roda mesmo se a constraint nunca tiver existido. **Nenhuma variável de ambiente nova** — a transcrição usa a `OPENAI_API_KEY` que já está lá.
 
 5. ⭐ **Pedido → plano (16/ago/2026)**, uma coisa manual só: o **SQL** que acrescenta `pedido` ao `CHECK` de `planos_estudo.origem` (entregue no chat), idempotente igual ao da rodada 2. **Nenhuma variável de ambiente nova.**
+
+6. ⭐ **Rodada 3 — link externo (16/ago/2026)**, uma coisa manual só: o **SQL** que acrescenta `link` ao `CHECK` de `planos_estudo.origem` (entregue no chat). Ele derruba **todas** as constraints de check que citam `origem` naquela tabela antes de recriar — porque o nome da constraint pode ter mudado entre as rodadas, e um `drop constraint if exists` com o nome errado deixaria a antiga barrando `link` em silêncio. **Nenhuma variável de ambiente nova, nenhuma dependência npm nova** — a leitura de link usa `fetch` e `node:dns`, que já vêm no runtime.
    > 🩹 Se o site subir antes do SQL, o insert do plano de pedido morreria com `23514` (check_violation) **depois** de o pai revisar tarefa por tarefa. O `criarPlanoComTarefas` (`supabase-data.js`) detecta esse código e regrava com a origem `manual`: perde-se o **selo**, não o trabalho. A rede some sozinha quando o SQL roda — a primeira tentativa passa a funcionar.
 
 (O Claude gerencia os `.env`. Credenciais rotacionadas depois pelo Nicolas.)
