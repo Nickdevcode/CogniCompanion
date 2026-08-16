@@ -47,7 +47,19 @@ const TIPOS = ["imagem", "pdf", "texto", "audio"];
  */
 const RE_IMAGEM = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 const RE_PDF = /^data:application\/pdf;base64,[A-Za-z0-9+/=]+$/;
-const RE_AUDIO = /^data:audio\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/;
+
+/**
+ * O áudio é o único que precisa aceitar **parâmetros de mídia** antes do `;base64,`.
+ *
+ * 🔴 O `MediaRecorder` não devolve `audio/webm` — devolve `audio/webm;codecs=opus`
+ * (Chrome, Android) ou `audio/mp4;codecs=mp4a.40.2` (Safari), e o `FileReader` copia
+ * o mime INTEIRO pro data URL: `data:audio/webm;codecs=opus;base64,…`. Sem o grupo de
+ * parâmetros aqui, o botão de gravar era recusado em 100% dos aparelhos — enquanto o
+ * mesmo áudio escolhido como arquivo passava, porque o mime que o sistema anexa a um
+ * arquivo do disco vem sem codecs. Era um "formato inválido" que só o gravador via.
+ */
+const RE_AUDIO =
+  /^data:audio\/[a-z0-9.+-]+(?:\s*;\s*[a-z0-9-]+=(?:"[^"]*"|[^;,"]+))*;base64,[A-Za-z0-9+/=]+$/;
 
 /** Data ISO "YYYY-MM-DD" vinda do cliente, ou a de hoje no servidor. */
 export function normalizarHoje(valor) {
