@@ -1,11 +1,19 @@
 /**
- * dnd.js — Drag and drop de quadro (Kanban), escrito à mão com Pointer Events.
+ * dnd.js — Drag and drop de quadro, escrito à mão com Pointer Events.
  *
  * Sem biblioteca e sem o drag-and-drop nativo do HTML5, e os dois motivos são
  * concretos: o nativo **não funciona em toque** (que é onde o pai usa o Companion),
  * e o SortableJS — a escolha óbvia — **não tem acessibilidade por teclado**. Como os
  * caminhos de teclado teriam que ser escritos de qualquer jeito, a biblioteca só
  * acrescentaria peso e uma animação que não dá pra controlar.
+ *
+ * ⭐ 16/ago/2026 — ele deixou de ser "o dnd do Kanban" e virou o dnd do painel: a
+ * faixa de planos da Mesa reordena a PRIORIDADE que a Cogni segue, e reordenar é o
+ * mesmo problema com outra geometria. Em vez de um segundo módulo (dois lugares pra
+ * consertar cada bug de toque, de fuso de foco e de leitor de tela), `criarQuadro`
+ * ganhou duas dimensões de configuração: `eixo` (a direção do movimento) e `item`
+ * (a palavra que os anúncios usam). Com **uma coluna só** ele é uma lista simples —
+ * e é assim que a faixa de planos o usa.
  *
  * O módulo não conhece Supabase, nem a Mesa, nem plano nenhum: ele calcula posição,
  * anima e chama `aoSoltar`. Quem grava é a seção.
@@ -47,6 +55,9 @@ const ESPERA_TOQUE_MS = 150;
 /** Faixa de borda que liga o auto-scroll, e a velocidade máxima por frame. */
 const BORDA_PX = 56;
 const VEL_MAX = 18;
+
+/** Quanto se pode passar da borda da lista e ainda estar soltando "dentro" dela. */
+const FOLGA_PX = 40;
 
 const MS_ATERRISSA = 180;
 const MS_CANCELA = 200;
@@ -161,11 +172,17 @@ export function flip(nos, mutar, { ms = MS_ATERRISSA, curva = CURVA } = {}) {
    -------------------------------------------------------------------------- */
 
 /**
- * Liga o drag and drop (ponteiro + teclado) num quadro de colunas.
+ * Liga o drag and drop (ponteiro + teclado) num quadro de colunas — ou, com uma
+ * coluna só, numa lista simples.
  *
  * @param {object} cfg
  * @param {HTMLElement} cfg.raiz — o elemento do quadro
  * @param {Array<{id:string, titulo:string}>} cfg.colunas — na ordem visual
+ * @param {'vertical'|'horizontal'} [cfg.eixo='vertical'] — a direção em que os itens
+ *   se sucedem DENTRO de uma coluna. Decide de onde sai o índice de soltura (meio
+ *   vertical × meio horizontal) e quais setas movem o item.
+ * @param {string} [cfg.item='tarefa'] — o nome do que se arrasta, na voz do pai. Vai
+ *   pros anúncios do leitor de tela ("plano movido para a posição 1 de 3").
  * @param {(mov:{id:string, de:string, para:string, indice:number, ordem:number,
  *   reindexar:boolean}) => Promise<any>} cfg.aoSoltar — grava o movimento. Se
  *   rejeitar, o card volta sozinho pro lugar de origem.
@@ -174,8 +191,26 @@ export function flip(nos, mutar, { ms = MS_ATERRISSA, curva = CURVA } = {}) {
  * @param {(texto:string) => void} [cfg.aoAnunciar] — default: região aria-live interna
  * @returns {object} a API do quadro
  */
-export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }) {
+export function criarQuadro({
+  raiz,
+  colunas,
+  eixo = "vertical",
+  item = "tarefa",
+  aoSoltar,
+  aoReindexar,
+  aoAnunciar,
+}) {
   if (!raiz) throw new Error("criarQuadro precisa de uma raiz.");
+
+  /** Os itens se sucedem no eixo X (faixa) em vez do Y (coluna do Kanban). */
+  const noEixoX = eixo === "horizontal";
+  /**
+   * Uma coluna só = lista simples. Muda três coisas: não há para onde as setas
+   * cruzadas levarem (então TODAS movem posição), o alvo não precisa ser
+   * desambiguado (a área de soltura fica folgada nos dois eixos) e os anúncios
+   * param de citar um nome de coluna que o pai não vê na tela.
+   */
+  const listaSimples = colunas.length < 2;
 
   const st = {
     modo: "ocioso", // ocioso | pendente | arrastando | teclado | soltando
@@ -207,9 +242,13 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
   const instrucoes = document.createElement("p");
   instrucoes.className = "dnd-anuncio";
   instrucoes.id = "dnd-instrucoes-" + Math.round(performance.now());
+  // O texto descreve o que as setas fazem NESTE quadro. Prometer "escolha a coluna"
+  // numa faixa de coluna única seria mandar quem usa leitor de tela procurar uma
+  // coisa que não existe.
   instrucoes.textContent =
-    "Pressione Espaço para pegar a tarefa. Use as setas para escolher a coluna e a " +
-    "posição, Espaço para soltar e Escape para cancelar.";
+    `Pressione Espaço para pegar o ${item}. Use as setas para ` +
+    (listaSimples ? "escolher a posição" : "escolher a coluna e a posição") +
+    ", Espaço para soltar e Escape para cancelar.";
   raiz.append(anuncio, instrucoes);
 
   /**
@@ -247,7 +286,31 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
   }
 
   const rotuloDe = (card) =>
-    (card.getAttribute("data-titulo") || card.textContent || "tarefa").trim();
+    (card.getAttribute("data-titulo") || card.textContent || item).trim();
+
+  /**
+   * A frase de "onde este item foi parar", pro leitor de tela.
+   *
+   * Na lista simples ela nomeia o ITEM ("Frações movido para a posição 1 de 3"):
+   * sem coluna pra citar, o nome é a única âncora que diz de qual dos cards a
+   * frase está falando.
+   */
+  /**
+   * "Nada mudou", pro leitor de tela — cancelamento e falha de gravação.
+   *
+   * Ela cita o RÓTULO em vez do tipo ("a tarefa voltou") porque o tipo é
+   * configurável e o português não é: *"o tarefa"* e *"a plano"* saem errados na
+   * metade das combinações. O nome do próprio item não tem esse problema, e ainda
+   * diz de qual dos cards a frase fala.
+   */
+  const fraseDeVolta = (card) => `${rotuloDe(card)} voltou para o lugar.`;
+
+  function fraseDePosicao(card, lista, indice, total) {
+    if (listaSimples) {
+      return `${rotuloDe(card)} movido para a posição ${indice + 1} de ${total}.`;
+    }
+    return `Movido para ${tituloCol(colunaDe(lista))}, posição ${indice + 1} de ${total}.`;
+  }
 
   /* ---- Camada do fantasma ------------------------------------------------ */
 
@@ -271,8 +334,11 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
     raiz.querySelectorAll("[data-dnd-card]:not([data-dnd-pronto])").forEach((card) => {
       card.setAttribute("data-dnd-pronto", "1");
       card.setAttribute("tabindex", "0");
-      card.setAttribute("role", "button");
-      card.setAttribute("aria-roledescription", "tarefa arrastável");
+      // Só quando não há papel declarado: o chip da faixa de planos já é um `tab`
+      // dentro de um `tablist`, e sobrescrever isso por `button` quebraria a
+      // semântica da faixa pra ganhar uma que ela não precisa (ela já é focável).
+      if (!card.hasAttribute("role")) card.setAttribute("role", "button");
+      card.setAttribute("aria-roledescription", `${item} arrastável`);
       card.setAttribute("aria-describedby", instrucoes.id);
       // Uma <img> ou <a> dentro do card ainda dispararia o arraste NATIVO do HTML5
       // por cima do nosso — e os dois juntos deixam o card preso no cursor.
@@ -313,11 +379,7 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
       flip(nos, () => listaDestino.insertBefore(card, proximo || null));
     }
 
-    anunciar(
-      `Movido para ${tituloCol(para)}, posição ${indice + 1} de ${
-        cardsDe(listaDestino).length
-      }.`
-    );
+    anunciar(fraseDePosicao(card, listaDestino, indice, cardsDe(listaDestino).length));
 
     try {
       await aoSoltar({ id, de, para, indice, ordem, reindexar });
@@ -328,7 +390,7 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
       flip(volta, () =>
         st.origem.lista.insertBefore(card, st.origem.referencia || null)
       );
-      anunciar("Não consegui mover a tarefa. Ela voltou para o lugar.");
+      anunciar(`Não consegui mover. ${fraseDeVolta(card)}`);
       throw err;
     }
 
@@ -372,9 +434,15 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
     if (!card || !raiz.contains(card)) return;
     // Botões, links e o menu "⋯" têm vida própria — arrastar a partir deles seria
     // roubar o clique de quem só queria apertar.
-    if (e.target.closest("[data-dnd-ignorar], button, a, input, select, textarea")) {
-      return;
-    }
+    //
+    // ⚠️ `!== card`: o item arrastável pode SER o controle (o chip da faixa de planos
+    // é um `<button>`). Sem essa comparação, o `closest` acharia o próprio chip e o
+    // arraste jamais começaria — e o motivo seria invisível, porque nada falha, o
+    // gesto só não acontece.
+    const bloqueio = e.target.closest(
+      "[data-dnd-ignorar], button, a, input, select, textarea"
+    );
+    if (bloqueio && bloqueio !== card) return;
 
     st.pid = e.pointerId;
     st.toque = e.pointerType !== "mouse";
@@ -450,6 +518,10 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
     const ph = document.createElement("div");
     ph.className = "dnd-placeholder";
     ph.style.height = `${r.height}px`;
+    // Na faixa horizontal a largura é que reserva o buraco — o item não ocupa a
+    // linha inteira como o card do Kanban, e um placeholder sem `width` colapsaria
+    // pra zero, fazendo o resto da faixa pular pra trás no primeiro frame.
+    if (noEixoX) ph.style.width = `${r.width}px`;
     lista.insertBefore(ph, card);
     st.placeholder = ph;
 
@@ -493,11 +565,15 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
       const rc = lista.getBoundingClientRect();
       // Folga vertical: soltar um pouco acima/abaixo da lista ainda conta como a
       // coluna. Sem isso, coluna curta vira um alvo que só acerta quem mira bem.
+      // Com UMA coluna a folga vale nos dois eixos: não há coluna vizinha pra
+      // confundir, então exigir mira lateral só criaria um "soltou fora" que o pai
+      // lê como o arraste tendo falhado.
+      const folgaX = listaSimples ? FOLGA_PX : 0;
       if (
-        st.ponto.x >= rc.left &&
-        st.ponto.x <= rc.right &&
-        st.ponto.y >= rc.top - 40 &&
-        st.ponto.y <= rc.bottom + 40
+        st.ponto.x >= rc.left - folgaX &&
+        st.ponto.x <= rc.right + folgaX &&
+        st.ponto.y >= rc.top - FOLGA_PX &&
+        st.ponto.y <= rc.bottom + FOLGA_PX
       ) {
         alvoLista = lista;
         break;
@@ -506,10 +582,14 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
 
     let indice = 0;
     if (alvoLista) {
+      // Passou do MEIO do vizinho no eixo em que os itens se sucedem = está depois
+      // dele. É a mesma conta nos dois eixos, só muda qual metade se mede.
       const outros = cardsDe(alvoLista);
       for (const n of outros) {
         const rn = n.getBoundingClientRect();
-        if (rn.top + rn.height / 2 < st.ponto.y) indice += 1;
+        const meio = noEixoX ? rn.left + rn.width / 2 : rn.top + rn.height / 2;
+        const ponto = noEixoX ? st.ponto.x : st.ponto.y;
+        if (meio < ponto) indice += 1;
       }
     }
 
@@ -543,6 +623,20 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
   /* ---- Auto-scroll ------------------------------------------------------- */
 
   /**
+   * Quem rola na horizontal: a lista alvo, se ela transbordar, senão a raiz.
+   *
+   * No Kanban os dois são a mesma coisa (o board rola e as colunas não). Na faixa de
+   * planos, não: a raiz é um wrapper parado e quem transborda é a própria faixa —
+   * sem esta escolha, arrastar até a borda direita não revelaria o resto da fila.
+   */
+  function rolavelX() {
+    const lista = st.alvo && st.alvo.lista;
+    if (lista && lista.scrollWidth > lista.clientWidth + 1) return lista;
+    if (raiz.scrollWidth > raiz.clientWidth + 1) return raiz;
+    return null;
+  }
+
+  /**
    * Rola a janela (vertical) e o quadro (horizontal) quando o ponteiro chega perto
    * da borda. Obrigatório no mobile, onde a coluna não cabe na tela — sem isto não
    * há como levar um card de "A fazer" até "Feito".
@@ -554,8 +648,9 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
     const alturaVisivel = (window.visualViewport && window.visualViewport.height) ||
       window.innerHeight;
     const vy = rampa(st.ponto.y, topoUtil(), alturaVisivel - baseUtil());
-    const rolaX = raiz.scrollWidth > raiz.clientWidth + 1;
-    const vx = rolaX ? rampa(st.ponto.x, rRaiz.left, rRaiz.right) : 0;
+    const alvoX = rolavelX();
+    const rX = alvoX === raiz ? rRaiz : alvoX && alvoX.getBoundingClientRect();
+    const vx = rX ? rampa(st.ponto.x, rX.left, rX.right) : 0;
 
     if (!vy && !vx) {
       st.ultimoT = 0;
@@ -563,7 +658,7 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
     }
     const fator = dt / 16.67;
     if (vy) window.scrollBy(0, vy * fator);
-    if (vx) raiz.scrollLeft += vx * fator;
+    if (vx) alvoX.scrollLeft += vx * fator;
     // Com o dedo PARADO na borda não chegam mais `pointermove`, então o próximo
     // frame precisa ser agendado daqui — senão a rolagem para junto com o dedo.
     agendar();
@@ -596,12 +691,34 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
 
   /* ---- Soltar ------------------------------------------------------------ */
 
+  /**
+   * Engole o `click` que o navegador dispara logo depois de um arraste de mouse.
+   *
+   * O item arrastável pode ser clicável (o chip da faixa de planos ABRE o plano), e
+   * aí soltar o card na posição nova acabaria abrindo aquele plano — um efeito
+   * colateral que ninguém pediu, em cima de um gesto que já terminou. Um listener de
+   * captura, uma vez só, e que se desfaz no tick seguinte caso o clique não venha
+   * (é o que acontece no toque).
+   */
+  function engolirProximoClique() {
+    const engolir = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    };
+    window.addEventListener("click", engolir, { capture: true, once: true });
+    window.setTimeout(
+      () => window.removeEventListener("click", engolir, { capture: true }),
+      0
+    );
+  }
+
   async function aoSubir(e) {
     if (e && e.pointerId !== st.pid) return;
     if (st.modo === "pendente") return desarmar();
     if (st.modo !== "arrastando") return;
 
     st.modo = "soltando";
+    engolirProximoClique();
     if (st.raf) cancelAnimationFrame(st.raf);
     st.raf = 0;
     st.ultimoT = 0;
@@ -614,7 +731,7 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
       const phCancelado = st.placeholder;
       await aterrissar(card, phCancelado, MS_CANCELA);
       restaurar(card, phCancelado);
-      anunciar("Movimento cancelado. A tarefa voltou para o lugar.");
+      anunciar(`Movimento cancelado. ${fraseDeVolta(card)}`);
       desarmar();
       liberar();
       return;
@@ -631,7 +748,7 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
       // commit não precisa animar de novo.
       await comprometer({ card, listaDestino: lista, indice, animar: false });
     } catch (err) {
-      console.error("[Companion] Falha ao mover a tarefa:", err);
+      console.error("[Companion] Falha ao mover o item do quadro:", err);
     } finally {
       desarmar();
       liberar();
@@ -706,7 +823,7 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
       st.modo = "soltando";
       aterrissar(card, ph, MS_CANCELA).then(() => {
         restaurar(card, ph);
-        anunciar("Movimento cancelado. A tarefa voltou para o lugar.");
+        anunciar(`Movimento cancelado. ${fraseDeVolta(card)}`);
         desarmar();
         liberar();
       });
@@ -778,6 +895,14 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
       case "ArrowLeft":
       case "ArrowRight": {
         e.preventDefault();
+        // Numa lista simples não há coluna vizinha, então ←/→ movem a posição —
+        // que é o gesto natural numa faixa horizontal, e a única coisa que as setas
+        // laterais poderiam significar ali. Seta que não faz nada ensina quem usa
+        // teclado que o quadro não responde.
+        if (listaSimples) {
+          posicionar(card, lista, iAtual + (e.key === "ArrowRight" ? 1 : -1));
+          return;
+        }
         const atual = colunas.findIndex((c) => c.id === colunaDe(lista));
         const alvo = colunas[atual + (e.key === "ArrowRight" ? 1 : -1)];
         if (!alvo) return;
@@ -849,16 +974,13 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
     card.setAttribute("aria-pressed", "true");
     raiz.classList.add("is-arrastando");
     anunciar(
-      `${rotuloDe(card)} pega. Setas movem, Espaço solta, Escape cancela.`
+      `Você pegou ${rotuloDe(card)}. Setas movem, Espaço solta, Escape cancela.`
     );
   }
 
   function anunciarPosicao(card, lista) {
     const irmaos = cardsDe(lista);
-    const pos = irmaos.indexOf(card);
-    anunciar(
-      `Movido para ${tituloCol(colunaDe(lista))}, posição ${pos + 1} de ${irmaos.length}.`
-    );
+    anunciar(fraseDePosicao(card, lista, irmaos.indexOf(card), irmaos.length));
   }
 
   async function soltarComTeclado() {
@@ -872,7 +994,7 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
     try {
       await comprometer({ card, listaDestino: lista, indice, animar: false });
     } catch (err) {
-      console.error("[Companion] Falha ao mover a tarefa:", err);
+      console.error("[Companion] Falha ao mover o item do quadro:", err);
     } finally {
       // O foco fica no card: quem navega por teclado não pode ser jogado pro topo.
       card.focus({ preventScroll: true });
@@ -892,7 +1014,7 @@ export function criarQuadro({ raiz, colunas, aoSoltar, aoReindexar, aoAnunciar }
       () => st.origem.lista.insertBefore(card, st.origem.referencia || null)
     );
     card.focus({ preventScroll: true });
-    anunciar("Movimento cancelado. A tarefa voltou para o lugar.");
+    anunciar(`Movimento cancelado. ${fraseDeVolta(card)}`);
     st.card = null;
     liberar();
   }

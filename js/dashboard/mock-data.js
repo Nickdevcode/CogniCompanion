@@ -25,6 +25,9 @@
  */
 
 import * as supa from "./supabase-data.js";
+// A fila dos planos (`ordem asc → atualizado_em desc → …`) mora no format.js, que é
+// a cópia da regra do servidor. O mock a usa pra ordenar do mesmo jeito que o banco.
+import { ordenarPlanos } from "./format.js";
 
 /**
  * Liga (true) os dados reais do Supabase; desliga (false) volta pro mock.
@@ -310,6 +313,7 @@ let planos = [
     foco: "portugues",
     duracao_dias: 30,
     status: "ativo",
+    ordem: 1000,
     criado_em: "2026-05-10T09:00:00-03:00",
     atualizado_em: "2026-05-10T09:00:00-03:00",
   },
@@ -324,6 +328,7 @@ let planos = [
     foco: "matematica",
     duracao_dias: 21,
     status: "em_andamento",
+    ordem: 2000,
     criado_em: "2026-05-12T10:30:00-03:00",
     atualizado_em: "2026-05-18T11:00:00-03:00",
   },
@@ -338,6 +343,7 @@ let planos = [
     foco: "ciencias",
     duracao_dias: 14,
     status: "pausado",
+    ordem: 3000,
     criado_em: "2026-05-05T08:00:00-03:00",
     atualizado_em: "2026-05-15T08:00:00-03:00",
   },
@@ -352,6 +358,7 @@ let planos = [
     foco: "historia",
     duracao_dias: 20,
     status: "concluido",
+    ordem: 4000,
     criado_em: "2026-04-01T08:00:00-03:00",
     atualizado_em: "2026-04-21T08:00:00-03:00",
   },
@@ -369,6 +376,7 @@ let planos = [
     foco: "matematica",
     duracao_dias: 7,
     status: "rascunho",
+    ordem: 5000,
     origem: "foto",
     extraido_texto:
       "AGENDA — 26/05\nMat: exercícios pág. 42 e 43 (frações equivalentes)\n" +
@@ -870,9 +878,36 @@ async function _mockConversas() {
     .map((c) => ({ ...c }));
 }
 
+/**
+ * Os planos na ORDEM DA FILA, igual ao modo real.
+ *
+ * A ordenação vive no `format.js` (`ordenarPlanos`) e é usada aqui de propósito: o
+ * modo mock existe pra a tela ser testada sem banco, e uma fila que só o Supabase
+ * sabe montar deixaria justamente o arraste — o que esta rodada acrescentou —
+ * impossível de conferir no demo.
+ */
 async function _mockPlanos() {
   await delay();
-  return planos.map((p) => ({ ...p }));
+  return ordenarPlanos(planos).map((p) => ({ ...p }));
+}
+
+/** Muda a posição de um plano na fila (mock). Espelha `reordenarPlano` do real. */
+async function _mockReordenarPlano(id, ordem) {
+  await delay(60);
+  const i = planos.findIndex((p) => String(p.id) === String(id));
+  if (i === -1) return null;
+  // Sem tocar em `atualizado_em`, como no modo real: reordenar não é editar.
+  planos[i] = { ...planos[i], ordem: Number(ordem) };
+  return { ...planos[i] };
+}
+
+async function _mockReindexarPlanos(novas) {
+  const linhas = [];
+  for (const n of novas || []) {
+    const linha = await _mockReordenarPlano(n.id, n.ordem);
+    if (linha) linhas.push(linha);
+  }
+  return linhas;
 }
 
 async function _mockDicas() {
@@ -1016,6 +1051,10 @@ async function _mockCriarPlano(dados) {
     foco: dados.foco || "outros",
     duracao_dias: Number(dados.duracao_dias) || 0,
     status: dados.status || "ativo",
+    // O default da coluna no banco. Plano novo nasce empatado com quem nunca foi
+    // arrastado, e o desempate por recência o coloca no topo — o site não manda
+    // `ordem` no insert justamente pra não divergir desse default.
+    ordem: 1000,
     // Mesma regra do modo real: `origem` tem default no banco e o texto extraído
     // só existe em plano vindo de foto.
     origem: dados.origem || "manual",
@@ -1196,6 +1235,52 @@ export async function atualizarPlano(id, patch) {
  */
 export async function removerPlano(id) {
   return USAR_SUPABASE ? supa.removerPlano(id) : _mockRemoverPlano(id);
+}
+
+/* --- A prioridade dos planos (`planos_estudo.ordem`) ⭐ 16/ago/2026 -------
+   O pai arrasta a faixa da Mesa e diz por onde a Cogni COMEÇA. É a mesma mecânica
+   fracionária dos cards do quadro: soltar entre dois grava a média dos vizinhos,
+   1 UPDATE por movimento. */
+
+/**
+ * Muda a posição de um plano na fila. Grava só `ordem` — nunca `atualizado_em`,
+ * que é o critério de desempate.
+ * @param {number} id
+ * @param {number} ordem — fracionária, vinda do `dnd.js`
+ * @returns {Promise<object|null>}
+ */
+export async function reordenarPlano(id, ordem) {
+  return USAR_SUPABASE ? supa.reordenarPlano(id, ordem) : _mockReordenarPlano(id, ordem);
+}
+
+/**
+ * Reescreve a fila em 1000, 2000, 3000… — só quando o gap fracionário acabou.
+ * @param {Array<{id:number|string, ordem:number}>} novas
+ * @returns {Promise<Array<object>>}
+ */
+export async function reindexarPlanos(novas) {
+  return USAR_SUPABASE ? supa.reindexarPlanos(novas) : _mockReindexarPlanos(novas);
+}
+
+/**
+ * A falha veio de a coluna `ordem` ainda não existir no banco (o SQL desta rodada
+ * não foi rodado)? A tela usa pra dizer *"a prioridade ainda não está disponível"*
+ * em vez de "não consegui salvar", que mandaria o pai tentar de novo pra sempre.
+ * No modo mock nunca é verdade — lá a coluna existe por construção.
+ * @param {any} err
+ * @returns {boolean}
+ */
+export function ehPrioridadeIndisponivel(err) {
+  return USAR_SUPABASE ? supa.ehPrioridadeIndisponivel(err) : false;
+}
+
+/**
+ * A prioridade está funcionando neste banco? `false` depois de a válvula desligar
+ * a ordenação — a tela para de prometer um arraste que o banco recusa.
+ * @returns {boolean}
+ */
+export function prioridadeDePlanosAtiva() {
+  return USAR_SUPABASE ? supa.prioridadeDePlanosAtiva() : true;
 }
 
 /* --- Quadro da Mesa de Estudos (`plano_tarefas`) ⭐ ago/2026 --------------

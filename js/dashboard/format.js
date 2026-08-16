@@ -396,11 +396,44 @@ export function formatQuandoRevisar(value, now = new Date()) {
 }
 
 /**
+ * O DIA de um valor, como texto "YYYY-MM-DD".
+ *
+ * 🗓️ Existe por causa de um bug de fuso que custa a tarde de alguém em todo projeto
+ * que mistura `date` com `timestamp`. `plano_tarefas.prazo` é um `date` **sem hora**,
+ * e `new Date('2026-08-17')` é meia-noite em **UTC** — ou seja, 21h do dia 16 no
+ * Brasil. Passar isso por um `getDate()` local devolve o dia ERRADO: o prazo de hoje
+ * vira "atrasado ontem" e o de amanhã deixa de ser urgente. O servidor corrigiu o
+ * mesmo defeito comparando dia com dia, como texto (`YYYY-MM-DD` é ordenável
+ * lexicograficamente), e é o que fazemos aqui.
+ *
+ * Data pura (só "YYYY-MM-DD") é lida como o dia que está escrito, sem fuso nenhum.
+ * Timestamp e `Date` continuam sendo convertidos pro dia LOCAL, que é o certo pra
+ * eles — um instante pertence ao dia de quem está olhando.
+ *
+ * @param {string|Date} value
+ * @returns {string} "" quando não dá pra ler um dia
+ */
+export function chaveDeDia(value) {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    return value.trim();
+  }
+  const d = toDate(value);
+  return Number.isNaN(d.getTime()) ? "" : dayKey(d);
+}
+
+/** "YYYY-MM-DD" → meia-noite LOCAL daquele dia (nunca UTC). */
+function diaLocal(chave) {
+  const [y, m, d] = chave.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/**
  * Prazo de uma tarefa do quadro (`plano_tarefas.prazo`, um `date` "YYYY-MM-DD").
  *
  * Diferente de `formatQuandoRevisar`, aqui a comparação é de CALENDÁRIO, não de
  * relógio: `prazo` é um dia inteiro, não um instante. Uma tarefa com prazo hoje
- * não está atrasada às 8h da manhã.
+ * não está atrasada às 8h da manhã — nem, por causa do fuso, na noite de ontem
+ * (ver `chaveDeDia`).
  *
  * @param {string|Date} value
  * @param {Date} [now]
@@ -410,7 +443,10 @@ export function formatQuandoRevisar(value, now = new Date()) {
  */
 export function formatPrazo(value, now = new Date()) {
   if (!value) return null;
-  const d = diffDias(now, value);
+  const chave = chaveDeDia(value);
+  const hoje = chaveDeDia(now);
+  if (!chave || !hoje) return null;
+  const d = Math.round((diaLocal(chave) - diaLocal(hoje)) / DIA_MS);
   if (!Number.isFinite(d)) return null;
   if (d < 0) {
     const atraso = -d;
@@ -423,7 +459,10 @@ export function formatPrazo(value, now = new Date()) {
   if (d === 0) return { texto: "hoje", atrasado: false, perto: true };
   if (d === 1) return { texto: "amanhã", atrasado: false, perto: true };
   if (d < 7) return { texto: `em ${d} dias`, atrasado: false, perto: d <= 2 };
-  return { texto: `até ${_dayFmt.format(toDate(value))}`, atrasado: false, perto: false };
+  // `diaLocal` de novo (e não `toDate(value)`): senão o rótulo longo mostraria o dia
+  // anterior, com o prazo curto já corrigido logo acima — o pior tipo de bug, o que
+  // se contradiz dentro da mesma tela.
+  return { texto: `até ${_dayFmt.format(diaLocal(chave))}`, atrasado: false, perto: false };
 }
 
 /* --------------------------------------------------------------------------
@@ -451,8 +490,38 @@ export function planoVencido(plano, now = new Date()) {
  */
 export const MAX_PLANOS_VIGENTES = 5;
 
-/** Desempate do servidor, na mesma ordem: `atualizado_em → criado_em → id`. */
-function maisRecentePrimeiro(a, b) {
+/**
+ * A `ordem` que um plano vale na fila. Ausente, nula ou suja vira `1000`.
+ *
+ * O default do banco é 1000 e **não houve backfill**: enquanto o pai não arrastar
+ * nada, todos empatam e o desempate continua sendo `atualizado_em` — exatamente o
+ * comportamento anterior. `1000` também é a resposta certa enquanto o SQL não roda
+ * (a coluna simplesmente não vem no `select`), o que mantém site e robô contando a
+ * mesma história nesse intervalo. Espelha `linhaParaPlano()` do servidor.
+ */
+export const ORDEM_PADRAO = 1000;
+
+/** @returns {number} a `ordem` do plano, nunca `NaN`. */
+export function ordemDoPlano(plano) {
+  const n = Number(plano && plano.ordem);
+  return Number.isFinite(n) ? n : ORDEM_PADRAO;
+}
+
+/**
+ * A fila da Cogni: `ordem asc → atualizado_em desc → criado_em desc → id desc`.
+ *
+ * ⚠️ Esta ordem é um CONTRATO com o servidor (`porPrioridade`, em
+ * `server/modules/planos.js`), não uma preferência da tela. Se as duas divergirem, o
+ * pai vê o arraste funcionar e a Cogni seguir outra fila — o pior resultado possível,
+ * porque a tela fica mentindo com cara de certeza. Mudou lá, muda aqui.
+ *
+ * ⭐ 16/ago/2026 — até esta rodada a chave principal era `atualizado_em desc`, o que
+ * fazia *editar* um plano virar *promover* um plano sem o pai saber disso.
+ */
+export function porPrioridade(a, b) {
+  const oa = ordemDoPlano(a);
+  const ob = ordemDoPlano(b);
+  if (oa !== ob) return oa - ob;
   const ta = toDate(a.atualizado_em || a.criado_em).getTime() || 0;
   const tb = toDate(b.atualizado_em || b.criado_em).getTime() || 0;
   if (tb !== ta) return tb - ta;
@@ -460,6 +529,16 @@ function maisRecentePrimeiro(a, b) {
   const cb = toDate(b.criado_em).getTime() || 0;
   if (cb !== ca) return cb - ca;
   return Number(b.id) - Number(a.id);
+}
+
+/**
+ * Uma CÓPIA da lista na ordem da fila. Não mexe no array recebido — a tela guarda
+ * a mesma referência em vários lugares.
+ * @param {Array<object>} planos
+ * @returns {Array<object>}
+ */
+export function ordenarPlanos(planos) {
+  return (planos || []).slice().sort(porPrioridade);
 }
 
 /**
@@ -475,18 +554,47 @@ function maisRecentePrimeiro(a, b) {
  * 🔴 16/ago/2026 — ela devolvia UM plano (o servidor tinha um `limit(1)`), e isso
  * virou mentira na tela: com dois planos `ativo`, o segundo exibia *"a Cogni não
  * está seguindo este plano agora"* enquanto a Cogni o seguia normalmente. Agora
- * **todos** os que passam no filtro estão valendo, até o teto — e só o 6º em
- * diante fica de fora, pelos mais recentes.
+ * **todos** os que passam no filtro estão valendo, até o teto.
+ *
+ * ⭐ E quem sobrevive ao teto passou a ser decidido pela `ordem` do pai, não pela
+ * recência: o 6º em diante é o 6º da FILA DELE. Corte por recência num teto que ele
+ * não controlava era a versão silenciosa do mesmo problema — o plano que importava
+ * caía fora porque outro tinha sido editado depois.
  *
  * @param {Array<object>} planos — linhas de `planos_estudo`
  * @param {Date} [now]
- * @returns {Array<object>} os vigentes, do mais recente pro mais antigo (pode ser vazio)
+ * @returns {Array<object>} os vigentes, na ordem da fila (pode ser vazio)
  */
 export function planosVigentes(planos, now = new Date()) {
-  return (planos || [])
-    .filter((p) => STATUS_VIGENTES.includes(p.status) && !planoVencido(p, now))
-    .sort(maisRecentePrimeiro)
-    .slice(0, MAX_PLANOS_VIGENTES);
+  return filaDePlanos(planos, now).slice(0, MAX_PLANOS_VIGENTES);
+}
+
+/**
+ * A fila INTEIRA, sem o corte do teto: todo plano que está no ar e no prazo, na
+ * ordem que o pai arrastou.
+ *
+ * Serve pra tela conseguir dizer *"este é o 6º"* — sem ela, o plano que ficou de fora
+ * seria indistinguível de um pausado, e o aviso viraria o genérico "não está entre os
+ * que ela segue", que não ensina nada nem sugere o que fazer.
+ *
+ * @param {Array<object>} planos
+ * @param {Date} [now]
+ * @returns {Array<object>}
+ */
+export function filaDePlanos(planos, now = new Date()) {
+  return ordenarPlanos(planos).filter(
+    (p) => STATUS_VIGENTES.includes(p.status) && !planoVencido(p, now)
+  );
+}
+
+/**
+ * A posição deste plano na fila (1 = por onde a Cogni começa).
+ * @returns {number} 0 quando ele não está na fila (rascunho, pausado, vencido…)
+ */
+export function posicaoNaFila(plano, planos, now = new Date()) {
+  if (!plano) return 0;
+  const i = filaDePlanos(planos, now).findIndex((p) => String(p.id) === String(plano.id));
+  return i + 1;
 }
 
 /**
@@ -518,16 +626,35 @@ export function motivoNaoVigente(plano, planos, now = new Date()) {
   if (planoVencido(plano, now)) return "O prazo deste plano terminou.";
   /**
    * Sobrou o 6º plano em diante: ele está ativo e no prazo, e mesmo assim ficou de
-   * fora — o teto é do servidor, e quem entra são os mais recentes. Dizer o número
-   * importa: sem ele, o aviso parece defeito da tela em vez de um limite conhecido.
+   * fora — o teto é do servidor. Dizer a POSIÇÃO importa: sem ela o aviso parece
+   * defeito da tela em vez de um limite conhecido, e o pai não descobre que existe
+   * uma saída que depende só dele (arrastar). Desde 16/ago/2026 quem sobrevive ao
+   * teto são os primeiros da fila DELE, não os planos mais recentes.
    */
   if (STATUS_VIGENTES.includes(plano.status)) {
+    const pos = posicaoNaFila(plano, planos, now);
     return (
-      `Ela segue no máximo ${MAX_PLANOS_VIGENTES} planos ao mesmo tempo, e este ficou ` +
-      "de fora por ser o mais antigo. Pause ou conclua um dos outros pra abrir vaga."
+      `Ela segue no máximo ${MAX_PLANOS_VIGENTES} planos ao mesmo tempo, e este é o ` +
+      `${pos}º da sua fila. Arraste ele pra cima da faixa, ou pause um dos outros.`
     );
   }
   return "Este plano não está entre os que ela segue.";
+}
+
+/**
+ * O que o arraste significa PRA ESTE plano — o texto que evita o pai reordenar uma
+ * fila que não existe.
+ *
+ * A faixa é arrastável inteira quando está na aba dos ativos, mas nem todo plano
+ * dela está valendo (um pode ter vencido, outro pode ser o 6º). Arrastar esses não
+ * muda nada no robô hoje, e um arraste sem efeito, repetido duas ou três vezes,
+ * ensina o pai a desconfiar do gesto — inclusive onde ele funciona.
+ *
+ * @returns {string|null} `null` quando a ordem deste plano vale agora (nada a dizer)
+ */
+export function avisoDeOrdem(plano, planos, now = new Date()) {
+  if (!plano || ehVigente(plano, planos, now)) return null;
+  return "A posição dele na fila só passa a valer quando ele voltar a valer.";
 }
 
 /* --------------------------------------------------------------------------

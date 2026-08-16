@@ -160,20 +160,142 @@ export async function getConversas() {
   return data || [];
 }
 
+/* --------------------------------------------------------------------------
+   A prioridade dos planos (`planos_estudo.ordem`) ⭐ 16/ago/2026
+   -------------------------------------------------------------------------- */
+
 /**
- * Planos de estudo da criança pareada.
+ * `undefined_column` do Postgres — a coluna citada na consulta não existe.
+ *
+ * É o código exato que sai enquanto o SQL desta rodada não foi rodado à mão no
+ * Supabase. E aqui ele é traiçoeiro: `select('*')` sobrevive tranquilo a uma coluna
+ * ausente, mas o `ORDER BY ordem` faz o Postgres recusar a consulta **inteira** — os
+ * planos sumiriam da tela por causa de um detalhe de ordenação.
+ */
+const COLUNA_AUSENTE = "42703";
+
+/**
+ * O erro é "a prioridade ainda não existe neste banco"?
+ *
+ * Exportado porque a MENSAGEM é decisão da tela, não da camada de dados: um arraste
+ * que falha por isto não é um erro do pai nem da rede, e dizer "não consegui salvar"
+ * mandaria ele tentar de novo pra sempre.
+ */
+export function ehPrioridadeIndisponivel(err) {
+  return !!err && err.code === COLUNA_AUSENTE;
+}
+
+/**
+ * Desliga a ordenação por `ordem` pelo resto da sessão, no primeiro 42703.
+ *
+ * Mesma válvula do servidor (`modules/planos.js`), e pelo mesmo motivo: o SQL é
+ * rodado à mão, então a janela entre o deploy e a migração é real. Sem ela, a Mesa
+ * abriria vazia — o pior jeito de comunicar "falta rodar um SQL".
+ */
+let prioridadeDisponivel = true;
+
+/** Avisa UMA vez por sessão. Repetir a cada leitura viraria ruído no console. */
+function desligarPrioridade(err) {
+  if (!prioridadeDisponivel) return;
+  prioridadeDisponivel = false;
+  console.warn(
+    "[Companion] Prioridade de planos indisponível (%s). " +
+      "Rode o SQL da coluna `planos_estudo.ordem`; até lá a fila cai no desempate antigo.",
+    (err && err.message) || COLUNA_AUSENTE
+  );
+}
+
+/** A prioridade está funcionando neste banco? (a tela usa pra não prometer arraste) */
+export function prioridadeDePlanosAtiva() {
+  return prioridadeDisponivel;
+}
+
+/**
+ * Planos de estudo da criança pareada, **na ordem da fila**.
+ *
+ * `ordem asc → atualizado_em desc → criado_em desc → id desc` — a mesma sequência de
+ * `porPrioridade()` no servidor. Não é preferência de tela: se as duas divergirem, o
+ * pai vê o arraste funcionar e a Cogni seguir outra fila.
+ *
  * @returns {Promise<Array<object>>} (vazio se não há criança pareada)
  */
 export async function getPlanos() {
   const crianca = await getCrianca();
   if (!crianca) return [];
-  const { data, error } = await client()
-    .from("planos_estudo")
-    .select("*")
-    .eq("crianca_id", crianca.id)
-    .order("criado_em", { ascending: false });
+  const consulta = () =>
+    client().from("planos_estudo").select("*").eq("crianca_id", crianca.id);
+
+  if (prioridadeDisponivel) {
+    const { data, error } = await desempatar(consulta().order("ordem", { ascending: true }));
+    if (!error) return data || [];
+    if (!ehPrioridadeIndisponivel(error)) throw error;
+    // A coluna ainda não existe: refazemos a consulta AGORA (sem o retry, a tela
+    // ficaria sem planos até o próximo render) e seguimos sem prioridade.
+    desligarPrioridade(error);
+  }
+
+  const { data, error } = await desempatar(consulta());
   if (error) throw error;
   return data || [];
+}
+
+/** O desempate que vale nos dois caminhos — um só, pra eles não divergirem. */
+function desempatar(q) {
+  return q
+    .order("atualizado_em", { ascending: false })
+    .order("criado_em", { ascending: false })
+    .order("id", { ascending: false });
+}
+
+/** O UPDATE cru de `ordem`. Sem aviso ao robô: quem chama decide quando avisar. */
+async function gravarOrdem(id, ordem) {
+  const { data, error } = await client()
+    .from("planos_estudo")
+    .update({ ordem: Number(ordem) })
+    .eq("id", id)
+    .select()
+    .maybeSingle();
+  if (error) {
+    if (ehPrioridadeIndisponivel(error)) desligarPrioridade(error);
+    throw error;
+  }
+  return data || null;
+}
+
+/**
+ * Muda a posição de um plano na fila — 1 UPDATE, na `ordem` e em mais nada.
+ *
+ * ⚠️ Não toca em `atualizado_em`, e isso é o ponto: `atualizado_em` é o critério de
+ * DESEMPATE da fila, então carimbá-lo aqui faria "arrastar" mexer também na regra
+ * que decide os empates. Editar um plano e reordenar um plano são coisas diferentes,
+ * e desde esta rodada a tela trata as duas assim.
+ *
+ * @param {number} id
+ * @param {number} ordem — fracionária (a média dos vizinhos, vinda do `dnd.js`)
+ * @returns {Promise<object|null>} o plano atualizado, ou null se nada bateu (RLS)
+ */
+export async function reordenarPlano(id, ordem) {
+  const linha = await gravarOrdem(id, ordem);
+  if (linha) avisarRobo(linha.crianca_id);
+  return linha;
+}
+
+/**
+ * Reescreve a fila inteira em 1000, 2000, 3000… — só quando o gap fracionário
+ * acabou (ver `precisaReindexar` no `dnd.js`). Raro por construção.
+ *
+ * Um aviso ao robô no fim, e não um por linha: são N escritas de um mesmo ato.
+ *
+ * @param {Array<{id:number|string, ordem:number}>} novas
+ * @returns {Promise<Array<object>>} as linhas atualizadas
+ */
+export async function reindexarPlanos(novas) {
+  const lista = Array.isArray(novas) ? novas : [];
+  if (!lista.length) return [];
+  const linhas = await Promise.all(lista.map((n) => gravarOrdem(n.id, n.ordem)));
+  const vivas = linhas.filter(Boolean);
+  if (vivas.length) avisarRobo(vivas[0].crianca_id);
+  return vivas;
 }
 
 /**
@@ -356,6 +478,11 @@ export async function atualizarPlano(id, patch) {
   const campos = {};
   // Allowlist explícita: campo fora dela é descartado em SILÊNCIO, então toda
   // coluna nova do contrato precisa ser acrescentada aqui também.
+  //
+  // ⚠️ `ordem` fica de fora DE PROPÓSITO: ela tem caminho próprio
+  // (`reordenarPlano`), que não carimba `atualizado_em`. Deixá-la entrar aqui faria
+  // qualquer edição de formulário poder reordenar a fila sem ninguém pedir — que é a
+  // versão nova do bug que esta rodada veio matar.
   for (const k of [
     "titulo",
     "conteudo",

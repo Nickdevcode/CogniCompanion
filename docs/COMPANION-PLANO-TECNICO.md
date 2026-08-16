@@ -162,9 +162,10 @@ Um dado, três coelhos. 🎯
 | `status` | text | `rascunho` \| `ativo` \| `em_andamento` \| `pausado` \| `concluido`. A Cogni **segue** (injeta no prompt) só os planos `ativo` **ou** `em_andamento`; os outros ela ignora. ⭐ **ATUALIZADO (16/ago/2026 · rodada 4): ela segue TODOS os que passarem nesse filtro**, não só o mais recente — até 5 por criança. ⭐ `rascunho` (ago/2026) é o plano que a IA montou de uma foto e o pai **ainda não aprovou** — ver "🧩 Mesa de Estudos" |
 | `origem` | text | ⭐ ATUALIZADA (16/ago/2026 · rodada 3) `manual` (default) \| `foto` \| `arquivo` \| `audio` \| `video` \| **`pedido`** \| **`link`**. Diz **de onde o plano nasceu** — a tela mostra o selo certo ("criado a partir de um PDF") e o rate limit conta todas as origens de IA, não só `foto`. `pedido` é o plano que a IA montou do que o responsável escreveu, **sem material nenhum**; `manual` continua sendo só o plano digitado à mão. Quando vieram os dois, ganha a origem do MATERIAL — foi ele que virou as tarefas. **`link` (rodada 3) fica no TOPO da precedência**: quando o pai junta um link, foi ele que escolheu aquele conteúdo de propósito, e é o selo que mais diz alguma coisa pra quem revisa depois |
 | `extraido_texto` | text | ⭐ ATUALIZADA (16/ago/2026) o que a IA leu no material. Duas funções: **auditoria** — o pai confere o que ela entendeu sem precisar do arquivo, que não é guardado em lugar nenhum — e, desde 15/ago, **conteúdo pro robô**: entra no system prompt pra Cogni conseguir ajudar a FAZER a lição, não só lembrar que ela existe (ver "🧠 O material da escola chega na Cogni"). ⚠️ O formato **depende da origem**: material de arquivo é **transcrição literal**; material de `link` é um **resumo denso do que o conteúdo ensina** — os primeiros 900 caracteres de uma videoaula literal são a vinheta do canal, e 900 é exatamente o que o robô injeta (ver "🔗 Rodada 3") |
-| `criado_em` / `atualizado_em` | timestamptz | `criado_em` define a expiração: um plano vence quando `criado_em + duracao_dias` já passou (1 dia dura 1 dia). Plano vencido a Cogni para de cobrar, mesmo que o status ainda esteja `ativo`. `duracao_dias` null/0 = sem prazo |
+| `ordem` | double precision NOT NULL default 1000 | ⭐ **NOVA (16/ago/2026 · rodada 5)** a **prioridade** do plano — a fila que o pai arrasta na Mesa. Mesma mecânica **fracionária** dos cards (gap de 1000, soltar entre dois grava a média = 1 UPDATE por movimento). É o **primeiro** critério de ordenação do servidor; `atualizado_em` virou desempate. Menor = mais prioritário. ⚠️ **Exige o SQL abaixo** — enquanto ele não rodar, o servidor detecta e cai na ordem antiga sozinho |
+| `criado_em` / `atualizado_em` | timestamptz | `criado_em` define a expiração: um plano vence quando `criado_em + duracao_dias` já passou (1 dia dura 1 dia). Plano vencido a Cogni para de cobrar, mesmo que o status ainda esteja `ativo`. `duracao_dias` null/0 = sem prazo. **Deixou de ser prioridade** em 16/ago: hoje é só desempate de `ordem` |
 
-Índice parcial: `(crianca_id) where status = 'ativo'`.
+Índice parcial: `(crianca_id) where status = 'ativo'`. Índice da prioridade: `(crianca_id, ordem)`.
 
 ### `plano_tarefas` — os cards do quadro ⭐ NOVO (ago/2026)
 
@@ -179,8 +180,8 @@ Um dado, três coelhos. 🎯
 | `detalhe` | text | a linha de baixo ("páginas 42 e 43"). Teto útil **240** |
 | `materia` | text | uma das **14** canônicas; `null` = herda o `foco` do plano |
 | `coluna` | text NOT NULL | `a_fazer` (default) \| `fazendo` \| `feito`. Valor desconhecido o servidor lê como `a_fazer` — card que aparece na coluna errada é visível; card que some é silencioso |
-| `ordem` | double precision NOT NULL | posição na coluna. **Fracionária** (gap de 1000): soltar entre dois cards grava a média dos vizinhos = **1 UPDATE por movimento**, não a coluna inteira |
-| `prazo` | date | quando a IA acha data na foto ("entregar terça") |
+| `ordem` | double precision NOT NULL | posição na coluna. **Fracionária** (gap de 1000): soltar entre dois cards grava a média dos vizinhos = **1 UPDATE por movimento**, não a coluna inteira. ⭐ **16/ago/2026:** virou de fato a **prioridade** que a Cogni segue — antes o prazo passava na frente dela (ver "🥇 Rodada 5") |
+| `prazo` | date | quando a IA acha data na foto ("entregar terça"). ⚠️ É `date`, **sem hora**: compare dia com dia (texto `YYYY-MM-DD`), nunca via `Date.parse` — a meia-noite UTC é a tarde do dia anterior no Brasil |
 | `estimativa_min` | int | sugestão da IA |
 | `origem` | text NOT NULL | ⭐ ATUALIZADA (15/ago/2026) `pai` (default) \| `ia` \| `cogni`. `ia_foto` continua **aceito e tratado igual a `ia`** — é o valor que os cards criados antes de 15/ago carregam, e reescrever linha de banco pra renomear rótulo não vale o risco |
 | `movida_por` | text | `null` \| `cogni` — quem fez a **última troca de coluna**. É o que acende o selo ✨ e o botão Desfazer na tela |
@@ -685,7 +686,7 @@ Eram **dois** problemas somados, e a auditoria achou **três** causas:
 3. **`refrescarPlanoAtivo(id)`** fire-and-forget nos demais turnos, e também na **troca de perfil** (`definirUsuarioAtivo`) e no **reset** (`limparConversa`).
 4. **`hidratarPlanos()`** no boot, como antes.
 
-> Em vez de aplicar a linha que chega pelo Realtime, o servidor **reconsulta** o plano vigente daquela criança. É o único jeito de respeitar a regra inteira: pausar o plano vigente tem que fazer o cache cair pro próximo vigente (ou pra `null`), e a linha do evento sozinha não sabe disso.
+> Em vez de aplicar a linha que chega pelo Realtime, o servidor **reconsulta** o plano vigente daquela criança. É o único jeito de respeitar a regra inteira: pausar um plano tem que fazer o cache cair pros que sobraram (ou pra lista vazia), e a linha do evento sozinha não sabe disso.
 
 **Proatividade — o "gancho" (`server/modules/brain/plano-gancho.js`, novo):** um motor puro que decide, **a cada turno**, uma de três ações:
 
@@ -1265,18 +1266,9 @@ Cobertura: **`npm run teste:perfil`** (45 casos, offline) — inclusive o caso q
 
 ## 🔗 Rodada 3 (16/ago/2026) — link externo vira material
 
-> [!important] ✅ **Feito no site (16/ago/2026).** O lado do robô também está feito — ver "🤖 O que o robô já fez nesta rodada" no fim da seção.
->
-> O que nasceu: **`api/ler-link.mjs`** + **`api/_lib/link/`** (3 módulos — `rede` com as travas de SSRF, `youtube` com a InnerTube, `pagina` com charset/HTML/anti-bot/PDF), **`js/dashboard/material/link.js`** (a resposta virando item de bandeja, com a chave de duplicata e o selo), e as mudanças em `captura.js` (campo de link, colagem no campo do pedido, card com miniatura e selo), `_lib/prompt.mjs` (o MODO LINK), `_lib/sanear.mjs` (textos-padrão de link), `_lib/auth.mjs` (`link` na cota), `material/index.js` (`origemDoPlano`), `revisao.js`, `format.js`, `icons.js` e `css/dashboard-mesa.css`. **Zero dependência npm, zero variável de ambiente nova.**
+> [!important] 🔴 **Quase tudo aqui é tarefa do SITE.** O lado do robô já está **feito** (16/ago/2026) — ver "🤖 O que o robô já fez nesta rodada" no fim da seção. O site constrói: a função `/api/ler-link`, o campo de link na Mesa, o card na bandeja, e as duas regras novas do prompt da IA.
 >
 > ⚠️ **Pré-requisito de deploy:** o SQL que abre o `CHECK` de `planos_estudo.origem` pra aceitar `link` roda **antes**. A rede do `23514` (regravar como `manual`) continua valendo, então o pai não perde o trabalho — mas perde o selo.
->
-> 🔎 **O que mudou do plano pra implementação** (medido em 16/ago, ver os detalhes nas subseções):
-> 1. **`&tlang=pt` é MUITO mais restrito que o download cru** — mesma track, mesmo segundo, deste PC: **200 crua e 429 traduzida**. O degrau 3 da escada virou uma *tentativa*, e a queda é pra legenda no idioma original (o cabeçalho do texto avisa o modelo em que língua ela veio, e manda escrever o plano em português).
-> 2. **A lista de legendas vem em ordem ALFABÉTICA do nome traduzido** — "a primeira manual" era *Alemão* num vídeo em inglês da Khan Academy. Quem aponta a track do idioma falado é **`defaultTranslationSourceTrackIndices`**.
-> 3. **A resposta ganhou o campo `chave`** (`yt:<id>` ou `web:<host><path><query>`): é a duplicata vista **depois** do redirect, que o cliente sozinho não enxerga.
-> 4. **`extrairUrl` também aceita endereço sem `https://` e sem `www.`** (`todamateria.com.br/fracoes`), mas só quando o campo tem **só isso** — dentro de frase, o mesmo padrão faria "dia 5.md" virar site.
-> 5. **Não havia CSP nenhum no site** (nem `<meta>`, nem `vercel.json`), então não houve o que liberar pro `i.ytimg.com`. Se um dia entrar CSP, `img-src https://i.ytimg.com` precisa entrar junto — e o card já degrada sozinho: `onerror` troca a miniatura pelo ícone.
 
 ### Por que link, e por que agora
 
@@ -1303,8 +1295,6 @@ Então a fonte `link` entra num **modo próprio**, mais perto do modo "só pedid
 | qualquer coisa **+** pedido | o pedido é o **recorte** (como já era) |
 
 A regra do modo link, escrita pro prompt: *"Este material é uma EXPLICAÇÃO (aula em vídeo ou página da web), não uma lição atribuída. Monte de 3 a 8 sessões de estudo que ensinem o que esse conteúdo ensina — na ordem, da mais simples pra mais difícil — como um bom professor particular montaria depois de assistir a essa aula. Fique dentro do assunto do material: não amplie pra matéria que ele não toca."*
-
-✅ **Onde isso vive (implementação):** `regrasDaFonte()` em `api/_lib/prompt.mjs` passou a receber `(pedido, temMaterial, temLink)`, e quem separa os dois é `ehItemDeLink()` — um item é de link quando `tipo:"texto"` e `formato` é `youtube` ou `web`. A precedência está em UM lugar só e vale nos três: o prompt, os textos-padrão do `sanear.mjs` (um plano de link que dá errado **não** pode responder *"tente com a folha inteira no quadro e boa luz"*) e o `origemDoPlano()` do cliente.
 
 ### 🎬 YouTube: de onde sai o conteúdo (medido, não suposto)
 
@@ -1341,16 +1331,10 @@ Ou seja: **~700 caracteres por minuto de aula**, e mesmo uma aula de 49 minutos 
 
 1. `ANDROID` → legenda `pt` manual (a melhor: tem pontuação e nomes certos);
 2. → legenda `pt` automática (`kind: "asr"` — erra número, nome e data, então **confiança mais baixa**, igual à transcrição de áudio);
-3. → legenda do **idioma original do vídeo**, com uma tentativa de tradução (`&tlang=pt`);
+3. → legenda de outro idioma, pedindo tradução com `&tlang=pt` no `baseUrl`;
 4. → **só metadados**: título + canal + descrição + keywords. Sai um plano mais genérico, e **a tela diz isso** (ver o aviso abaixo);
 5. → `oembed` (`https://www.youtube.com/oembed?url=…&format=json`) — leve, sem chave, responde de qualquer IP: título e canal;
 6. → `ok:false` com motivo executável.
-
-> 🔴 **Dois achados da implementação (16/ago), os dois medidos:**
->
-> **(a) `&tlang=pt` é rate-limitado com muito mais força que o download cru.** Mesma track, mesmo IP, no mesmo segundo: **200** sem `tlang` e **429** ("Sorry… unusual traffic") com `tlang`. Repetido depois de 8 s de espera, o 429 se manteve. Por isso o degrau 3 **não** é "traduz"; é "tenta traduzir e, falhando, usa o idioma original" — o modelo lê inglês e espanhol sem dificuldade, e o cabeçalho do texto diz em que língua a legenda veio e que **o plano sai em português**.
->
-> **(b) `captionTracks` vem em ordem ALFABÉTICA do nome traduzido pro `hl` pedido.** Num vídeo em inglês da Khan Academy com 9 legendas, a primeira manual da lista é **Alemão** — e "pegue a primeira manual" montaria o plano lendo a aula em alemão, sem erro nenhum na tela. A track do idioma falado está em **`renderer.defaultTranslationSourceTrackIndices[0]`** (medido: índice 5 = `en`).
 
 > ⚠️ **O risco que o Nicolas aceitou de olho aberto:** o YouTube pune reputação de **IP de datacenter** no `timedtext`, e a Vercel é datacenter. Além disso, desde 2025 alguns vídeos exigem **PoToken** — o `baseUrl` vem com `&exp=xpe` e a resposta é **corpo vazio com status 200**. Trate corpo vazio como "sem legenda" e **caia pro degrau 4**; nunca deixe virar 502. Se na prática o degrau 4 virar o caso comum em produção, a saída é uma API paga de transcript (Supadata e similares, ~US$ 9-25/mês) — decisão nova, não faça sozinho.
 
@@ -1395,19 +1379,16 @@ POST /api/ler-link
   body:    { url: "https://…" }        ← aceite texto com link no meio: extraia a 1ª URL
                                           (o pai cola direto do WhatsApp)
 
-  → 200 { ok:true, fonte:"youtube", formato:"youtube", chave:"yt:<id>", nome, titulo,
-          canal, duracao_s, miniatura, texto, grau:"transcricao"|"metadados",
-          idiomaLegenda, legendaAutomatica, cortado, aviso }
-  → 200 { ok:true, fonte:"pagina",  formato:"web", chave:"web:<host><path><query>",
-          nome, titulo, dominio, texto, cortado, aviso }
-  → 200 { ok:true, fonte:"pdf",     chave, nome, titulo,
-          dados:"data:application/pdf;base64,…", bytes }
+  → 200 { ok:true, fonte:"youtube", formato:"youtube", nome, titulo, canal,
+          duracao_s, miniatura, texto, grau:"transcricao"|"metadados",
+          idiomaLegenda, legendaAutomatica, cortado, aviso? }
+  → 200 { ok:true, fonte:"pagina",  formato:"web", nome, titulo, dominio,
+          texto, cortado, aviso? }
+  → 200 { ok:true, fonte:"pdf",     nome, titulo, dados:"data:application/pdf;base64,…", bytes }
   → 200 { ok:false, motivo:"…" }    ← link ruim NÃO é erro HTTP (mesma regra do material)
   → 400 forma · 401 sem sessão · 403 sem criança · 405 método · 415 content-type
   → 429 cota do dia · 502 falha nossa · 503 função sem env vars
 ```
-
-⭐ **`chave` (acrescentada na implementação):** é a identidade do material **depois** do redirect, e é ela que faz a duplicata funcionar de verdade — o cliente calcula uma chave local antes de chamar (pra não gastar rede à toa com `youtu.be/X` × `watch?v=X`), mas só a função sabe que um encurtador apontava pro mesmo vídeo. `aviso` vem sempre no corpo (`null` quando não há), pra a tela não precisar checar existência de campo.
 
 O cliente converte a resposta em item da bandeja e **nada mais muda no `plano-de-material`**:
 
@@ -1472,21 +1453,11 @@ O layout resolve os 5 formatos sem virar parede de botão. O link **não** ganha
   └──────────────────────────────────────────┘
 ```
 
-- **Colar link no campo do pedido também funciona.** Implementado no evento **`paste`**, não no `input`: no `input` a regex casa com `https://a` no meio da digitação e a leitura dispararia com o endereço pela metade. O texto colado é limpo da URL depois de virar card — senão a URL crua vai pro `pedido` e a IA tenta interpretar `https://` como instrução.
-- **Card do YouTube mostra a miniatura** (`https://i.ytimg.com/vi/<id>/mqdefault.jpg`). ✅ **Não havia CSP no site** (nem `<meta http-equiv>`, nem `vercel.json` com headers), então não houve o que liberar — mas se um dia entrar CSP, `img-src https://i.ytimg.com` entra junto. O card não depende disso pra ser legível: um `onerror` na `<img>` troca a miniatura pelo ícone de link.
+- **Colar link no campo do pedido também funciona.** É barato de implementar (uma regex no `input`/`paste`), cobre quem cola sem ler a tela, e o texto colado é limpo da URL depois de virar card — senão a URL crua vai pro `pedido` e a IA tenta interpretar `https://` como instrução.
+- **Card do YouTube mostra a miniatura** (`https://i.ytimg.com/vi/<id>/mqdefault.jpg`). 🔴 **Isso exige liberar `img-src https://i.ytimg.com` no CSP do site** — sem isso a imagem some sem erro visível no lugar, e só o console reclama.
 - **O selo de grau é obrigatório no card.** Com transcrição: *"legenda automática — confira os números"*. Sem: *"sem legenda: li só o título e a descrição, o plano vai ficar mais genérico"*. É a diferença entre uma degradação honesta e uma que o pai só descobre olhando as tarefas ruins.
 - Enquanto o link carrega, o card entra em estado de carregando **na bandeja** (não no palco inteiro): diferente de foto e vídeo, a leitura de link é I/O de rede, e travar a tela por 8 s pra isso não se justifica.
 - A ordem dos botões e o `<input type="file">` no fim do DOM continuam como estão (foco inicial do modal).
-
-**O que nasceu além do previsto (16/ago):**
-
-- **"Montar o plano" fica desabilitado enquanto um link está sendo lido.** Sem isso, clicar no meio da leitura entregaria o plano **sem** a aula — e o pai só descobriria na revisão, procurando as tarefas do vídeo que ele colou.
-- **O foco volta pro campo de link** depois de juntar (ou de errar): a etapa é repintada inteira a cada material, e quem está colando links perderia o lugar a cada tentativa. O texto do link **volta pro campo quando dá erro** — link errado é o erro mais comum, e reescrever o endereço do zero puniria o pai duas vezes.
-- **Enter no campo junta**, além do botão.
-- **`type="text"`, não `type="url"`**: a validação nativa recusa `youtube.com/watch?v=…` sem `https://`, que é exatamente como metade das pessoas cola.
-- **Selo por caso**: legenda do canal (verde) · legenda automática — confira os números (âmbar) · legenda em outro idioma (âmbar) · sem legenda (âmbar) · domínio, no caso de página · "PDF aberto direto do link".
-- **A tela em 320px**: o botão "Juntar" desce pra linha inteira embaixo do campo (com os dois lado a lado sobrariam ~120px pro endereço). Verificado sem estouro horizontal, no claro e no escuro.
-- **`ORIGENS_DE_IA` em `_lib/auth.mjs` ganhou `link`** — é o mesmo erro silencioso que a rodada 2 quase cometeu: fora da lista, a cota diária não valeria justo pra fonte que também gasta a nossa saída de rede.
 
 ### 🤖 O que o robô já fez nesta rodada — ✅ **feito (16/ago/2026)**
 
@@ -1509,8 +1480,8 @@ Cobertura: **`npm run teste:perfil`** (48 casos, offline) — 3 casos novos: a p
 
 > [!important] Esta rodada tem **duas metades independentes**, e elas podem ser feitas em qualquer ordem:
 >
-> 1. **Vários planos vigentes** — o lado do robô está **✅ feito**; o lado do site (a frase que virou mentira) também está **✅ feito**.
-> 2. **A IA dentro dos campos de texto** — **✅ feito**, e foi 100% do site: um endpoint novo e um botão nos quatro campos. O robô não participa.
+> 1. **Vários planos vigentes** — o lado do robô está **✅ feito**. O site tem uma correção pequena e importante a fazer (uma frase que virou mentira).
+> 2. **A IA dentro dos campos de texto** — é **100% tarefa do site**: um endpoint novo e um botão nos formulários. O robô não participa.
 
 ### Metade 1 — a Cogni passa a seguir TODOS os planos vigentes
 
@@ -1569,25 +1540,16 @@ O **card alvo** do turno sai de dentro do plano em foco, nunca de outro: mirar u
 - **Teto de iniciativa (`MAX_PUXOES = 3`) é da SESSÃO, não do plano.** Três planos ativos não dão à Cogni três vezes o direito de insistir — isso transformaria a amiga que puxa coisas legais numa agenda cobrando pauta atrás de pauta.
 - **`MAX_CONCLUSOES_POR_SESSAO = 1` continua 1.** A trava não protege *um quadro*, protege a confiança do pai na tela. Três planos triplicam os cards e triplicam o estrago de uma detecção errada — é exatamente o motivo pra não mexer.
 
-#### ✅ O que o SITE corrigiu (pequeno, mas obrigatório)
+#### 🔴 O que o SITE precisa corrigir (pequeno, mas obrigatório)
 
-`js/dashboard/format.js` tinha `planoVigente(planos, now)` — uma **segunda cópia** da regra do servidor, e o comentário no arquivo admitia isso. Ela escolhia **um** plano; com a mudança do robô ela ficou errada, e o erro era visível pro pai:
+`js/dashboard/format.js` tem `planoVigente(planos, now)` — uma **segunda cópia** da regra do servidor, e o comentário no arquivo admite isso. Ela escolhia **um** plano; agora ela está errada, e o erro é visível pro pai:
 
-- **`motivoNaoVigente()`** fazia a tela dizer *"A Cogni não está seguindo este plano agora"* no segundo plano ativo. **Isso virou mentira** — ela está seguindo.
-- **o selo "a Cogni está seguindo"** aparecia em um plano só; tem que aparecer em **todos** os vigentes.
+- **`motivoNaoVigente()`** faz a tela dizer *"A Cogni não está seguindo este plano agora"* no segundo plano ativo. **Isso virou mentira** — ela está seguindo.
+- **o selo "a Cogni está seguindo"** aparece em um plano só; tem que aparecer em **todos** os vigentes.
 
-A regra nova: *vigente = `status ∈ {ativo, em_andamento}` **e** não vencido (`criado_em + duracao_dias`). **Todos** os que passarem nesse filtro estão sendo seguidos, até o teto de **5**; passando disso, ganham os mais recentes por `atualizado_em → criado_em → id`.* O aviso de "não está seguindo" continua valendo — e só — para: `rascunho`, `pausado`, `concluido`, vencido, **e o 6º plano em diante**.
+A regra nova, pra copiar: *vigente = `status ∈ {ativo, em_andamento}` **e** não vencido (`criado_em + duracao_dias`). **Todos** os que passarem nesse filtro estão sendo seguidos, até o teto de **5**; passando disso, ganham os mais recentes por `atualizado_em → criado_em → id`.* O aviso de "não está seguindo" continua valendo — e só — para: `rascunho`, `pausado`, `concluido`, vencido, **e o 6º plano em diante**.
 
-| O quê | Onde |
-| --- | --- |
-| `planoVigente()` (singular) virou **`planosVigentes()`** (lista, já cortada no teto de 5) | `js/dashboard/format.js` |
-| **`ehVigente(plano, planos, now)`** — "este plano está na lista?" | `js/dashboard/format.js` |
-| `motivoNaoVigente()` perdeu o *"ela está seguindo «Fulano» no momento"* e ganhou o caso do **6º em diante** | `js/dashboard/format.js` |
-| O selo e a classe `is-vigente` passaram a olhar `ehVigente`, não "quem ganhou" | `pintarPlano()` em `sections/mesa.js` |
-| "Que plano abrir primeiro" = `planosVigentes()[0]` (o mais recente) | `melhorDaAba`/`carregarPlanos`/`aplicarPlano` |
-| ⭐ **O ✨ no chip** de cada plano vigente — com dois ativos e um pausado na faixa, "quais ela segue?" virou pergunta de verdade | `chipDePlano()` |
-
-O **Kanban não precisou de mudança estrutural**: os cards já têm `plano_id`, `getTarefas(planoId)` já filtra, e a faixa de chips já trocava de plano. Isso estava certo desde o começo — mudou só o **estado visual**.
+O **Kanban não precisa de mudança estrutural**: os cards já têm `plano_id`, `getTarefas(planoId)` já filtra, e a faixa de chips já troca de plano. Isso está certo desde o começo. O que falta é só o **estado visual** dizer a verdade nova.
 
 #### Contrato: `POST {SERVIDOR}/api/planos/refrescar`
 
@@ -1610,7 +1572,7 @@ Com `planos[]`, a tela consegue confirmar que **aquele** plano que o pai acabou 
 
 ---
 
-### Metade 2 — a IA dentro dos campos (✅ **feito, tudo do site**)
+### Metade 2 — a IA dentro dos campos (🔴 **tarefa do site**)
 
 #### O buraco
 
@@ -1641,11 +1603,7 @@ Ordem de contexto pro título do plano: o que o pai digitou → o `conteudo` →
 
 #### `POST /api/melhorar-texto` (função nova, `api/melhorar-texto.mjs`)
 
-Reaproveita tudo que já existe em `api/_lib/`: `validarSessao` + `criancaPareada` (`auth.mjs`) e o saneamento (`sanear.mjs`).
-
-> 🔧 **`criarChat` não existia** — o plano citava um helper que nunca tinha sido escrito. Ele foi extraído de `openai.mjs`: é o POST em `/chat/completions` e **nada mais** (sem prompt, sem schema, sem interpretar a resposta). A leitura de material passou a usá-lo também, então a chamada de chat vive num lugar só. Quem decide o que fazer com `finish_reason` continua sendo cada chamador — pro material é *"esse PDF é grande demais"*, pro botão é *"não consegui agora"*.
-
-Os arquivos novos: **`api/melhorar-texto.mjs`** (o handler e as travas), **`api/_lib/melhorar.mjs`** (os 4 campos, as 4 ações, `temFonte()` e o prompt) e **`js/dashboard/campo-ia.js`** (o botão, o desfazer e a chamada). Em `sanear.mjs` entraram `cortarSemPartirPalavra()` e `descascarTexto()`.
+Reaproveita tudo que já existe em `api/_lib/`: `validarSessao` + `criancaPareada` (`auth.mjs`), `criarChat` (`openai.mjs`), o saneamento (`sanear.mjs`).
 
 ```
 POST /api/melhorar-texto
@@ -1673,20 +1631,185 @@ Notas de implementação:
 - **Modelo:** o `gpt-5.4-mini` que já está lá, com **`reasoning_effort: 'low'`**. Isto é um **botão**, não um pipeline: o pai está olhando o campo esperando. Raciocínio alto aqui compra latência e não compra qualidade de redação.
 - **Saída = só o texto.** Sem markdown, sem aspas em volta, sem "Aqui está:". Modelo pequeno adora envelopar — vale um `.trim()` que descasca aspas e prefixo, igual ao que o servidor do robô já faz na saída de voz.
 - **`idade`/`serie` no contexto** existem por um motivo só: o texto vai virar prompt de uma tutora de criança de 9 anos, não briefing corporativo.
-- **Cota:** a de 20/dia (`dentroDaCota`) conta linhas de `planos_estudo` por `origem` — ela **não enxerga** este endpoint, porque melhorar texto não cria plano. Daí a trava **4-B** em `auth.mjs`: `dentroDoLimiteDeTexto(uid)`, 40 por hora por responsável, num `Map` em memória da instância (com faxina e teto de sessões, pra não virar vazamento). Ela é honestamente **fraca** — o teto real é "40 por instância" —, e isso é aceito: o que ela protege é o acidente (clique repetido, laço na tela), não um atacante determinado, que já esbarra em login + criança pareada. O que **não** dava era ficar sem limite: é chamada de IA autenticada exposta na internet.
-- **`sem_contexto` vem antes do limitador.** Ele conta chamadas de IA, e essa não chega a ser uma — gastar um ponto do pai por uma resposta que a própria função deu seria cobrar por trabalho que ninguém fez.
+- **Cota:** a de 20/dia (`dentroDaCota`) conta linhas de `planos_estudo` por `origem` — ela **não enxerga** este endpoint, porque melhorar texto não cria plano. Precisa de limitador próprio; o mais barato que resolve é por sessão/IP em memória da função (ex.: 40/hora). Não deixe **sem** limite: é uma chamada de IA autenticada exposta na internet.
 - **A `origem` do plano NÃO muda.** Plano digitado à mão com o título polido pela IA continua **`manual`**. `origem` diz de onde o plano **nasceu**, não quem passou o corretor — marcar `pedido` faria a tela exibir "criado a partir do que você pediu" sobre um plano que o pai escreveu inteiro.
 
 #### Acessibilidade (não é enfeite: o texto muda sozinho embaixo do cursor)
 
 - Botão com `aria-label` explícito (*"Melhorar este texto com a Cogni"*), nunca só o ícone.
-- Enquanto processa: `aria-busy="true"` no campo e os botões desabilitados de verdade (evita clique duplo, que é chamada de IA duplicada) — o rótulo vira *"Escrevendo…"*.
-- Ao voltar: anunciar num `role="status"`/`aria-live="polite"` colado no campo (*"Texto atualizado — dá pra desfazer aqui do lado"*) e devolver o foco ao campo, com o cursor no fim.
-- Falhou: a mensagem entra **nessa mesma região, perto do campo**, não num toast que some — e o texto do pai fica **intacto**.
+- Enquanto processa: `aria-busy="true"` e o botão desabilitado (evita clique duplo, que é chamada de IA duplicada).
+- Ao voltar: anunciar em `aria-live="polite"` (*"texto atualizado, botão desfazer disponível"*) e devolver o foco ao campo, com o cursor no fim.
+- Falhou: a mensagem entra **perto do campo**, não num toast que some — e o texto do pai fica **intacto**.
 
-> ⚠️ **Uma decisão que foge da letra do plano, de propósito.** O botão sem contexto ficou desabilitado por **`aria-disabled="true"`**, não pelo atributo `disabled`. Um botão `disabled` some do teclado e não hospeda `title` nenhum no celular: o pai ficaria olhando um ✨ apagado sem nunca descobrir o porquê. Com `aria-disabled` ele continua alcançável, o leitor de tela anuncia "indisponível", e o clique mostra a dica (*"Escreva umas palavras aqui e eu melhoro"*) **sem chamar a IA**. Continua valendo a regra: nunca um erro depois do clique — o que aparece é a dica, e ela também está no `title` pra quem usa mouse.
+---
 
-> 📐 **E a barra ficou ABAIXO do campo, alinhada à direita**, em vez de flutuando no canto de dentro. Conteúdo e detalhe têm três ações; três botões dentro de um `<input>` de 240 caracteres cobririam justamente o texto que o pai está lendo. Um lugar só pros quatro campos também evita a tela em que metade dos botões está por dentro e a outra metade por fora.
+## 🥇 Rodada 5 (16/ago/2026) — a ordem do pai vira prioridade, e a trilha volta a funcionar
+
+> [!important] Três frentes. **Duas** têm tarefa pro site (1 e 2); a terceira é 100% robô e está aqui só como contexto.
+>
+> 1. **Prioridade dos cards** — o robô mudou a regra. 🟢 O site **não** precisa mexer em nada (a `ordem` que ele já grava passou a valer mais).
+> 2. **Prioridade dos planos** — ✅ **feita no site em 16/ago/2026**: drag and drop na faixa de planos, `ordem` fracionária, o selo "1º" e a válvula do `42703`. Ver "✅ O que o site construiu". Falta só 🔑 **o SQL que o Nicolas roda**.
+> 3. **A trilha de aprendizado** — 🟢 nada a fazer no site. O bloco do Painel continua igual.
+>
+> 🗓️ E o **item H** (o fuso do prazo) foi junto: `formatPrazo` comparava `Date.parse` de um `date` sem hora, então no Brasil o prazo de amanhã aparecia como "hoje" e o de hoje como "atrasado 1 dia", em vermelho. ✅ Corrigido — dia contra dia, como texto.
+
+### Frente 1 — o card que o pai arrastou pro topo volta a ser o primeiro
+
+#### O que estava errado
+
+A `ordem` do arraste era lida, ordenava o quadro e ordenava o bloco do prompt. Mas a função que escolhe **o card da vez** (`escolherAlvo`, em `brain/plano-tarefas.js`) tinha esta regra:
+
+1. o que está em `fazendo`;
+2. **o de prazo mais próximo**;
+3. a ordem do pai.
+
+Ou seja: bastava **um** card ter data — qualquer data, até de duas semanas — pra ele passar na frente do card que o pai tinha acabado de arrastar pro topo. Na prática, a fila dele só valia quando **nenhum** card tinha prazo, que é justamente o caso raro numa agenda escolar.
+
+#### A regra nova
+
+1. o que está em `fazendo` (não mudou: começado se termina);
+2. um card **atrasado, que vence hoje ou amanhã** — urgência de verdade, a única coisa que justifica furar a fila;
+3. **a ordem do pai**.
+
+E entre dois urgentes, quem desempata é **de novo a ordem dele** — não o prazo mais curto. Dois cards que vencem amanhã não têm entre si uma hierarquia que a gente conheça melhor do que ele.
+
+Junto veio um ajuste no bloco do prompt: o quadro mostra **3 cards por coluna**, e um card urgente parado na 8ª posição ficava de fora enquanto a ordem do turno mandava a Cogni entrar por ele — o bloco dizia uma coisa e a ordem, outra. Agora os urgentes sobem para o recorte (mantendo entre si a ordem do pai), **sem** estourar o teto de 3.
+
+> 🗓️ **O gotcha que vale a tarde de alguém, e vale pro site também:** `prazo` é `date`, sem hora. `Date.parse('2026-08-17')` é meia-noite em **UTC** = a tarde do dia 16 no Brasil. Sem cuidado, o card que vence **hoje** é lido como vencido **ontem**, e o de amanhã não é lido como urgente. A comparação certa é **dia com dia, como texto** (`YYYY-MM-DD` é lexicograficamente ordenável). Se a tela pinta "atrasado" em vermelho por `Date.parse`, ela tem o mesmo bug de fuso.
+
+#### 🟢 O que o site precisa fazer: nada
+
+O drag and drop dos cards já existe, já grava `ordem` fracionária e já dispara o Realtime. Ele só passou a **valer mais**. Se um dia a tela quiser explicar isso pro pai, a frase honesta é *"a Cogni começa pelo primeiro card — a não ser que outro esteja atrasado ou vença hoje"*.
+
+---
+
+### Frente 2 — 🔴 arrastar **planos**, do mesmo jeito que se arrasta card
+
+#### O buraco
+
+A rodada 4 deu à criança vários planos vigentes ao mesmo tempo. Ficou faltando dizer **qual importa mais** — e havia uma resposta implícita, que era a errada: o servidor ordenava por `atualizado_em desc`. Ou seja, **quem o pai editou por último** ganhava a vez, entrava completo no prompt e sobrevivia ao teto de 5.
+
+Corrigir uma vírgula no plano de inglês promovia o inglês na cabeça da Cogni. O pai reordenava a prioridade da filha **sem saber que tinha feito isso**, e não havia nenhum lugar na tela onde ele pudesse dizer o que realmente queria primeiro.
+
+#### 🔑 O SQL (o Nicolas roda no Supabase — o site depende disso)
+
+```sql
+alter table planos_estudo
+  add column if not exists ordem double precision not null default 1000;
+
+create index if not exists planos_estudo_prioridade_idx
+  on planos_estudo (crianca_id, ordem);
+```
+
+Nada de backfill: todos nascem com `1000` (empate), e enquanto ninguém arrastar nada o desempate continua sendo `atualizado_em` — exatamente o comportamento de antes. **A migração é invisível até o primeiro arraste.**
+
+#### O que o servidor já faz (✅ feito, `Cogni/`)
+
+| O quê | Onde |
+| --- | --- |
+| A consulta ordena por `ordem` **primeiro**, com `atualizado_em → criado_em → id` de desempate (`porPrioridade`) — a MESMA ordem no refresh e na hidratação do boot | `modules/planos.js` |
+| `plano.ordem` chega ao cache; ausente ou sujo vira `1000` (nunca `NaN`) | `linhaParaPlano()` |
+| O teto de 5 passou a cortar **por prioridade**, não por recência | `MAX_PLANOS_VIGENTES` |
+| `escolherPlanoEmFoco`: fala da criança → trabalho começado → **prioridade** | `brain/plano-gancho.js` |
+| `POST /api/planos/refrescar` devolve `ordem` em cada item de `planos[]` | `routes/api.js` |
+| **Válvula** pra coluna ainda não migrada (ver abaixo) | `modules/planos.js` |
+
+> [!warning] A válvula, e por que ela é obrigatória aqui
+> `select('*')` sobrevive tranquilo a uma coluna que não existe. Quem **não** sobrevive é o `ORDER BY ordem`: o Postgres recusa a consulta **inteira** (`42703`), e o plano — que não tem nada a ver com isso — sumiria do system prompt. Como o SQL é rodado à mão, essa janela é real.
+>
+> Então no primeiro erro desses o servidor **desliga a ordenação pelo resto da sessão**, refaz a consulta na hora (sem o retry, o turno atual perderia o plano) e avisa **uma vez**. Mesma mecânica da válvula do `plano_tarefas`. **Verificado contra o banco real**, com a coluna ainda inexistente: saiu `Prioridade de planos indisponivel (column planos_estudo.ordem does not exist)`, a hidratação completou, o Realtime subiu e o servidor iniciou normal.
+
+#### A decisão de produto que o Nicolas tomou (e que a tela deve refletir)
+
+**Trabalho começado continua acima da fila.** Se há card em `fazendo` num plano de prioridade menor, terminar aquilo ainda é a coisa certa — a fila diz por onde **começar**, não *"largue o que você começou"*. Quando dois planos têm card em `fazendo`, aí sim ganha o de maior prioridade.
+
+Então a hierarquia completa do turno é:
+
+```
+1. o assunto que a criança acabou de falar     (o agora manda)
+2. o plano com card em "Fazendo"               (começado se termina)
+3. a ORDEM QUE O PAI ARRASTOU                  ← a novidade
+```
+
+#### 🔴 O que o site precisa construir
+
+**1. Drag and drop na faixa de planos** — reaproveitando `js/dashboard/dnd.js`, que **já existe** e já resolve Pointer Events, threshold de 8px, 150ms no toque, FLIP, auto-scroll e teclado. Não escreva um segundo. Se o módulo hoje assume "colunas do Kanban", generalize-o para uma lista simples de um eixo — não duplique.
+
+- A faixa de chips de planos é o alvo natural (é onde o pai já troca de plano hoje). Numa lista vertical o arraste é ↑/↓; numa faixa horizontal, ←/→.
+- **Acessibilidade não é opcional aqui** (o `dnd.js` já tem o padrão): Espaço pega, setas movem, Espaço solta, Esc cancela, com `aria-live` anunciando *"Frações movido para a posição 1 de 3"*.
+- ⚠️ **O modo "Selecionar" (exclusão em lote) e o arraste não podem coexistir.** Com o modo de seleção ligado, o arraste fica **desligado** — senão um toque longo pra marcar vira drag, e o pai reordena achando que selecionou.
+
+**2. `ordem` fracionária, igual à dos cards** — gap de 1000, soltar entre dois grava a **média dos vizinhos** (1 UPDATE, não a lista inteira), reindexa (1000, 2000, 3000…) só quando o gap cai abaixo de 1. A função que os cards usam serve; extraia e reaproveite.
+
+**3. A ordem de leitura tem que bater com a do servidor** — senão a tela mostra uma fila e a Cogni segue outra, que é o pior resultado possível (o pai vê o arraste "funcionar" e o robô ignorar):
+
+```
+ordem asc → atualizado_em desc → criado_em desc → id desc
+```
+
+Isso vale onde quer que o site liste planos vigentes (`getPlanos`, a faixa de chips, e a cópia da regra em `format.js`).
+
+**4. Mostrar que a ordem significa alguma coisa.** Um arraste sem consequência visível é um arraste que o pai não vai usar. O mínimo honesto: um selo discreto de **"1º"** (ou "a Cogni começa por aqui") no primeiro plano vigente da fila — e **nada** nos outros, pra não virar placar. A frase precisa ser verdadeira: ela **não** é "o único que vale" (todos valem), é "por onde ela começa quando a conversa não pede outro".
+
+**5. Só planos VIGENTES entram na fila.** Arrastar um rascunho, um pausado ou um vencido não muda nada no robô, e uma tela que deixa arrastar o que não tem efeito ensina o pai a desconfiar do arraste. Duas saídas aceitáveis: ordenar só a aba dos ativos, ou deixar arrastar tudo e dizer no card do não-vigente que a ordem só vale quando ele estiver valendo.
+
+**6. Confirmação opcional, com o endpoint que já existe** — `POST {SERVIDOR}/api/planos/refrescar` agora devolve `ordem` em cada item:
+
+```json
+{ "ok": true, "temPlanoAtivo": true, "total": 2,
+  "planos": [ { "id": 12, "titulo": "Frações no dia a dia", "foco": "matematica", "ordem": 1000, "tarefas": 4 },
+              { "id": 13, "titulo": "Verbo to be", "foco": "ingles", "ordem": 2000, "tarefas": 3 } ] }
+```
+
+Com isso a tela consegue provar que o arraste chegou ao robô, em vez de a ordem certa poder ser coincidência. Continua **best-effort**: servidor desligado, engula o erro e siga (o Realtime cobre).
+
+#### ✅ O que o site construiu (16/ago/2026) — e os 5 desvios do plano
+
+| # | Onde | O que ficou de pé |
+| --- | --- | --- |
+| 1 | `js/dashboard/dnd.js` | `criarQuadro` ganhou **`eixo`** (`vertical`/`horizontal`) e **`item`** (a palavra dos anúncios). Com **uma coluna** ele é lista simples: hit-test folgado nos dois eixos, índice pelo meio horizontal, placeholder com `width`, e todas as setas movendo posição. **Nenhum segundo módulo** |
+| 2 | `js/dashboard/sections/mesa.js` | A faixa virou fila: wrapper `.mesa-fila` como raiz do dnd, chips com `data-dnd-*`, selo "1º", dica do gesto, e `gravarOrdemDoPlano`/`reindexarFila` |
+| 3 | `js/dashboard/format.js` | `porPrioridade` + `ordenarPlanos` + `filaDePlanos` + `posicaoNaFila`. `planosVigentes` corta o teto **pela fila**; `motivoNaoVigente` diz a posição do plano em vez de "o mais antigo" |
+| 4 | `js/dashboard/supabase-data.js` | `getPlanos` ordenado com a **válvula 42703**; `reordenarPlano` (1 UPDATE, sem tocar em `atualizado_em`) e `reindexarPlanos` |
+| 5 | `js/dashboard/servidor.js` | O ping do refresh passou a **ler a resposta** e logar a fila que o robô enxerga (item 6, a confirmação opcional) |
+
+**Os cinco desvios**, todos deliberados:
+
+1. **A pendência da rodada 4 já estava meio resolvida.** `planoVigente` (singular) não existia mais — `planosVigentes` já devolvia todos e o aviso já valia só pros não-vigentes. O que faltava era o **critério do teto** (era recência, virou `ordem`) e o texto do motivo. O plano descrevia um bug maior do que o que restava.
+2. **O arraste ficou só na aba "Ativos"** (a saída 1 do item 5), **e** o não-vigente daquela aba ganha a frase da saída 2 no card. As duas juntas, porque "Ativos" não é sinônimo de "vigente": um ativo pode ter vencido, ou ser o 6º.
+3. **O selo "1º" só aparece com 2+ vigentes.** Com um plano só não há fila, e o selo viraria decoração permanente.
+4. **No card do plano é UMA pílula, não duas.** O plano previa o "1º" convivendo com o ✨ de "está seguindo" — no chip da faixa ele convive mesmo, mas no card duas pílulas começando com "a Cogni" diziam quase a mesma coisa. Como *"começa por aqui"* já implica *"está seguindo"*, o primeiro recebe a frase mais específica, com o mesmo ✨ e um preenchimento mais forte.
+5. **Dois consertos que o plano não previa**, e que só apareceram com o item arrastável sendo um `<button>`: o dnd descartava o gesto que nascia num botão (que era **o próprio chip**), e o `click` disparado depois de soltar abria o plano recém-arrastado. Junto veio um bug de layout **pré-existente**: o card do plano é `.mesa-plano`, não `.pl-card`, então nunca recebeu o `flex-wrap` do mobile — sobravam ~99px pro conteúdo e o texto quebrava palavra por palavra.
+
+> 🗓️ **O bug de fuso (item H) era real e está corrigido.** Verificado: `new Date('2026-08-17')` no Brasil devolve **16/ago 21:00**, então `formatPrazo` lia o prazo de amanhã como "hoje" e o de hoje como "atrasado 1 dia" — em vermelho. Agora a comparação é dia contra dia, como texto (`chaveDeDia`), inclusive no rótulo longo ("até 27 de agosto"), que mostrava o dia anterior.
+
+> 🧪 **Como foi verificado.** `format.js` num harness Node com `TZ=America/Sao_Paulo` (16 casos: fila, empate sem a coluna, teto pela ordem, e os prazos às 15h e às 23h30). A tela num **preview isolado** com Playwright, mock em memória e o `mesa.js` de verdade: arraste por ponteiro (1 UPDATE, `ordem: 500`), teclado (Espaço/setas/Espaço), Escape, o 42703 devolvendo o chip pro lugar com o toast certo, o modo Selecionar desligando o arraste, as outras abas sem arraste, o clique pós-arraste não abrindo o plano — **e a regressão do Kanban** (arraste entre colunas e `←/→` por teclado continuam idênticos, com o anúncio ainda citando o nome da coluna).
+
+#### ⚠️ A pendência da rodada 4 — ✅ resolvida nesta rodada
+
+A regra correta é: *vigente = `status ∈ {ativo, em_andamento}` **e** não vencido (`criado_em + duracao_dias`). **Todos** os que passarem estão sendo seguidos, até o teto de **5**; passando disso ganham os de **menor `ordem`** (e não mais os mais recentes).* O aviso de "não está seguindo" vale — e só — para `rascunho`, `pausado`, `concluido`, vencido, **e o 6º plano em diante da fila**.
+
+✅ **É exatamente o que `format.js` faz agora.** Uma correção de rumo, porém: o plano descrevia `planoVigente(planos, now)` escolhendo **um** plano, e essa função **já não existia** — a rodada 4 tinha trocado por `planosVigentes` (plural), e o aviso já valia só pros não-vigentes. O que sobrou de pendência, e foi resolvido aqui, era o **critério do teto** (cortava por recência, agora corta pela fila do pai) e o **texto do motivo**, que dizia *"ficou de fora por ser o mais antigo"* — agora ele diz a posição real do plano na fila e sugere a saída que depende só do pai: arrastar.
+
+---
+
+### Frente 3 — 🟢 a trilha de aprendizado (contexto, sem tarefa pro site)
+
+A auditoria desta rodada foi na trilha (`criancas.progresso`), e o veredito é: ela **guardava bem e retomava mal**. O dado que o Painel lê sempre esteve certo — o que quase não acontecia era a Cogni **trazer o assunto de volta** na conversa.
+
+| # | O defeito | A correção |
+| --- | --- | --- |
+| 1 | A retomada era **conselho** no meio do prompt; conselho genérico o modelo dilui (a mesma lição que o plano de estudo já tinha ensinado) | Motor com estado (`brain/trilha-gancho.js`) + ordem imperativa no fim do prompt, citando o tema |
+| 2 | *"No máximo um tema por conversa"* estava escrito no texto e **nada contava** | Teto real de 1 por aula, consumido só quando a Cogni **realmente** falou do assunto |
+| 3 | Item retomado sem veredito ficava vencido **pra sempre**, voltando ao prompt em todo turno de todas as conversas | Adiado em 1 dia. Não conta como acerto nem erro — adiar não é medição |
+| 4 | Retomada e plano pediam iniciativa no **mesmo turno** | O plano ganha (é o que o responsável pediu); a retomada espera o próximo turno |
+| 5 | As duas fontes nomeavam o mesmo assunto diferente (`tabuada` × `tabuada do 7`), então a escada **nunca subia** | Canonização literal: `tabuada do 7` → `tabuada`; `soma de ângulos` **continua** `soma de ângulos` |
+
+**O que isso muda pro Companion — e é bom:** o item 5 é o que o pai vai notar. Antes, três conversas sobre tabuada podiam virar **três linhas** em "Praticando agora", cada uma com 1 acerto, e nenhuma chegava a "Já domina". Agora consolidam numa linha só, com a contagem certa. Nenhuma mudança de código no site: é a mesma coluna, com dado melhor.
+
+> ⚠️ **Item legado não é apagado, é promovido.** Um item gravado como `tabuada do 7` é encontrado quando chega `tabuada` e os dois se fundem no registro seguinte — o `conceito` passa a ser o canônico. Não há migração de dados, então até o próximo registro daquele assunto o nome antigo continua aparecendo na tela. É esperado.
+
+Cobertura nova: **`npm run teste:trilha`** (19 casos — a fila de vencidos, as travas do motor, a coordenação com o plano e a canonização). Bateria completa em **297/297** (eram 266).
 
 ---
 
@@ -1704,11 +1827,15 @@ Notas de implementação:
 - **O material chega na Cogni** → com um plano ativo criado por foto/arquivo, conversar e perguntar sobre uma questão que **só** existe no material ("como faz a 2?"). Ela tem que saber do que se trata e ensinar o caminho **sem** entregar a resposta. Sem rede: `npm run teste:perfil` (48 casos, offline).
 - **Link → plano** (rodada 3) → uma videoaula real do YouTube **com legenda** (o card tem que mostrar título, canal, duração e o selo de legenda; as tarefas têm que falar do que a aula ensina, não "assistir ao vídeo"); uma **sem legenda** (o plano sai mais genérico e o card **diz isso**); um artigo do Brasil Escola; uma página `.gov.br` (é o teste do **charset latin1** — se aparecer `Presid�ncia` em qualquer lugar, a decodificação está errada); a Khan Academy (tem que dar *"esse site bloqueia leitura automática"*, **nunca** um plano montado em cima da página do Cloudflare); um link direto pra PDF; e um link de **playlist** (mensagem própria pedindo o link do vídeo). Depois os torcidos: `http://169.254.169.254/`, `http://localhost/`, um encurtador que redireciona, o **mesmo vídeo colado duas vezes** (`youtu.be/X` e `watch?v=X` = mesmo material), e um link colado **dentro** do campo de pedido.
 - **A conduta de link no robô** → com um plano de origem `link` ativo, conversar: a Cogni ensina o conteúdo com as palavras dela e **não** procura "questão do material". E, sobretudo, ela **nunca** chama aquilo de lição da escola.
-- **Dois planos ao mesmo tempo** (rodada 4) → criar dois planos `ativo` na mesma criança, um de matemática e um de inglês, cada um com 2-3 cards. Esperado: (1) o boot do servidor loga `2 plano(s) vigente(s) em 1 crianca(s)`; (2) conversar sobre **fração** → ela puxa o card de matemática; falar *"como fala isso em inglês?"* → **no mesmo papo** ela vira pro outro plano, sem anunciar a troca; (3) dizer *"já terminei as frases do verbo to be"* → o card **do plano de inglês** vai pra Feito, e o de matemática **não se mexe**; (4) `POST /api/planos/refrescar` devolve `total: 2` e os dois em `planos[]`.
-- **A tela não pode mais dizer que ela não está seguindo** → com dois planos `ativo`, abrir cada um: os **dois** mostram o selo "a Cogni está seguindo", e o aviso *"A Cogni não está seguindo este plano agora"* **não aparece em nenhum**. Ele volta a aparecer em: rascunho, pausado, concluído, vencido e no 6º plano em diante.
-- **O plano que vence sozinho** → dois planos ativos, um com `duracao_dias: 1` criado anteontem → o vencido some do prompt (e perde o selo na tela) e **o outro continua**.
-- **A IA nos campos** (rodada 4) → no formulário manual, escrever *"fração prova sexta"* no título e clicar no sparkle → vira uma frase legível **e o desfazer volta ao original**. Campo de título **vazio** → botão desabilitado com a dica, nunca erro depois do clique. Pedir pra melhorar um detalhe que diz "páginas 42 e 43" → a IA **não pode** inventar uma data de entrega que não estava lá. Resposta longa demais → chega **já cortada** no teto do campo, sem `maxlength` mutilando frase. Sem login → **401**.
+- **Dois planos ao mesmo tempo** (rodada 4) → criar dois planos `ativo` na mesma criança, um de matemática e um de inglês, cada um com 2-3 cards. Esperado: (1) o boot loga `2 plano(s) vigente(s) em 1 crianca(s)`; (2) conversar sobre **fração** → ela puxa o card de matemática; falar *"como fala isso em inglês?"* → **no mesmo papo** ela vira pro outro plano, sem anunciar a troca; (3) dizer *"já terminei as frases do verbo to be"* → o card **do plano de inglês** vai pra Feito, e o de matemática **não se mexe**; (4) `POST /api/planos/refrescar` devolve `total: 2` e os dois em `planos[]`. Sem rede: `npm run teste:planos` (13 casos) e `npm run teste:plano` (28 casos).
+- **Ela não conduz os dois no mesmo turno** → com dois planos ativos, nenhuma resposta pode virar pauta de reunião ("vamos ver frações e depois o verbo to be"). Um assunto por turno, sempre.
+- **O plano que vence sozinho** → dois planos ativos, um com `duracao_dias: 1` criado anteontem → o vencido some do prompt e **o outro continua** (era o caso em que os dois caíam juntos).
 - **Drag and drop** → mouse no desktop; toque no celular (arrastar **não** pode rolar a página, e rolar a página **não** pode arrastar); e o quadro inteiro operável **só pelo teclado**, com o leitor de tela anunciando cada movimento.
+- **Prioridade dos cards** (rodada 5) → num plano com 3 cards, arrastar pro topo um card **sem prazo** e deixar mais abaixo um **com prazo daqui a duas semanas**. Conversar: ela tem que entrar pelo card **do topo**. Depois mudar o prazo do de baixo pra **hoje** → agora ela entra por esse. Sem rede: `npm run teste:tarefas`.
+- **Prioridade dos planos** (rodada 5) → com dois planos vigentes, arrastar o de **inglês** pra primeira posição e conversar sem dar pista de assunto ("oi", "nada demais") → ela puxa o **inglês**. Depois inverter a fila → ela puxa o outro. E o teste que prova a decisão do Nicolas: com um card em **Fazendo** no plano de prioridade **menor**, ela continua no card começado. Confirmar no `POST /api/planos/refrescar` que `planos[0].ordem` é o menor.
+- **Antes de rodar o SQL da `ordem`** (o teste que mais importa da rodada 5) → subir o servidor com a coluna ainda inexistente. Esperado: o aviso `Prioridade de planos indisponivel (…)` **uma vez**, a hidratação completa e os planos continuam entrando no prompt. **Se o plano sumir, a válvula falhou.** (Já verificado em 16/ago contra o banco real.)
+- **A trilha retomando** (rodada 5) → com um item vencido na trilha (ou esperando o dia seguinte de um "travou"), conversar sem tocar no assunto: no 2º/3º turno **ela mesma** traz o tema de volta perguntando *o que você lembra* — e **não** reexplicando. No mesmo papo ela não pode retomar um segundo tema. E o caso que era o bug: desconversar depois da retomada → o item **não** pode voltar no turno seguinte. Sem rede: `npm run teste:trilha` (19 casos).
+- **A IA nos campos** (rodada 4, site) → no formulário manual, escrever *"fração prova sexta"* no título e clicar no sparkle → vira uma frase legível **e o desfazer volta ao original**. Campo de título **vazio** → botão desabilitado com a dica, nunca erro depois do clique. Pedir pra melhorar um detalhe que diz "páginas 42 e 43" → a IA **não pode** inventar uma data de entrega que não estava lá. Sem login → **401**.
 - **Internet cai com servidor no ar** → robô continua conversando (cache RAM).
 - **Site** → logar → badge → Dashboard → dados da criança vinculada aparecem; criança de outra família **não** aparece (RLS).
 - **Mapa de Compreensão** → conversar com o robô por >1min tocando 2 assuntos, com a câmera ligada → `GET /api/mapa-aula` retorna `emAndamento: true` com os momentos; após reset (ou 15min parado) a linha aparece em `sessoes_atencao`.
@@ -1735,6 +1862,9 @@ Notas de implementação:
 
 6. ⭐ **Rodada 3 — link externo (16/ago/2026)**, uma coisa manual só: o **SQL** que acrescenta `link` ao `CHECK` de `planos_estudo.origem` (entregue no chat). Ele derruba **todas** as constraints de check que citam `origem` naquela tabela antes de recriar — porque o nome da constraint pode ter mudado entre as rodadas, e um `drop constraint if exists` com o nome errado deixaria a antiga barrando `link` em silêncio. **Nenhuma variável de ambiente nova, nenhuma dependência npm nova** — a leitura de link usa `fetch` e `node:dns`, que já vêm no runtime.
    > 🩹 Se o site subir antes do SQL, o insert do plano de pedido morreria com `23514` (check_violation) **depois** de o pai revisar tarefa por tarefa. O `criarPlanoComTarefas` (`supabase-data.js`) detecta esse código e regrava com a origem `manual`: perde-se o **selo**, não o trabalho. A rede some sozinha quando o SQL roda — a primeira tentativa passa a funcionar.
+
+7. ⭐ **Rodada 5 — prioridade dos planos (16/ago/2026)**, uma coisa manual só: o **SQL** que cria `planos_estudo.ordem` + o índice (entregue no chat, e também na seção "🥇 Rodada 5"). Idempotente (`add column if not exists`), **sem backfill** — todos nascem em `1000` e o comportamento só muda no primeiro arraste. **Nenhuma variável de ambiente nova.**
+   > 🩹 Se o robô ou o site subirem antes do SQL: o servidor **detecta e se vira sozinho** (a válvula desliga a ordenação e avisa uma vez — verificado contra o banco real). ✅ **E o site também**: a leitura tem a mesma válvula (`getPlanos` refaz a consulta sem o `ORDER BY ordem` e avisa uma vez), e o arraste trata o `42703` como *"a prioridade ainda não está disponível"* — com o chip **voltando pro lugar**, porque uma faixa reordenada por cima de uma escrita recusada é a tela mentindo. Verificado no preview, simulando o erro.
 
 (O Claude gerencia os `.env`. Credenciais rotacionadas depois pelo Nicolas.)
 

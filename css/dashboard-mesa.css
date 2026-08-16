@@ -135,6 +135,16 @@
 .pl-card__topbar > .mesa-plano__selo {
   margin-left: auto;
 }
+/* O "começa por aqui" é a versão FORTE do mesmo selo (é a mesma pílula, com a
+   frase mais específica): dourado preenchido contra o dourado suave dos outros
+   vigentes. O degrau é o que deixa a fila visível ao trocar de plano na faixa. */
+.mesa-plano__selo--fila {
+  background-color: var(--dash-accent);
+  color: var(--brand-navy);
+}
+.mesa-plano__selo--fila .mesa-plano__selo-ico {
+  color: var(--brand-navy);
+}
 .pl-card__title {
   font-family: var(--font-display);
   font-weight: var(--fw-semibold);
@@ -546,7 +556,13 @@
    Responsivo
    -------------------------------------------------------------------------- */
 @media (max-width: 620px) {
-  .pl-card {
+  /* `.mesa-plano` entrou aqui em 16/ago/2026: o card do plano da Mesa não é um
+     `.pl-card` (é `.dash-card.mesa-plano`), então ele nunca recebeu este wrap. Sem
+     ele, no celular os botões de editar/excluir dividiam a ÚNICA linha com o disco
+     da matéria e sobravam ~99px pro conteúdo — título e selo quebravam palavra por
+     palavra. Com o wrap, os botões sobem sozinhos e o texto usa a largura inteira. */
+  .pl-card,
+  .mesa-plano {
     flex-wrap: wrap;
   }
   .pl-card__disc {
@@ -563,6 +579,15 @@
   .mesa-plano__botoes {
     order: -1;
     margin-left: auto;
+  }
+  /* Editar e excluir ficam com a PRIMEIRA LINHA inteira, encostados à direita.
+     Só `flex-wrap` não bastava: `.pl-card__main` é `flex: 1 1 0` com `min-width: 0`
+     (o que dá o corte com reticências no título), então ele encolhia até ~99px em
+     vez de quebrar pra linha de baixo, e o texto do card virava uma palavra por
+     linha. Tomando a linha, os botões empurram disco e conteúdo pra largura cheia. */
+  .mesa-plano__botoes {
+    flex: 0 0 100%;
+    justify-content: flex-end;
   }
   .mesa-plano__botoes .pl-card__edit {
     order: 0;
@@ -680,6 +705,108 @@
 .mesa-selecao .pl-btn--danger:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* --- A fila de planos: arrastar é dizer por onde a Cogni começa ⭐ 16/ago -- */
+
+/* O wrapper existe pro `dnd.js` ter uma raiz que NÃO é a lista (ele pendura ali a
+   região de anúncio e o texto de instruções do leitor de tela). */
+.mesa-fila {
+  display: block;
+}
+/* A dica que ensina o gesto. Discreta de propósito — ela informa, não convoca. */
+.mesa-fila__dica {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  color: var(--dash-text-muted);
+}
+.mesa-fila__dica-ico {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--dash-text-soft, var(--dash-text-muted));
+}
+.mesa-fila__dica-ico svg {
+  width: 14px;
+  height: 14px;
+}
+/* Enquanto a faixa é fila, o cursor promete o que o gesto entrega. */
+.mesa-seletor[data-dnd-coluna] .mesa-chip-plano {
+  cursor: grab;
+  touch-action: pan-y;
+}
+.mesa-seletor[data-dnd-coluna] .mesa-chip-plano.is-arrastando {
+  cursor: grabbing;
+}
+/* O chip levantado. Mesma linguagem do card do quadro (sombra funda + escala),
+   com metade da rotação: um chip é largo e baixo, e 2° nele lê como desalinhado
+   em vez de "solto". Classe própria, nunca por descendência — na camada do <body>
+   os ancestrais somem (ver a decisão 3 no topo do dnd.js). */
+.dnd-camada > .mesa-chip-plano,
+.mesa-chip-plano.is-arrastando {
+  pointer-events: none;
+  border-color: var(--dash-accent);
+  background-color: var(--dash-surface);
+  box-shadow: var(--dash-shadow-pop);
+  will-change: transform;
+}
+.dnd-camada > .mesa-chip-plano {
+  animation: dnd-levantar-chip 0.14s ease-out forwards;
+}
+@keyframes dnd-levantar-chip {
+  to {
+    scale: 1.04;
+    rotate: 1deg;
+  }
+}
+.mesa-chip-plano.is-arrastando.is-fora {
+  opacity: 0.65;
+  border-color: var(--dash-border-strong);
+}
+/* Pego pelo teclado (não há fantasma: o chip real anda na faixa). */
+.mesa-chip-plano.is-pego {
+  border-color: var(--dash-accent);
+  box-shadow: 0 0 0 3px var(--dash-accent-soft);
+}
+/* O placeholder numa faixa é uma pílula, não um bloco: ele ocupa o buraco de um
+   chip, e o raio quadrado do quadro pareceria um elemento de outra tela. */
+.mesa-seletor .dnd-placeholder {
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+}
+/* O selo "1º": por onde ela COMEÇA. Discreto de propósito — ele existe pra
+   responder uma pergunta, não pra virar placar (por isso só o primeiro o tem). */
+.mesa-chip-plano__fila {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background-color: var(--dash-accent);
+  /* Navy sobre o dourado, e não branco: #fff em #f0a315 dá ~2:1 de contraste, que
+     some no primeiro celular sob o sol. O navy da marca passa dos 8:1 e vale nos
+     dois temas — o dourado é o mesmo no claro e no escuro. */
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+}
+.mesa-chip-plano__fila[hidden],
+.mesa-chip-plano__seguindo[hidden] {
+  display: none;
+}
+/* Marcar pra excluir manda em tudo: o vermelho não pode dividir o chip com o
+   dourado da prioridade, senão o pai lê "importante" onde está escrito "vai sumir". */
+.mesa-chip-plano.is-marcado .mesa-chip-plano__fila {
+  background-color: var(--toast-error, #c0392b);
+  color: #fff;
 }
 
 /* --- Seletor de plano (só aparece com 2+ planos na aba) ------------------- */
@@ -825,6 +952,17 @@
   font-weight: var(--fw-semibold);
   color: var(--dash-text);
   white-space: nowrap;
+}
+/* No celular a pílula deixa de ser uma linha só: "a Cogni começa por aqui" não
+   cabe na largura de um card empilhado, e com `nowrap` ela sangrava pra fora dele.
+   A regra mora AQUI, e não no bloco responsivo lá de cima, porque a declaração de
+   `nowrap` acima venceria por ordem de cascata — mesma especificidade, e o que
+   vem depois ganha. */
+@media (max-width: 620px) {
+  .mesa-plano__selo {
+    max-width: 100%;
+    white-space: normal;
+  }
 }
 .mesa-plano__selo-ico {
   display: grid;

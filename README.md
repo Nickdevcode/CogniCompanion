@@ -296,6 +296,7 @@ Agora é a **Mesa de Estudos** (`#/mesa`), e ela faz três coisas:
 | 🔗 | **Link → plano** | Cola a **videoaula do YouTube** ou o **link de uma página** e a Cogni monta as sessões de estudo do que aquele conteúdo ensina |
 | 🗂️ | **Quadro Kanban** | `A fazer` · `Fazendo` · `Feito`, com arraste de mouse, de dedo **e de teclado** |
 | ✨ | **O quadro é vivo** | A Cogni move os cards sozinha enquanto conversa com a criança — e com a tela aberta o pai **vê acontecer** |
+| 🥇 | **A fila de planos** | Com vários planos valendo, o pai **arrasta a faixa** e diz por onde ela começa. A ordem dele é a prioridade que o robô segue |
 | 🖊️ | **A IA dentro dos campos** | Quem prefere escrever o plano na mão não fica sozinho: um ✨ em cada campo melhora, encurta ou detalha o que ele digitou — com **desfazer** do lado |
 
 > 💬 **Por que o pedido virou a entrada principal (16/ago/2026).** A primeira versão perguntava
@@ -431,6 +432,58 @@ que a tela quebrou).
 > 📐 A expiração é **por plano**: um plano de 1 dia criado anteontem perde o selo, e o de 30 dias do
 > lado dele continua valendo.
 
+#### 🥇 O pai arrasta a fila, e a Cogni segue (16/ago/2026)
+
+Ela seguir vários planos criou a pergunta seguinte: **qual deles importa mais?** Havia uma resposta
+implícita, e era a errada — o servidor ordenava por `atualizado_em`, então **quem foi editado por
+último ganhava a vez**. Corrigir uma vírgula no plano de inglês promovia o inglês na cabeça da Cogni,
+e o pai reordenava a prioridade da filha **sem saber que tinha feito isso**. Pior: não existia lugar
+nenhum na tela onde ele pudesse dizer o que realmente queria primeiro.
+
+Agora a **faixa de planos é a fila**, e ela se arrasta igual aos cards do quadro:
+
+| | O quê |
+| --- | --- |
+| 🖱️ | **Arrastar** de mouse, de dedo e **de teclado** (`Espaço` pega · `←/→` move · `Espaço` solta · `Esc` cancela), com o leitor de tela anunciando *"Frações movido para a posição 1 de 3"* |
+| 🥇 | Um selo **"1º"** no primeiro da fila, e a pílula do card dele muda pra ***"a Cogni começa por aqui"*** |
+| 📌 | Só na aba **Ativos** — a `ordem` só muda o que ela faz entre os planos que estão valendo |
+| 🚫 | Com o modo **Selecionar** ligado, o arraste **desliga** |
+
+**A frase do selo foi escolhida com cuidado, e é a parte que mais importa.** Ele **não** é "o único
+que vale": a Cogni segue todos os vigentes, e o primeiro é só por onde ela **começa** quando a
+conversa não pede outro assunto. Prometer exclusividade ali faria o pai concluir que ela abandonou os
+outros planos — e ele nos pegaria na primeira conversa em que ela não faz isso. Pelo mesmo motivo o
+selo só aparece com **fila de verdade** (2+ planos valendo): com um plano só, "começa por aqui" é
+verdade e é inútil, e vira decoração permanente — que é a primeira coisa que o olho aprende a ignorar.
+
+E duas travas que parecem detalhe e não são:
+
+1. **Selecionar e arrastar não podem coexistir.** O gesto que marca um plano pra excluir (toque
+   longo) é *o mesmo* que inicia um arraste. Sem desligar um dos dois, o pai reordenaria a prioridade
+   da filha achando que estava escolhendo o que apagar.
+2. **Só a aba dos ativos arrasta.** Arrastar um rascunho ou um pausado não muda nada no robô, e um
+   gesto sem consequência — repetido duas ou três vezes — ensina o pai a desconfiar do arraste
+   inclusive onde ele funciona. Quando um plano da aba mesmo assim não está valendo (venceu, ou é o
+   6º), o card dele diz que **a posição só passa a valer quando ele voltar a valer**.
+
+> 🔢 `planos_estudo.ordem` é `double precision` com gap de 1000 — a **mesma** mecânica fracionária dos
+> cards, com o mesmo código: soltar entre dois grava a média dos vizinhos, **1 UPDATE por movimento**.
+> O teto de 5 também passou a cortar por ela: quem sobrevive são os primeiros da fila **dele**, não
+> os planos mais recentes.
+
+> 🤝 **A ordem de leitura do site tem que ser byte a byte a do servidor** — `ordem asc →
+> atualizado_em desc → criado_em desc → id desc`, em `getPlanos`, na faixa e na cópia da regra do
+> `format.js`. Se divergirem, a tela mostra uma fila e a Cogni segue outra: o pai vê o arraste
+> "funcionar" e o robô ignorar, que é o pior resultado possível, porque a tela fica mentindo com cara
+> de certeza.
+
+> 🩹 **E se o SQL ainda não tiver rodado?** Um `update` em coluna inexistente falha com **42703**, e
+> aí o site trata como *"a prioridade ainda não está disponível"* — não como erro de rede, que
+> mandaria o pai tentar de novo pra sempre. O chip **volta pro lugar**: uma faixa reordenada por cima
+> de um banco que recusou a escrita é a tela mentindo do jeito mais caro. A leitura tem a mesma
+> válvula do robô — o `ORDER BY ordem` derrubaria a consulta **inteira**, e os planos sumiriam da
+> Mesa por causa de um detalhe de ordenação.
+
 #### 📎 Quem lê o quê, e por que isso decide a arquitetura
 
 A Vercel corta o corpo da requisição em **4,5 MB antes do nosso código rodar**. A resposta não é
@@ -480,6 +533,20 @@ pra controlar. Então `js/dashboard/dnd.js` faz tudo com Pointer Events:
 que dá **1 UPDATE por movimento** em vez de reescrever a coluna. Só na 10ª soltura no mesmo ponto o
 gap acaba, e aí a coluna é reindexada de uma vez.
 
+> ♻️ **Um módulo, dois usos (16/ago/2026).** Quando a faixa de planos virou fila arrastável, o
+> caminho fácil era um segundo dnd — e seriam dois lugares pra consertar cada bug de toque, de foco e
+> de leitor de tela. Em vez disso o `criarQuadro` ganhou duas dimensões: **`eixo`** (`vertical` no
+> quadro, `horizontal` na faixa, que decide de onde sai o índice de soltura e quais setas movem) e
+> **`item`** (a palavra dos anúncios — "tarefa" ou "plano"). Com **uma coluna só** ele é uma lista
+> simples, e os anúncios param de citar um nome de coluna que o pai não vê. As frases de erro também
+> deixaram de dizer *"a tarefa voltou pro lugar"* e passaram a citar o **nome do item**: *"o tarefa"*
+> e *"a plano"* saem errados em metade das combinações, e o nome não tem gênero pra errar.
+
+> 🖱️ Dois detalhes que só apareceram com o item arrastável sendo um `<button>` (o chip é um): o dnd
+> ignorava o gesto quando ele nascia num botão — que era **o próprio chip** —, e o `click` que o
+> navegador dispara depois de soltar abria o plano recém-arrastado. Agora o bloqueio só vale pra
+> controles **dentro** do item, e o clique seguinte ao arraste é engolido.
+
 #### ⚙️ O que o Nicolas precisa configurar
 
 O que fala com a IA é a **única** parte do Companion que roda fora do navegador — três Vercel
@@ -510,6 +577,12 @@ Faltando qualquer uma, a função responde **503** com mensagem clara em vez de 
 > de link) viola a constraint. A ordem é **SQL → função → site** — e existe uma rede: o
 > `criarPlanoComTarefas` detecta o `23514` e regrava como `manual`, então o pai perde o **selo** da
 > origem, não o trabalho.
+
+> 🥇 **E mais um SQL, o da fila de planos (16/ago/2026):** a coluna `planos_estudo.ordem` +
+> o índice `(crianca_id, ordem)`. É idempotente (`add column if not exists`) e **sem backfill** —
+> todos os planos nascem em `1000` e nada muda de comportamento até o primeiro arraste. Se o site
+> subir antes, ninguém quebra: a leitura cai no desempate antigo e o arraste diz *"a prioridade ainda
+> não está disponível"* em vez de fingir que gravou.
 
 > 🧪 **Testar sem OpenAI, sem deploy e sem login:** vire `USAR_SUPABASE = false` e "Criar com a
 > Cogni" devolve uma proposta de exemplo local. Só a **rede** é falsa — toda a extração roda de

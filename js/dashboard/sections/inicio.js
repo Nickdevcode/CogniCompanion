@@ -29,6 +29,7 @@ import {
   statusLabel,
   tempoTotal,
   primeiroNome,
+  planosVigentes,
 } from "../format.js";
 
 /* --------------------------------------------------------------------------
@@ -308,8 +309,19 @@ export async function renderInicio(ctx) {
     ctx.mock.getPlanos(),
   ]);
 
-  // Plano "próximo": o ativo (ou, na falta, o em andamento).
+  /**
+   * Plano "próximo": o PRIMEIRO DA FILA — por onde a Cogni começa.
+   *
+   * ⭐ 16/ago/2026 — era `find(status === 'ativo')`, ou seja, o primeiro que
+   * aparecesse no array. Agora que o pai ordena a fila na Mesa, o Início tem que
+   * mostrar o mesmo plano que ela: dois lugares do painel apontando planos
+   * diferentes como "o de agora" é pior do que nenhum deles apontar.
+   *
+   * O fallback antigo continua pros casos que a fila não cobre (todos vencidos, por
+   * exemplo): melhor um plano desatualizado no card do que um card vazio.
+   */
   const planoAtivo =
+    planosVigentes(planos, ctx.now)[0] ||
     planos.find((p) => p.status === "ativo") ||
     planos.find((p) => p.status === "em_andamento") ||
     null;

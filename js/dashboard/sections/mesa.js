@@ -18,7 +18,14 @@
  *    não reage. A regra de "quais estão valendo" é a mesma do servidor (ver
  *    `planosVigentes` em `format.js`) — e desde 16/ago/2026 são VÁRIOS ao mesmo
  *    tempo, até 5: o selo aparece em todos eles, e o aviso, em nenhum.
- * 3. **O canal do Realtime é `const` do escopo do render** e morre com a seção. O
+ * 3. **A faixa de planos é uma FILA, e ela é arrastável** (⭐ 16/ago/2026). A ordem
+ *    dos chips é a prioridade que a Cogni segue: `planos_estudo.ordem`, fracionária
+ *    como a dos cards, gravada com 1 UPDATE por movimento. O primeiro vigente ganha
+ *    o selo "1º" — e a frase precisa ser esta, *"a Cogni começa por aqui"*, porque
+ *    ela segue todos os vigentes; o primeiro é só por onde ela entra quando a
+ *    conversa não pede outro assunto. O arraste vive na aba "Ativos" e some no modo
+ *    de seleção (ver `ABA_DA_FILA` e `pintarSeletor`).
+ * 4. **O canal do Realtime é `const` do escopo do render** e morre com a seção. O
  *    router não avisa quando desmonta — ver `aposentar()` no fim do arquivo.
  *
  * Campos do contrato: `planos_estudo` (titulo, conteudo, foco, duracao_dias, status,
@@ -39,6 +46,9 @@ import {
   planosVigentes,
   ehVigente,
   motivoNaoVigente,
+  ordenarPlanos,
+  ordemDoPlano,
+  avisoDeOrdem,
 } from "../format.js";
 import { criarQuadro } from "../dnd.js";
 import { assinarMesa } from "../mesa-realtime.js";
@@ -58,6 +68,22 @@ const CONFIANCA_BAIXA = 0.6;
 
 /** Pra onde o "Desfazer" devolve o card que a Cogni moveu. */
 const COLUNA_ANTERIOR = { feito: "fazendo", fazendo: "a_fazer" };
+
+/**
+ * A aba em que a fila de planos pode ser arrastada.
+ *
+ * Só uma, e é uma decisão de produto: `ordem` só muda o que a Cogni faz entre os
+ * planos VIGENTES, então deixar arrastar em "Todos" — onde ela conviveria com
+ * pausados, concluídos e rascunhos — seria oferecer um gesto que, na maior parte da
+ * lista, não faz nada. Arraste sem consequência ensina o pai a desconfiar do
+ * arraste, inclusive onde ele funciona. Em "Ativos" a fila é a fila de verdade, e o
+ * único caso de borda (um ativo VENCIDO, ou o 6º) ganha uma frase própria no card
+ * dizendo que a posição dele só passa a valer quando ele voltar a valer.
+ */
+const ABA_DA_FILA = "ativos";
+
+/** A "coluna" única da faixa — o `dnd.js` precisa de um id, e ninguém mais o vê. */
+const COLUNA_DA_FILA = [{ id: "fila", titulo: "Fila de planos" }];
 
 /** O ✨ explicado — a partir de `plano_tarefas.evidencia.motivo`. */
 function explicarCogni(evidencia) {
@@ -109,6 +135,16 @@ export async function renderMesa(ctx) {
   };
 
   let quadro = null;
+  /**
+   * O drag and drop da FAIXA DE PLANOS — a prioridade que a Cogni segue.
+   *
+   * É o mesmo módulo do quadro (`criarQuadro`), com uma coluna só e eixo horizontal.
+   * Dois motores de arraste diferentes na mesma tela seriam dois lugares pra
+   * consertar cada bug de toque, de foco e de leitor de tela.
+   */
+  let fila = null;
+  /** Uma releitura chegou no meio de um arraste da fila e a repintura ficou devendo. */
+  let seletorPendente = false;
   let sincronia = null;
   /**
    * O callback que drena a fila do Realtime quando o arraste acaba.
@@ -292,7 +328,8 @@ export async function renderMesa(ctx) {
     estado.planos.find((p) => String(p.id) === String(estado.planoId)) || null;
 
   /**
-   * Os planos que a Cogni está seguindo agora (o mais recente primeiro).
+   * Os planos que a Cogni está seguindo agora, **na ordem da fila** — o primeiro é
+   * por onde ela começa quando a conversa não pede outro.
    *
    * `agora` é o instante do render, como no resto da seção: o quadro não é um
    * relógio, e recalcular "hoje" a cada pintura faria dois trechos da mesma tela
@@ -300,15 +337,32 @@ export async function renderMesa(ctx) {
    */
   const vigentes = () => planosVigentes(estado.planos, agora);
 
-  /** O vigente mais recente — a resposta pra "o que abrir primeiro?". */
+  /** O primeiro da fila — a resposta pra "o que abrir primeiro?". */
   const vigentePrincipal = () => vigentes()[0] || null;
+
+  /**
+   * O selo "1º" só existe quando há FILA — dois vigentes ou mais.
+   *
+   * Com um plano só, dizer "a Cogni começa por aqui" é verdade e é inútil: não há
+   * outro por onde ela pudesse começar. O selo viraria decoração permanente, e
+   * decoração permanente é a primeira coisa que o olho aprende a ignorar — inclusive
+   * no dia em que ela passar a significar alguma coisa.
+   */
+  const temFila = () => vigentes().length > 1;
+
+  /** Este plano é por onde ela começa? (só responde `true` quando há fila) */
+  function ehPrimeiroDaFila(plano) {
+    if (!plano || !temFila()) return false;
+    const primeiro = vigentePrincipal();
+    return !!primeiro && String(primeiro.id) === String(plano.id);
+  }
 
   /**
    * Qual plano abrir numa lista — um vigente, se houver algum ali.
    *
    * Pegar só o primeiro da lista jogava o pai num plano antigo e vazio ao voltar
    * de "Para revisar" pra "Ativos". O que ele quer ver é o que está valendo — e
-   * com vários valendo, o mais recente deles.
+   * com vários valendo, aquele por onde a Cogni começa.
    */
   function melhorDaAba(lista) {
     if (!lista.length) return null;
@@ -317,7 +371,14 @@ export async function renderMesa(ctx) {
   }
 
   async function carregarPlanos() {
-    estado.planos = await ctx.mock.getPlanos();
+    /**
+     * Reordenar aqui, e não confiar só no `ORDER BY`, é de propósito: enquanto o SQL
+     * da coluna `ordem` não roda, a consulta cai na válvula e volta pelo desempate
+     * antigo. Passar tudo por `ordenarPlanos` garante que a fila da TELA é sempre a
+     * mesma que o servidor monta — inclusive nesse intervalo, em que os dois leem
+     * `ordem` ausente como 1000.
+     */
+    estado.planos = ordenarPlanos(await ctx.mock.getPlanos());
     if (!estado.planoId) {
       // Abre num plano que a Cogni está seguindo — é a resposta que o pai quer
       // primeiro ("o que está valendo agora?"). Sem nenhum vigente, o que importa
@@ -394,9 +455,23 @@ export async function renderMesa(ctx) {
     barraDeSelecao.hidden = !estado.modoSelecao;
     if (estado.modoSelecao) pintarBarraDeSelecao();
 
+    // A faixa é recriada, então o arraste antigo aponta pra nós que já não existem.
+    destruirFila();
     faixaHost.replaceChildren();
     if (!lista.length) return;
     if (lista.length < 2 && !estado.modoSelecao) return;
+
+    /**
+     * A faixa vira fila arrastável quando três coisas valem ao mesmo tempo: é a aba
+     * dos ativos, há 2+ planos pra ordenar e o modo de seleção está DESLIGADO.
+     *
+     * ⚠️ A última é a que não pode faltar. Com a seleção ligada, o toque longo que
+     * marca um plano pra excluir é exatamente o gesto que inicia um arraste (150ms
+     * de dedo parado) — o pai reordenaria a prioridade da filha achando que estava
+     * escolhendo o que apagar, e sem nada na tela sugerindo isso.
+     */
+    const arrastavel =
+      !estado.modoSelecao && estado.aba === ABA_DA_FILA && lista.length > 1;
 
     const faixa = el("div", {
       class: "mesa-seletor" + (estado.modoSelecao ? " is-selecionando" : ""),
@@ -404,11 +479,44 @@ export async function renderMesa(ctx) {
         ? { role: "group", "aria-label": "Escolher planos para excluir" }
         : { role: "tablist", "aria-label": "Escolher plano" },
     });
+    if (arrastavel) faixa.setAttribute("data-dnd-coluna", COLUNA_DA_FILA[0].id);
+
     // Um conjunto só pra faixa inteira: o teto é por CRIANÇA, então a resposta não
     // muda de chip pra chip e recalcular em cada um seria refazer a mesma conta.
     const idsVigentes = new Set(vigentes().map((v) => String(v.id)));
-    lista.forEach((p) => faixa.appendChild(chipDePlano(p, idsVigentes)));
-    faixaHost.appendChild(faixa);
+    lista.forEach((p) => faixa.appendChild(chipDePlano(p, idsVigentes, arrastavel)));
+
+    // A raiz do arraste é um WRAPPER, não a faixa: o `dnd.js` pendura nela a região
+    // de anúncio e o texto de instruções, e dois <p> soltos dentro de um flex
+    // container que também é a lista virariam filhos do layout da fila.
+    const wrap = el("div", { class: "mesa-fila", children: [faixa] });
+    if (arrastavel) wrap.insertBefore(dicaDaFila(), faixa);
+    faixaHost.appendChild(wrap);
+
+    if (arrastavel) ligarFila(wrap);
+  }
+
+  /**
+   * A linha que ensina o gesto.
+   *
+   * Um arraste que ninguém descobre é um arraste que não existe: a faixa parece uma
+   * barra de abas, e nada nela sugere que a posição significa algo. A frase diz as
+   * duas coisas de uma vez — que dá pra arrastar, e o que isso muda no robô.
+   */
+  function dicaDaFila() {
+    return el("p", {
+      class: "mesa-fila__dica",
+      children: [
+        el("span", {
+          class: "mesa-fila__dica-ico",
+          svg: ICON.grip,
+          attrs: { "aria-hidden": "true" },
+        }),
+        el("span", {
+          text: "Arraste os planos pra dizer por onde a Cogni começa.",
+        }),
+      ],
+    });
   }
 
   /**
@@ -418,38 +526,74 @@ export async function renderMesa(ctx) {
    * ativos e um pausado na mesma faixa, "quais ela está seguindo?" virou uma
    * pergunta de verdade — e a resposta só aparecia depois de abrir plano por plano.
    */
-  function chipDePlano(p, idsVigentes) {
+  /**
+   * O que o leitor de tela ouve no chip.
+   *
+   * O título vem SEMPRE primeiro (regra do "label in name": quem usa comando de voz
+   * fala o que está escrito no chip, e o que está escrito é o título). O resto é o
+   * que a cor e o ícone dizem pra quem enxerga — sem isso, o ✨ e o "1º" seriam
+   * informação que só existe pra parte das pessoas.
+   */
+  function rotuloDoChip(p, seguindo, primeiro) {
+    if (primeiro) return `${p.titulo} — a Cogni começa por aqui`;
+    if (seguindo) return `${p.titulo} — a Cogni está seguindo`;
+    return null;
+  }
+
+  function chipDePlano(p, idsVigentes, arrastavel) {
     const id = String(p.id);
     const marcado = estado.selecionados.has(id);
     const on = !estado.modoSelecao && id === String(estado.planoId);
     const seguindo = idsVigentes.has(id);
+    const primeiro = ehPrimeiroDaFila(p);
 
     const ico = el("span", {
       class: "mesa-chip-plano__ico",
       svg: estado.modoSelecao && marcado ? ICON.check : materiaIcon(p.foco),
     });
-    // O rótulo acessível repete o título ANTES do resto (regra do "label in name":
-    // quem usa comando de voz fala o que está escrito no chip).
-    const rotulo = seguindo ? `${p.titulo} — a Cogni está seguindo` : null;
+    /**
+     * O "1º" e o ✨ nascem SEMPRE, escondidos quando não valem.
+     *
+     * Porque um arraste muda os dois em vários chips de uma vez (subir o 6º plano
+     * promove ele e derruba o 5º), e a faixa não pode ser repintada no meio do
+     * gesto — repintar destrói o chip que está sendo arrastado. Com os nós já no
+     * lugar, atualizar é alternar `hidden`, o que não mexe em foco nem em layout.
+     */
+    const seloFila = el("span", {
+      class: "mesa-chip-plano__fila",
+      text: "1º",
+      attrs: { "aria-hidden": "true", hidden: primeiro ? null : "hidden" },
+    });
+    const seloSeguindo = el("span", {
+      class: "mesa-chip-plano__seguindo",
+      svg: ICON.sparkle,
+      attrs: { "aria-hidden": "true", hidden: seguindo ? null : "hidden" },
+    });
+
     const chip = el("button", {
       class:
         "mesa-chip-plano" +
         (on ? " is-active" : "") +
         (seguindo ? " is-seguindo" : "") +
+        (primeiro ? " is-primeiro" : "") +
         (estado.modoSelecao && marcado ? " is-marcado" : ""),
       attrs: estado.modoSelecao
-        ? { type: "button", "aria-pressed": String(marcado), "aria-label": rotulo }
-        : { type: "button", role: "tab", "aria-selected": String(on), "aria-label": rotulo },
+        ? {
+            type: "button",
+            "aria-pressed": String(marcado),
+            "aria-label": rotuloDoChip(p, seguindo, primeiro),
+          }
+        : {
+            type: "button",
+            role: "tab",
+            "aria-selected": String(on),
+            "aria-label": rotuloDoChip(p, seguindo, primeiro),
+          },
       children: [
         ico,
         el("span", { class: "mesa-chip-plano__titulo", text: p.titulo }),
-        seguindo
-          ? el("span", {
-              class: "mesa-chip-plano__seguindo",
-              svg: ICON.sparkle,
-              attrs: { "aria-hidden": "true" },
-            })
-          : null,
+        seloFila,
+        seloSeguindo,
         el("span", {
           class: "pl-status pl-status--mini",
           attrs: { "data-status": p.status },
@@ -457,6 +601,15 @@ export async function renderMesa(ctx) {
         }),
       ],
     });
+
+    // O contrato de DOM do `dnd.js`. Só quando a faixa é fila: sem estes atributos o
+    // chip é um chip, e o arraste simplesmente não existe naquela aba.
+    if (arrastavel) {
+      chip.setAttribute("data-dnd-card", "");
+      chip.setAttribute("data-id", id);
+      chip.setAttribute("data-ordem", String(ordemDoPlano(p)));
+      chip.setAttribute("data-titulo", p.titulo || "plano");
+    }
 
     chip.addEventListener("click", () => {
       if (!estado.modoSelecao) {
@@ -482,6 +635,128 @@ export async function renderMesa(ctx) {
     });
 
     return chip;
+  }
+
+  /* ---- A fila de planos: arrastar é dizer por onde ela começa ------------ */
+
+  /** Liga o arraste da faixa. `wrap` é a raiz; a lista é a `.mesa-seletor` dentro. */
+  function ligarFila(wrap) {
+    fila = criarQuadro({
+      raiz: wrap,
+      colunas: COLUNA_DA_FILA,
+      eixo: "horizontal",
+      item: "plano",
+      aoSoltar: gravarOrdemDoPlano,
+      aoReindexar: reindexarFila,
+    });
+    // A mesma fila do Realtime do quadro: sem re-registrar aqui, um evento que
+    // chegasse durante um arraste de PLANO ficaria preso pra sempre (o callback só
+    // estava pendurado no quadro de tarefas, que não é quem está ocupado).
+    if (drenarFila) fila.aoFicarLivre(drenarFila);
+    // E a repintura que a releitura adiou por causa do arraste (ver `aoReler`).
+    fila.aoFicarLivre(() => {
+      if (!seletorPendente) return;
+      seletorPendente = false;
+      pintarSeletor();
+    });
+  }
+
+  function destruirFila() {
+    if (!fila) return;
+    fila.destruir();
+    fila = null;
+  }
+
+  /**
+   * Grava a posição nova de um plano na fila — chamada pelo `dnd.js` a cada
+   * movimento (arraste, teclado ou Home/End).
+   *
+   * É a MESMA mecânica fracionária dos cards: a `ordem` já vem calculada como a
+   * média dos vizinhos, então é 1 UPDATE por movimento e não a lista inteira.
+   *
+   * Se a gravação falhar, o erro sobe: quem devolve o chip pro lugar é o `dnd.js`,
+   * e é isso que garante que a faixa nunca fica mostrando uma fila que o banco
+   * recusou — o pai veria o arraste "funcionar" e a Cogni seguir outra ordem.
+   */
+  async function gravarOrdemDoPlano({ id, ordem }) {
+    try {
+      const linha = await ctx.mock.reordenarPlano(id, ordem);
+      // Sem linha (RLS, id que sumiu) atualizamos só a `ordem` em memória: o
+      // movimento visual já aconteceu, e a próxima releitura conta a verdade.
+      const i = estado.planos.findIndex((p) => String(p.id) === String(id));
+      if (i !== -1) {
+        estado.planos[i] = linha || { ...estado.planos[i], ordem: Number(ordem) };
+      }
+      estado.planos = ordenarPlanos(estado.planos);
+      atualizarSelosDaFaixa();
+      pintarPlano();
+    } catch (err) {
+      /**
+       * A coluna `ordem` ainda não existe no banco (o SQL não foi rodado).
+       *
+       * Não é erro do pai, não é a rede, e "não consegui salvar" o faria tentar de
+       * novo pra sempre. A frase precisa dizer que a FUNÇÃO ainda não está no ar —
+       * e o `throw` logo abaixo é o que devolve o chip pro lugar, porque uma faixa
+       * reordenada por cima de um banco que recusou a escrita é a tela mentindo.
+       */
+      if (ctx.mock.ehPrioridadeIndisponivel(err)) {
+        toast("A prioridade dos planos ainda não está disponível neste banco.", "info");
+      } else {
+        console.error("[Companion] Falha ao reordenar o plano:", err);
+        toast("Não consegui mudar a ordem agora.", "error");
+      }
+      throw err;
+    }
+  }
+
+  /** Só quando o gap fracionário acabou — raro por construção. */
+  async function reindexarFila(_colunaId, novas) {
+    const linhas = await ctx.mock.reindexarPlanos(novas);
+    for (const linha of linhas) {
+      const i = estado.planos.findIndex((p) => String(p.id) === String(linha.id));
+      if (i !== -1) estado.planos[i] = linha;
+    }
+    estado.planos = ordenarPlanos(estado.planos);
+  }
+
+  /**
+   * Repinta os selos da faixa SEM recriar os chips.
+   *
+   * Um arraste muda mais coisa do que a posição: subir o 6º plano faz ele passar a
+   * valer e derruba quem era o 5º, então o ✨ e o "1º" mudam em vários chips de uma
+   * vez. Recriar a faixa resolveria — e destruiria o chip que o pai acabou de soltar
+   * (e o foco de quem fez isso pelo teclado). Daí os selos já nascerem no DOM: aqui
+   * só se liga e desliga o que já está lá.
+   */
+  function atualizarSelosDaFaixa() {
+    const faixa = faixaHost.querySelector(".mesa-seletor");
+    if (!faixa) return;
+    const idsVigentes = new Set(vigentes().map((v) => String(v.id)));
+    const primeiro = temFila() ? vigentePrincipal() : null;
+
+    faixa.querySelectorAll("[data-id]").forEach((chip) => {
+      const id = chip.getAttribute("data-id");
+      const plano = estado.planos.find((p) => String(p.id) === id);
+      if (!plano) return;
+      const seguindo = idsVigentes.has(id);
+      const ehPrimeiro = !!primeiro && String(primeiro.id) === id;
+
+      chip.classList.toggle("is-seguindo", seguindo);
+      chip.classList.toggle("is-primeiro", ehPrimeiro);
+      alternar(chip.querySelector(".mesa-chip-plano__seguindo"), seguindo);
+      alternar(chip.querySelector(".mesa-chip-plano__fila"), ehPrimeiro);
+
+      const rotulo = rotuloDoChip(plano, seguindo, ehPrimeiro);
+      if (rotulo) chip.setAttribute("aria-label", rotulo);
+      else chip.removeAttribute("aria-label");
+    });
+  }
+
+  /** `hidden` de um nó que pode não existir (chip de aba sem selo, por exemplo). */
+  function alternar(no, mostrar) {
+    if (!no) return;
+    if (mostrar) no.removeAttribute("hidden");
+    else no.setAttribute("hidden", "hidden");
   }
 
   /**
@@ -557,15 +832,33 @@ export async function renderMesa(ctx) {
         }),
       ],
     });
-    // A pílula diz em palavras o que está valendo. É o par do aviso de baixo: um
-    // confirma, o outro corrige — e nenhum dos dois depende de o pai decifrar cor.
+    /**
+     * A pílula diz em palavras o que está valendo. É o par do aviso de baixo: um
+     * confirma, o outro corrige — e nenhum dos dois depende de o pai decifrar cor.
+     *
+     * ⭐ Ela é UMA só, e o texto é que muda. O primeiro da fila poderia ganhar um
+     * segundo selo ao lado, mas duas pílulas começando com "a Cogni" e dizendo quase
+     * a mesma coisa fazem o pai ler as duas pra descobrir que uma bastava. Como
+     * *"começa por aqui"* já implica *"está seguindo"*, o primeiro simplesmente
+     * recebe a frase mais específica — com o mesmo ✨, que é o sinal que ele já
+     * aprendeu a reconhecer, e um preenchimento mais forte pra marcar o degrau.
+     *
+     * A frase foi escolhida com cuidado: ele **não** é "o único que vale" (ela segue
+     * todos os vigentes), é por onde ela COMEÇA quando a conversa não pede outro
+     * assunto. Prometer exclusividade aqui faria o pai concluir que a Cogni abandonou
+     * os outros planos — e ele nos pegaria na primeira conversa em que ela não faz
+     * isso. O "começa por aqui" só aparece com fila de verdade (2+ vigentes).
+     */
     if (seguindo) {
+      const primeiro = ehPrimeiroDaFila(plano);
       topo.appendChild(
         el("span", {
-          class: "mesa-plano__selo",
+          class: "mesa-plano__selo" + (primeiro ? " mesa-plano__selo--fila" : ""),
           children: [
             el("span", { class: "mesa-plano__selo-ico", svg: ICON.sparkle }),
-            el("span", { text: "a Cogni está seguindo" }),
+            el("span", {
+              text: primeiro ? "a Cogni começa por aqui" : "a Cogni está seguindo",
+            }),
           ],
         })
       );
@@ -613,6 +906,14 @@ export async function renderMesa(ctx) {
 
     // O aviso que evita o pai arrastar card esperando reação do robô.
     if (!seguindo) {
+      /**
+       * Na aba dos ativos a faixa é arrastável INTEIRA, e um plano pode estar ali
+       * sem estar valendo (venceu, ou é o 6º). O aviso ganha a segunda frase só
+       * nesse caso: arrastar aquele chip não muda nada no robô hoje, e um gesto sem
+       * efeito, repetido, ensina o pai a desconfiar do arraste onde ele funciona.
+       */
+      const sobreAOrdem =
+        estado.aba === ABA_DA_FILA ? avisoDeOrdem(plano, estado.planos, agora) : null;
       filhos.push(
         el("p", {
           class: "mesa-aviso",
@@ -622,7 +923,8 @@ export async function renderMesa(ctx) {
             el("span", {
               text:
                 "A Cogni não está seguindo este plano agora. " +
-                (motivoNaoVigente(plano, estado.planos, agora) || ""),
+                (motivoNaoVigente(plano, estado.planos, agora) || "") +
+                (sobreAOrdem ? " " + sobreAOrdem : ""),
             }),
           ],
         })
@@ -1699,10 +2001,15 @@ export async function renderMesa(ctx) {
     sincronia = assinarMesa({
       client: cliente,
       criancaId: ctx.crianca.id,
-      estaOcupado: () => !!quadro && quadro.estaArrastando(),
+      // Os DOIS arrastes da tela contam como ocupado. A faixa de planos é repintada
+      // por qualquer delta de `planos_estudo` — inclusive o eco do próprio arraste —,
+      // e repintar no meio do gesto arrancaria o chip da mão do pai.
+      estaOcupado: () =>
+        (!!quadro && quadro.estaArrastando()) || (!!fila && fila.estaArrastando()),
       aoFicarLivre: (cb) => {
         drenarFila = cb;
         if (quadro) quadro.aoFicarLivre(cb);
+        if (fila) fila.aoFicarLivre(cb);
       },
       aoTarefa: aplicarTarefa,
       aoPlano: aplicarPlano,
@@ -1716,7 +2023,17 @@ export async function renderMesa(ctx) {
         await carregarPlanos();
         await carregarTarefas();
         pintarAbas();
-        pintarSeletor();
+        /**
+         * ⚠️ A releitura NÃO passa pela fila de eventos do Realtime.
+         *
+         * `relerAgora()` é chamada direto ao (re)assinar o canal, no poll degradado e
+         * ao voltar pra aba — nenhuma delas consulta `estaOcupado`. Antes isso era
+         * inofensivo: repintar a faixa trocava chips que ninguém estava segurando.
+         * Agora a faixa é arrastável, e um canal que reconecta no meio do gesto
+         * arrancaria o chip da mão do pai. Então a repintura espera o arraste acabar.
+         */
+        if (fila && fila.estaArrastando()) seletorPendente = true;
+        else pintarSeletor();
         pintarPlano();
         // Repinta o quadro só quando o conteúdo mudou de verdade: repintar a cada
         // releitura mataria o foco de quem navega por teclado e cortaria animação.
@@ -1862,6 +2179,7 @@ export async function renderMesa(ctx) {
     document.removeEventListener("click", fecharMenu);
     document.removeEventListener("keydown", aoTeclarMenu);
     if (quadro) quadro.destruir();
+    destruirFila();
     if (sincronia) sincronia.encerrar();
     quadro = null;
     sincronia = null;

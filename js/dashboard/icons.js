@@ -100,6 +100,17 @@ export const ICON = {
   undo: stroke('<path d="M4 9h10a5 5 0 0 1 0 10h-4"/><path d="M8 5 4 9l4 4"/>'),
   arrowLeft: stroke('<path d="M19 12H5M11 6l-6 6 6 6"/>', "2.1"),
   arrowRight: stroke('<path d="M5 12h14M13 6l6 6-6 6"/>', "2.1"),
+  // A "pegada" do arraste — a convenção que o olho já conhece de listas
+  // reordenáveis. Aparece na dica da fila de planos, onde o gesto precisa ser
+  // ANUNCIADO: uma faixa de chips não parece arrastável por si só.
+  grip: stroke(
+    '<circle cx="9" cy="6" r="1.35" fill="currentColor"/>' +
+      '<circle cx="15" cy="6" r="1.35" fill="currentColor"/>' +
+      '<circle cx="9" cy="12" r="1.35" fill="currentColor"/>' +
+      '<circle cx="15" cy="12" r="1.35" fill="currentColor"/>' +
+      '<circle cx="9" cy="18" r="1.35" fill="currentColor"/>' +
+      '<circle cx="15" cy="18" r="1.35" fill="currentColor"/>'
+  ),
 };
 
 /* --------------------------------------------------------------------------
