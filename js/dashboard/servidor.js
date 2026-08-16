@@ -28,11 +28,18 @@ const TIMEOUT_MS = 4000;
 
 /**
  * Avisa o servidor local que os planos desta criança mudaram, pra ele recarregar
- * o plano vigente no cache e a Cogni já usar na conversa em andamento.
+ * os planos vigentes no cache e a Cogni já usar na conversa em andamento.
  *
  *   POST {SERVIDOR_URL}/api/planos/refrescar { criancaId }
- *   → 200 { ok: true, temPlanoAtivo: boolean, titulo: string|null }
+ *   → 200 { ok: true, temPlanoAtivo: boolean, titulo: string|null,
+ *           total: number,
+ *           planos: [{ id, titulo, foco, tarefas }] }   ⭐ 16/ago/2026
  *   → 400 { erro: "criancaId obrigatorio" } · 503 { ok: false, erro: … }
+ *
+ * ⭐ `total`/`planos[]` nasceram quando a Cogni passou a seguir VÁRIOS planos (até
+ * 5 por criança): com eles dá pra saber que AQUELE plano recém-salvo entrou, e não
+ * só que algum entrou. Os campos antigos continuam — nada aqui quebra por causa de
+ * um servidor mais velho respondendo sem eles.
  *
  * É o PLANO B do Realtime do Supabase (que o servidor escuta em `planos_estudo`):
  * se a replicação for desabilitada no painel ou o canal cair, este ping mantém a

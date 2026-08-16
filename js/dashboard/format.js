@@ -156,7 +156,7 @@ const STATUS_LABELS = {
 
 /**
  * Status que fazem a Cogni SEGUIR o plano (= injetar no system prompt dela).
- * Espelha `STATUS_VIGENTES` de `server/modules/planos.js`. Ver `planoVigente()`.
+ * Espelha `STATUS_VIGENTES` de `server/modules/planos.js`. Ver `planosVigentes()`.
  */
 export const STATUS_VIGENTES = ["ativo", "em_andamento"];
 
@@ -427,7 +427,7 @@ export function formatPrazo(value, now = new Date()) {
 }
 
 /* --------------------------------------------------------------------------
-   Planos — qual deles a Cogni está seguindo
+   Planos — quais deles a Cogni está seguindo
    -------------------------------------------------------------------------- */
 
 /**
@@ -446,8 +446,25 @@ export function planoVencido(plano, now = new Date()) {
 }
 
 /**
- * O plano que a Cogni está seguindo AGORA — a mesma regra de `obterPlanoAtivo()`
- * em `server/modules/planos.js`.
+ * Teto de planos que a Cogni segue ao mesmo tempo, por criança.
+ * Espelha `MAX_PLANOS_VIGENTES` de `server/modules/planos.js`.
+ */
+export const MAX_PLANOS_VIGENTES = 5;
+
+/** Desempate do servidor, na mesma ordem: `atualizado_em → criado_em → id`. */
+function maisRecentePrimeiro(a, b) {
+  const ta = toDate(a.atualizado_em || a.criado_em).getTime() || 0;
+  const tb = toDate(b.atualizado_em || b.criado_em).getTime() || 0;
+  if (tb !== ta) return tb - ta;
+  const ca = toDate(a.criado_em).getTime() || 0;
+  const cb = toDate(b.criado_em).getTime() || 0;
+  if (cb !== ca) return cb - ca;
+  return Number(b.id) - Number(a.id);
+}
+
+/**
+ * TODOS os planos que a Cogni está seguindo AGORA — a mesma regra de
+ * `obterPlanosVigentes()` em `server/modules/planos.js`.
  *
  * ⚠️ Isto é uma SEGUNDA CÓPIA de uma regra do servidor, o que o projeto evita por
  * princípio (ver a nota das 14 matérias). Ela existe porque a tela precisa dizer
@@ -455,47 +472,62 @@ export function planoVencido(plano, now = new Date()) {
  * de um plano pausado/concluído/rascunho/vencido — e o site não tem endpoint que
  * responda isso. Se a regra do servidor mudar, esta função muda junto.
  *
+ * 🔴 16/ago/2026 — ela devolvia UM plano (o servidor tinha um `limit(1)`), e isso
+ * virou mentira na tela: com dois planos `ativo`, o segundo exibia *"a Cogni não
+ * está seguindo este plano agora"* enquanto a Cogni o seguia normalmente. Agora
+ * **todos** os que passam no filtro estão valendo, até o teto — e só o 6º em
+ * diante fica de fora, pelos mais recentes.
+ *
  * @param {Array<object>} planos — linhas de `planos_estudo`
  * @param {Date} [now]
- * @returns {object|null} o plano vigente, ou `null` se nenhum está valendo
+ * @returns {Array<object>} os vigentes, do mais recente pro mais antigo (pode ser vazio)
  */
-export function planoVigente(planos, now = new Date()) {
-  const candidatos = (planos || []).filter(
-    (p) => STATUS_VIGENTES.includes(p.status) && !planoVencido(p, now)
-  );
-  if (!candidatos.length) return null;
-  // Desempate do servidor, na mesma ordem: atualizado_em → criado_em → id.
-  return candidatos.slice().sort((a, b) => {
-    const ta = toDate(a.atualizado_em || a.criado_em).getTime() || 0;
-    const tb = toDate(b.atualizado_em || b.criado_em).getTime() || 0;
-    if (tb !== ta) return tb - ta;
-    const ca = toDate(a.criado_em).getTime() || 0;
-    const cb = toDate(b.criado_em).getTime() || 0;
-    if (cb !== ca) return cb - ca;
-    return Number(b.id) - Number(a.id);
-  })[0];
+export function planosVigentes(planos, now = new Date()) {
+  return (planos || [])
+    .filter((p) => STATUS_VIGENTES.includes(p.status) && !planoVencido(p, now))
+    .sort(maisRecentePrimeiro)
+    .slice(0, MAX_PLANOS_VIGENTES);
 }
 
 /**
- * Por que este plano NÃO é o que a Cogni segue — em linguagem de pai.
+ * Este plano está entre os que a Cogni segue?
+ *
+ * @param {object} plano
+ * @param {Array<object>} planos — TODOS os planos da criança (o teto é por criança)
+ * @returns {boolean}
+ */
+export function ehVigente(plano, planos, now = new Date()) {
+  if (!plano) return false;
+  return planosVigentes(planos, now).some((p) => String(p.id) === String(plano.id));
+}
+
+/**
+ * Por que este plano NÃO está entre os que a Cogni segue — em linguagem de pai.
  *
  * Existe pra tela não se limitar a um aviso genérico: o pai que abre um plano
  * pausado e arrasta cards esperando o robô reagir merece saber o motivo, não só
  * o fato.
- * @returns {string|null} `null` quando o plano É o vigente (nada a avisar)
+ * @returns {string|null} `null` quando o plano ESTÁ valendo (nada a avisar)
  */
 export function motivoNaoVigente(plano, planos, now = new Date()) {
   if (!plano) return null;
-  const vigente = planoVigente(planos, now);
-  if (vigente && String(vigente.id) === String(plano.id)) return null;
+  if (ehVigente(plano, planos, now)) return null;
   if (plano.status === "rascunho") return "Este plano ainda está esperando sua aprovação.";
   if (plano.status === "pausado") return "Este plano está pausado.";
   if (plano.status === "concluido") return "Este plano já foi concluído.";
   if (planoVencido(plano, now)) return "O prazo deste plano terminou.";
-  // Sobrou o caso de dois planos vigentes ao mesmo tempo: o servidor segue só o
-  // mais recente, e o pai precisa saber qual.
-  if (vigente) return `A Cogni está seguindo “${vigente.titulo}” no momento.`;
-  return "A Cogni não está seguindo nenhum plano agora.";
+  /**
+   * Sobrou o 6º plano em diante: ele está ativo e no prazo, e mesmo assim ficou de
+   * fora — o teto é do servidor, e quem entra são os mais recentes. Dizer o número
+   * importa: sem ele, o aviso parece defeito da tela em vez de um limite conhecido.
+   */
+  if (STATUS_VIGENTES.includes(plano.status)) {
+    return (
+      `Ela segue no máximo ${MAX_PLANOS_VIGENTES} planos ao mesmo tempo, e este ficou ` +
+      "de fora por ser o mais antigo. Pause ou conclua um dos outros pra abrir vaga."
+    );
+  }
+  return "Este plano não está entre os que ela segue.";
 }
 
 /* --------------------------------------------------------------------------

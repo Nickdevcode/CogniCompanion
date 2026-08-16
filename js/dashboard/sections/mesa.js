@@ -9,14 +9,15 @@
  *
  * Três decisões desta tela que não são óbvias no código:
  *
- * 1. **O quadro é do plano SELECIONADO**, não de todas as tarefas da criança. É o
- *    que o backend implementa (o servidor lê as tarefas embutidas no plano vigente),
- *    e é o que faz "o que a Cogni está seguindo" ter uma resposta única.
+ * 1. **O quadro é do plano SELECIONADO**, não de todas as tarefas da criança. Cada
+ *    card carrega `plano_id` e o servidor junta os quadros de todos os planos que
+ *    ela segue — a tela mostra um de cada vez porque é assim que o pai pensa neles.
  * 2. **Selecionar um plano que a Cogni NÃO segue é permitido — e avisado.** O pai
  *    pode abrir o quadro de um plano pausado, concluído, vencido ou ainda em
  *    rascunho. Sem o aviso, ele arrastaria cards esperando o robô reagir, e o robô
- *    não reage. A regra de "qual é o vigente" é a mesma do servidor (ver
- *    `planoVigente` em `format.js`).
+ *    não reage. A regra de "quais estão valendo" é a mesma do servidor (ver
+ *    `planosVigentes` em `format.js`) — e desde 16/ago/2026 são VÁRIOS ao mesmo
+ *    tempo, até 5: o selo aparece em todos eles, e o aviso, em nenhum.
  * 3. **O canal do Realtime é `const` do escopo do render** e morre com a seção. O
  *    router não avisa quando desmonta — ver `aposentar()` no fim do arquivo.
  *
@@ -35,12 +36,14 @@ import {
   statusLabel,
   origemLabel,
   formatPrazo,
-  planoVigente,
+  planosVigentes,
+  ehVigente,
   motivoNaoVigente,
 } from "../format.js";
 import { criarQuadro } from "../dnd.js";
 import { assinarMesa } from "../mesa-realtime.js";
 import { abrirCapturaDeMaterial } from "../captura.js";
+import { ligarCampoIA } from "../campo-ia.js";
 
 /**
  * Status que o pai pode escolher no formulário.
@@ -289,26 +292,37 @@ export async function renderMesa(ctx) {
     estado.planos.find((p) => String(p.id) === String(estado.planoId)) || null;
 
   /**
-   * Qual plano abrir numa lista — o vigente, se ele estiver ali.
+   * Os planos que a Cogni está seguindo agora (o mais recente primeiro).
+   *
+   * `agora` é o instante do render, como no resto da seção: o quadro não é um
+   * relógio, e recalcular "hoje" a cada pintura faria dois trechos da mesma tela
+   * discordarem sobre um plano que vence no meio da visita.
+   */
+  const vigentes = () => planosVigentes(estado.planos, agora);
+
+  /** O vigente mais recente — a resposta pra "o que abrir primeiro?". */
+  const vigentePrincipal = () => vigentes()[0] || null;
+
+  /**
+   * Qual plano abrir numa lista — um vigente, se houver algum ali.
    *
    * Pegar só o primeiro da lista jogava o pai num plano antigo e vazio ao voltar
-   * de "Para revisar" pra "Ativos". O que ele quer ver é o que está valendo.
+   * de "Para revisar" pra "Ativos". O que ele quer ver é o que está valendo — e
+   * com vários valendo, o mais recente deles.
    */
   function melhorDaAba(lista) {
     if (!lista.length) return null;
-    const vigente = planoVigente(estado.planos, agora);
-    const temVigente =
-      vigente && lista.some((p) => String(p.id) === String(vigente.id));
-    return temVigente ? vigente.id : lista[0].id;
+    const naAba = vigentes().find((v) => lista.some((p) => String(p.id) === String(v.id)));
+    return naAba ? naAba.id : lista[0].id;
   }
 
   async function carregarPlanos() {
     estado.planos = await ctx.mock.getPlanos();
     if (!estado.planoId) {
-      // Abre no plano que a Cogni está seguindo — é a resposta que o pai quer
+      // Abre num plano que a Cogni está seguindo — é a resposta que o pai quer
       // primeiro ("o que está valendo agora?"). Sem nenhum vigente, o que importa
       // é o que está esperando aprovação; sem isso também, mostra tudo.
-      const vigente = planoVigente(estado.planos, agora);
+      const vigente = vigentePrincipal();
       estado.planoId = vigente ? vigente.id : estado.planos[0] && estado.planos[0].id;
       if (vigente) estado.aba = "ativos";
       else if (estado.planos.some((p) => p.status === "rascunho")) estado.aba = "revisar";
@@ -390,31 +404,52 @@ export async function renderMesa(ctx) {
         ? { role: "group", "aria-label": "Escolher planos para excluir" }
         : { role: "tablist", "aria-label": "Escolher plano" },
     });
-    lista.forEach((p) => faixa.appendChild(chipDePlano(p)));
+    // Um conjunto só pra faixa inteira: o teto é por CRIANÇA, então a resposta não
+    // muda de chip pra chip e recalcular em cada um seria refazer a mesma conta.
+    const idsVigentes = new Set(vigentes().map((v) => String(v.id)));
+    lista.forEach((p) => faixa.appendChild(chipDePlano(p, idsVigentes)));
     faixaHost.appendChild(faixa);
   }
 
-  /** Um chip da faixa. Vira alvo de seleção quando o modo está ligado. */
-  function chipDePlano(p) {
+  /**
+   * Um chip da faixa. Vira alvo de seleção quando o modo está ligado.
+   *
+   * O ✨ no chip existe desde que a Cogni passou a seguir vários planos: com dois
+   * ativos e um pausado na mesma faixa, "quais ela está seguindo?" virou uma
+   * pergunta de verdade — e a resposta só aparecia depois de abrir plano por plano.
+   */
+  function chipDePlano(p, idsVigentes) {
     const id = String(p.id);
     const marcado = estado.selecionados.has(id);
     const on = !estado.modoSelecao && id === String(estado.planoId);
+    const seguindo = idsVigentes.has(id);
 
     const ico = el("span", {
       class: "mesa-chip-plano__ico",
       svg: estado.modoSelecao && marcado ? ICON.check : materiaIcon(p.foco),
     });
+    // O rótulo acessível repete o título ANTES do resto (regra do "label in name":
+    // quem usa comando de voz fala o que está escrito no chip).
+    const rotulo = seguindo ? `${p.titulo} — a Cogni está seguindo` : null;
     const chip = el("button", {
       class:
         "mesa-chip-plano" +
         (on ? " is-active" : "") +
+        (seguindo ? " is-seguindo" : "") +
         (estado.modoSelecao && marcado ? " is-marcado" : ""),
       attrs: estado.modoSelecao
-        ? { type: "button", "aria-pressed": String(marcado) }
-        : { type: "button", role: "tab", "aria-selected": String(on) },
+        ? { type: "button", "aria-pressed": String(marcado), "aria-label": rotulo }
+        : { type: "button", role: "tab", "aria-selected": String(on), "aria-label": rotulo },
       children: [
         ico,
         el("span", { class: "mesa-chip-plano__titulo", text: p.titulo }),
+        seguindo
+          ? el("span", {
+              class: "mesa-chip-plano__seguindo",
+              svg: ICON.sparkle,
+              attrs: { "aria-hidden": "true" },
+            })
+          : null,
         el("span", {
           class: "pl-status pl-status--mini",
           attrs: { "data-status": p.status },
@@ -484,8 +519,9 @@ export async function renderMesa(ctx) {
     const plano = planoAtual();
     if (!plano) return;
 
-    const vigente = planoVigente(estado.planos, agora);
-    const ehVigente = vigente && String(vigente.id) === String(plano.id);
+    // "Está valendo?" é uma pergunta sobre ESTE plano, não sobre quem ganhou a
+    // disputa: com vários vigentes ao mesmo tempo, não existe mais um vencedor.
+    const seguindo = ehVigente(plano, estado.planos, agora);
 
     const editar = el("button", {
       class: "pl-card__edit",
@@ -523,7 +559,7 @@ export async function renderMesa(ctx) {
     });
     // A pílula diz em palavras o que está valendo. É o par do aviso de baixo: um
     // confirma, o outro corrige — e nenhum dos dois depende de o pai decifrar cor.
-    if (ehVigente) {
+    if (seguindo) {
       topo.appendChild(
         el("span", {
           class: "mesa-plano__selo",
@@ -576,7 +612,7 @@ export async function renderMesa(ctx) {
     filhos.push(metas);
 
     // O aviso que evita o pai arrastar card esperando reação do robô.
-    if (!ehVigente) {
+    if (!seguindo) {
       filhos.push(
         el("p", {
           class: "mesa-aviso",
@@ -634,7 +670,7 @@ export async function renderMesa(ctx) {
 
     planoHost.appendChild(
       el("article", {
-        class: "dash-card mesa-plano" + (ehVigente ? " is-vigente" : ""),
+        class: "dash-card mesa-plano" + (seguindo ? " is-vigente" : ""),
         children: [
           el("div", {
             class: "pl-card__disc",
@@ -1065,12 +1101,47 @@ export async function renderMesa(ctx) {
   btnCogni.addEventListener("click", abrirCogni);
   btnNovo.addEventListener("click", () => abrirFormulario(null));
 
+  /**
+   * O que a IA precisa saber sobre a criança pra escrever no tom certo.
+   *
+   * A função confirma esses dois campos no banco (é ela que manda); mandar daqui
+   * cobre o intervalo em que o perfil mudou e o cache da tela ainda não sabe.
+   */
+  const perfilDaCrianca = () => ({
+    idade: (ctx.crianca && ctx.crianca.idade) || null,
+    serie: (ctx.crianca && ctx.crianca.serie) || "",
+  });
+
+  /**
+   * Liga os botões do ✨ de um formulário entre si.
+   *
+   * O contexto de um campo costuma ser OUTRO campo — o botão do título do plano só
+   * acende quando o conteúdo tem texto —, então digitar em qualquer lugar redesenha
+   * todos. `input` borbulha, então um listener na `<form>` cobre a folha inteira.
+   */
+  function ligarIADoFormulario(form, controles) {
+    const vivos = controles.filter(Boolean);
+    const aoDigitar = () => vivos.forEach((c) => c.atualizar());
+    form.addEventListener("input", aoDigitar);
+    return () => {
+      form.removeEventListener("input", aoDigitar);
+      vivos.forEach((c) => c.destruir());
+    };
+  }
+
   /** Formulário de plano (criar/editar) — a evolução do de "Planos". */
   function abrirFormulario(plano) {
     const editando = !!plano;
+    /** Desligamento dos botões de IA — preenchido ao montar, chamado ao fechar. */
+    let desligarIA = null;
+
     openModal({
       title: editando ? "Editar plano" : "Novo plano",
       size: "md",
+      onClose: () => {
+        if (desligarIA) desligarIA();
+        desligarIA = null;
+      },
       content: ({ close }) => {
         const form = el("form", { class: "pl-form", attrs: { novalidate: "true" } });
 
@@ -1153,6 +1224,34 @@ export async function renderMesa(ctx) {
             dica: "Esse texto é injetado no que a Cogni sabe sobre o plano.",
           })
         );
+
+        /**
+         * O ✨ nos dois campos de texto do plano.
+         *
+         * O contexto é lido NA HORA do clique, nunca aqui: o pai escreve o conteúdo
+         * depois do título tanto quanto antes, e um contexto congelado na abertura do
+         * modal mandaria a IA melhorar o título com um conteúdo que já mudou.
+         */
+        desligarIA = ligarIADoFormulario(form, [
+          ligarCampoIA({
+            controle: inTitulo,
+            campo: "plano.titulo",
+            contexto: () => ({
+              conteudoDoPlano: txt.value.trim(),
+              foco: selFoco.value,
+              ...perfilDaCrianca(),
+            }),
+          }),
+          ligarCampoIA({
+            controle: txt,
+            campo: "plano.conteudo",
+            contexto: () => ({
+              tituloDoPlano: inTitulo.value.trim(),
+              foco: selFoco.value,
+              ...perfilDaCrianca(),
+            }),
+          }),
+        ]);
 
         const acoes = el("div", { class: "pl-form__actions" });
         if (editando) {
@@ -1243,10 +1342,15 @@ export async function renderMesa(ctx) {
     const editando = !!tarefa;
     const plano = planoAtual();
     if (!plano) return;
+    let desligarIA = null;
 
     openModal({
       title: editando ? "Editar tarefa" : "Nova tarefa",
       size: "md",
+      onClose: () => {
+        if (desligarIA) desligarIA();
+        desligarIA = null;
+      },
       content: ({ close }) => {
         const form = el("form", { class: "pl-form", attrs: { novalidate: "true" } });
         const inTitulo = el("input", {
@@ -1301,6 +1405,47 @@ export async function renderMesa(ctx) {
             children: [campoForm("Matéria", selM), campoForm("Prazo", inPrazo)],
           })
         );
+
+        /**
+         * Os outros cards do quadro entram como contexto do TÍTULO.
+         *
+         * É o que evita a quarta tarefa repetir a primeira: um quadro que já tem
+         * "Exercícios da página 42" e "Ler o capítulo 3" diz à IA de que plano de aula
+         * se trata melhor que qualquer campo do formulário. O card em edição sai da
+         * lista — ele é justamente o que está sendo reescrito.
+         */
+        const outrosCards = () =>
+          Array.from(estado.porId.values())
+            .filter((t) => !editando || String(t.id) !== String(tarefa.id))
+            .map((t) => t.titulo)
+            .filter(Boolean);
+
+        desligarIA = ligarIADoFormulario(form, [
+          ligarCampoIA({
+            controle: inTitulo,
+            campo: "tarefa.titulo",
+            contexto: () => ({
+              tituloDoPlano: plano.titulo,
+              conteudoDoPlano: plano.conteudo || "",
+              foco: plano.foco,
+              materia: selM.value,
+              cards: outrosCards(),
+              ...perfilDaCrianca(),
+            }),
+          }),
+          ligarCampoIA({
+            controle: inDetalhe,
+            campo: "tarefa.detalhe",
+            contexto: () => ({
+              tituloDaTarefa: inTitulo.value.trim(),
+              tituloDoPlano: plano.titulo,
+              conteudoDoPlano: plano.conteudo || "",
+              foco: plano.foco,
+              materia: selM.value,
+              ...perfilDaCrianca(),
+            }),
+          }),
+        ]);
 
         const cancelar = el("button", {
           class: "dash-btn dash-btn--ghost",
@@ -1668,7 +1813,7 @@ export async function renderMesa(ctx) {
       await carregarPlanos();
       if (!estado.planos.some((p) => String(p.id) === String(estado.planoId))) {
         // O plano aberto sumiu (apagado noutra aba, ou o cascade levou junto).
-        const vigente = planoVigente(estado.planos, agora);
+        const vigente = vigentePrincipal();
         estado.planoId = vigente ? vigente.id : estado.planos[0] && estado.planos[0].id;
         await carregarTarefas();
         pintarTudo();

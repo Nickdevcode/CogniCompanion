@@ -1,10 +1,16 @@
 /**
- * _lib/openai.mjs — As duas chamadas à OpenAI: transcrever e ler.
+ * _lib/openai.mjs — As chamadas à OpenAI: transcrever, ler material e conversar.
  *
- * São duas chamadas com **fallbacks completamente diferentes** — schema recusado de
- * um lado, modelo indisponível do outro — e por isso não têm um `retry()`
- * compartilhado. Cada degradação fica colada na chamada que ela protege; um retry
- * genérico esconderia justamente o que distingue os casos.
+ * Transcrever e ler são duas chamadas com **fallbacks completamente diferentes** —
+ * schema recusado de um lado, modelo indisponível do outro — e por isso não têm um
+ * `retry()` compartilhado. Cada degradação fica colada na chamada que ela protege;
+ * um retry genérico esconderia justamente o que distingue os casos.
+ *
+ * O que é compartilhado é o **transporte**: `criarChat()` é o POST em
+ * `/chat/completions` e mais nada — sem prompt, sem schema, sem interpretação da
+ * resposta. Quem decide o que fazer com `finish_reason` ou com um corpo vazio é
+ * cada chamador, porque a resposta certa muda: pro material é "esse PDF é grande
+ * demais", pro botão de melhorar texto é "não consegui agora".
  */
 
 import { buscar, TIMEOUT_IA_MS, TIMEOUT_TRANSCRICAO_MS } from "./http.mjs";
@@ -20,8 +26,11 @@ import {
  * O mesmo modelo que o robô usa (`CHAT_MODEL` em `Cogni/server/config.js`).
  * É um modelo de RACIOCÍNIO: usa `max_completion_tokens` (não `max_tokens`) e não
  * aceita `temperature`.
+ *
+ * Exportado porque a função de melhorar texto usa o mesmo — só que com
+ * `reasoning_effort: 'low'`, já que ali o pai está olhando o campo esperando.
  */
-const MODELO = "gpt-5.4-mini";
+export const MODELO = "gpt-5.4-mini";
 
 /** Só pro caso de o modelo principal recusar a content part de arquivo (PDF). */
 const MODELO_FALLBACK_PDF = "gpt-4o-mini";
@@ -55,6 +64,71 @@ const MAX_TOKENS_SAIDA = 9000;
  * diferente.
  */
 export class FalhaSuave extends Error {}
+
+/* ==========================================================================
+   O transporte: uma chamada de chat, sem opinião
+   ========================================================================== */
+
+/**
+ * POST em `/v1/chat/completions`. É o único lugar do Companion que fala com o
+ * endpoint de chat.
+ *
+ * Ela NÃO interpreta a resposta de propósito: devolve o texto cru e o motivo da
+ * parada, e cada chamador traduz isso pro vocabulário dele. Um `finish_reason:
+ * "length"` na leitura de material significa "mande uma parte por vez"; no botão de
+ * melhorar texto significa outra coisa completamente. Uma função que decidisse por
+ * todo mundo estaria errada pra metade dos casos.
+ *
+ * @param {string} chave
+ * @param {object} cfg
+ * @param {string} cfg.modelo
+ * @param {Array<object>} cfg.mensagens — `messages` da API
+ * @param {number} cfg.maxTokens — teto de saída (num modelo de raciocínio, o
+ *   pensamento sai DESTE mesmo orçamento)
+ * @param {object} [cfg.formato] — `response_format` (omitido = texto livre)
+ * @param {"low"|"medium"|"high"} [cfg.esforco] — `reasoning_effort`
+ * @param {number} [cfg.timeoutMs]
+ * @returns {Promise<{conteudo:string, motivoDeParada:string|null}>}
+ * @throws {Error} com `.status` e `.corpo` quando a API responde erro
+ */
+export async function criarChat(
+  chave,
+  { modelo, mensagens, maxTokens, formato, esforco, timeoutMs = TIMEOUT_IA_MS }
+) {
+  const corpo = {
+    model: modelo,
+    messages: mensagens,
+    max_completion_tokens: maxTokens,
+  };
+  // Chaves opcionais só entram quando pedidas: mandar `response_format` ou
+  // `reasoning_effort` nulo é o tipo de coisa que um modelo novo recusa com 400.
+  if (formato) corpo.response_format = formato;
+  if (esforco) corpo.reasoning_effort = esforco;
+
+  const resp = await buscar(
+    "https://api.openai.com/v1/chat/completions",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${chave}` },
+      body: JSON.stringify(corpo),
+    },
+    timeoutMs
+  );
+
+  const texto = await resp.text();
+  if (!resp.ok) {
+    const err = new Error(`OpenAI ${resp.status}: ${texto.slice(0, 500)}`);
+    err.status = resp.status;
+    err.corpo = texto;
+    throw err;
+  }
+
+  const escolha = JSON.parse(texto)?.choices?.[0];
+  return {
+    conteudo: escolha?.message?.content || "",
+    motivoDeParada: escolha?.finish_reason || null,
+  };
+}
 
 /* ==========================================================================
    Transcrição
@@ -186,49 +260,29 @@ function recusouArquivo(err) {
 }
 
 async function disparar(chave, modelo, conteudoUsuario, hoje, crianca, formato, fonte) {
-  const resp = await buscar(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${chave}` },
-      body: JSON.stringify({
-        model: modelo,
-        messages: [
-          { role: "system", content: systemPrompt(hoje, crianca, fonte) },
-          { role: "user", content: conteudoUsuario },
-        ],
-        max_completion_tokens: MAX_TOKENS_SAIDA,
-        response_format: formato,
-      }),
-    },
-    TIMEOUT_IA_MS
-  );
-
-  const texto = await resp.text();
-  if (!resp.ok) {
-    const err = new Error(`OpenAI ${resp.status}: ${texto.slice(0, 500)}`);
-    err.status = resp.status;
-    err.corpo = texto;
-    throw err;
-  }
-
-  const json = JSON.parse(texto);
-  const escolha = json?.choices?.[0];
+  const { conteudo, motivoDeParada } = await criarChat(chave, {
+    modelo,
+    mensagens: [
+      { role: "system", content: systemPrompt(hoje, crianca, fonte) },
+      { role: "user", content: conteudoUsuario },
+    ],
+    maxTokens: MAX_TOKENS_SAIDA,
+    formato,
+  });
 
   /**
    * `finish_reason === "length"` nunca era checado, e o sintoma era enganoso: o JSON
    * vinha cortado, o `JSON.parse` lançava, e o pai recebia "a IA está fora" quando na
    * verdade o material dele era grande demais. Dizer isso é acionável; 502 não é.
    */
-  if (escolha?.finish_reason === "length") {
+  if (motivoDeParada === "length") {
     throw new FalhaSuave(
       "Esse material é longo demais pra eu ler de uma vez. Mande uma parte por vez — uma folha, ou as páginas da lição."
     );
   }
 
-  const bruto = escolha?.message?.content;
-  if (!bruto) throw new Error("OpenAI devolveu resposta vazia.");
-  return JSON.parse(bruto);
+  if (!conteudo) throw new Error("OpenAI devolveu resposta vazia.");
+  return JSON.parse(conteudo);
 }
 
 /**

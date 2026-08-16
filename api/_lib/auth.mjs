@@ -6,7 +6,9 @@
  *
  * 2. o JWT do pai é validado **no servidor** (nunca confiar num id vindo no corpo);
  * 3. ele tem que ter criança pareada — e quem confere é a RLS, não a gente;
- * 4. cota de 20 gerações por dia por criança, sem infra nova.
+ * 4. cota de 20 gerações por dia por criança, sem infra nova;
+ * 4-B. e um teto por hora pro `/api/melhorar-texto`, que a cota do dia **não
+ *    enxerga** — melhorar um texto não cria plano, então não há linha pra contar.
  *
  * (A trava 1 é "só POST" e vive no handler; a 5 é o tamanho, em `itens.mjs`; a 6 é
  * "erro da OpenAI nunca vaza", no `catch` do handler.)
@@ -129,4 +131,66 @@ export async function dentroDaCota(token, criancaId, env) {
     if (err instanceof ErroHttp) throw err;
     console.warn("[api] Não consegui contar a cota (seguindo):", err);
   }
+}
+
+/* ==========================================================================
+   Trava 4-B — o limite do botão de melhorar texto
+   ========================================================================== */
+
+/** Chamadas de `/api/melhorar-texto` por responsável, por hora. */
+const MAX_TEXTO_POR_HORA = 40;
+const JANELA_MS = 60 * 60 * 1000;
+
+/**
+ * Quantos responsáveis diferentes esta instância guarda antes de se limpar.
+ * Um `Map` que só cresce numa função que pode viver horas é vazamento de memória.
+ */
+const MAX_SESSOES = 500;
+
+/** uid → carimbos das chamadas recentes. Vive na memória DESTA instância. */
+const chamadasDeTexto = new Map();
+
+/**
+ * Trava própria do `/api/melhorar-texto`.
+ *
+ * ⚠️ **Ela não substitui a cota diária — a cota simplesmente não enxerga este
+ * endpoint.** `dentroDaCota()` conta linhas de `planos_estudo`, e melhorar um texto
+ * não cria plano nenhum: sem esta função, o botão do ✨ seria uma chamada de IA
+ * autenticada, exposta na internet e **sem teto**.
+ *
+ * ⚠️ E ela é honestamente FRACA: o estado vive na memória da instância, e a Vercel
+ * pode ter várias (ou reciclar a sua no meio). O teto real é "40 por hora por
+ * instância", não 40 no total. Isso é aceito de propósito — o que ela protege é o
+ * acidente (um clique repetido, um laço na tela), não um atacante determinado, que
+ * já esbarra em login + criança pareada. Um teto exato exigiria KV ou tabela nova,
+ * que é justamente a infra que este projeto decidiu não ter.
+ *
+ * @param {string} uid — o `auth.uid()` já validado
+ * @throws {ErroHttp} 429 quando estourou
+ */
+export function dentroDoLimiteDeTexto(uid) {
+  const agora = Date.now();
+
+  // Faxina antes de contar: sessão sem chamada recente não ocupa lugar.
+  if (chamadasDeTexto.size > MAX_SESSOES) {
+    for (const [chave, marcas] of chamadasDeTexto) {
+      if (!marcas.length || agora - marcas[marcas.length - 1] > JANELA_MS) {
+        chamadasDeTexto.delete(chave);
+      }
+    }
+    // Ainda cheio: instância movimentada de verdade. Zerar é fail-open consciente —
+    // segurar memória seria pior que deixar passar algumas chamadas a mais.
+    if (chamadasDeTexto.size > MAX_SESSOES) chamadasDeTexto.clear();
+  }
+
+  const recentes = (chamadasDeTexto.get(uid) || []).filter((t) => agora - t < JANELA_MS);
+  if (recentes.length >= MAX_TEXTO_POR_HORA) {
+    throw new ErroHttp(
+      429,
+      "Você usou a Cogni pra escrever muitas vezes seguidas. Tente de novo daqui a pouco."
+    );
+  }
+
+  recentes.push(agora);
+  chamadasDeTexto.set(uid, recentes);
 }
