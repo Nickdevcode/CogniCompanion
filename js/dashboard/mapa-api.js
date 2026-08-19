@@ -21,7 +21,33 @@
  * (`travada`/`confusa`) e `resultado` (`travou`) são dados INTERNOS e NUNCA vão
  * pra tela. O que se mostra é o `rotulo`, que o servidor já manda pronto em
  * linguagem de apoio. Aqui eles são preservados só pra escolher a cor do
- * marcador e achar o ponto de atrito — nunca pra renderizar.
+ * marcador — nunca pra renderizar.
+ *
+ * 🩺 Reforma de confiabilidade do Mapa (ago/2026). O motor do robô tinha seis
+ * defeitos que faziam o mapa AFIRMAR o que os dados não sustentavam ("travou em
+ * frações" 44 min depois de frações sair da mesa). Todos corrigidos no servidor,
+ * e o efeito aqui é uma regra nova, de uma linha só:
+ *
+ *     este arquivo NÃO CALCULA NENHUM DERIVADO. Ele sanea o que o servidor manda.
+ *
+ * O `pontoDeAtrito` tinha uma cópia da regra aqui, como fallback pra tabela. Ela
+ * FOI DELETADA: o critério do servidor inverteu (a câmera saiu da frente e foi
+ * pro fim, e só entra se corroborada por outra fonte no mesmo assunto) e passou a
+ * depender de `confianca` e `superado` — dois campos que exigem agrupar tópico
+ * com a mesma chave de conceito da trilha de aprendizado do robô. Replicar isso
+ * no front seria recriar a normalização inteira; replicar pela metade seria
+ * reintroduzir, calada, exatamente a leitura errada que a reforma removeu.
+ *
+ * Onde não há derivado (a tabela lida via RLS), a saída é `derivadosDisponiveis:
+ * false` e a tela mostra a linha do tempo SEM cabeçalho conclusivo. Um ponto de
+ * atrito com a regra velha é pior que nenhum.
+ *
+ * 🚫 E nada aqui é cacheado, de propósito: `pontoDeAtrito`, `assuntoMaisDificil`
+ * e `qualidade` são RECALCULADOS pelo servidor a cada leitura — é assim que uma
+ * aula gravada antes da reforma para de repetir a leitura errada de ontem. O
+ * mesmo id de sessão pode devolver derivados diferentes depois de uma mudança no
+ * robô. Cachear `momentos` seria seguro; cachear derivado, não. Se um dia entrar
+ * cache nesta camada, ele tem que parar nos `momentos`.
  */
 
 /** Quantas sessões anteriores buscar (o endpoint aceita até 50; 10 é o default). */
@@ -134,7 +160,11 @@ const TOM_POR_RESULTADO = { travou: "apoio", aprendeu: "bom" };
  * @property {string} rotulo — texto PRONTO pra tela (linguagem de apoio)
  * @property {'apoio'|'duvida'|'bom'|'neutro'} tom — só pra cor do marcador
  * @property {string|null} materia
- * @property {string|null} topico — o assunto que estava valendo naquele segundo
+ * @property {string|null} topico — o assunto que estava valendo naquele segundo;
+ *   `null` quando a janela de 4 min venceu (esperado, não é dado faltando)
+ * @property {string|null} confianca — 'media' ou 'baixa' nos momentos de câmera
+ * @property {boolean} superado — venceu este atrito depois, na mesma aula
+ * @property {number} repeticoes — leituras iguais fundidas neste momento (>= 1)
  * @property {string|null} sinal — INTERNO: nunca renderizar
  * @property {string|null} resultado — INTERNO: nunca renderizar
  */
@@ -144,19 +174,29 @@ const TOM_POR_RESULTADO = { travou: "apoio", aprendeu: "bom" };
  * @property {string} topico — o assunto a rever (ou a matéria, se não houve tópico)
  * @property {string|null} materia
  * @property {number} ocorrencias — quantos momentos de atrito caíram nele
+ * @property {string|null} confianca — da melhor fonte que sustenta este assunto
  */
 
 /**
  * @typedef {object} Sessao
  * @property {string} chave — identidade estável da aula (ver `chaveDaSessao`)
  * @property {string|null} inicioEm — ISO de quando a aula começou
- * @property {number} duracaoMs
+ * @property {number} duracaoMs — o vão do início ao fim (é o eixo da linha do tempo)
+ * @property {number|null} tempoEfetivoMs — o mesmo vão sem os silêncios longos;
+ *   `null` em aula gravada antes de ago/2026
  * @property {number} turnos — trocas de conversa
  * @property {string[]} materias
  * @property {string[]} topicos
  * @property {Momento[]} momentos — ordenados por `emMs`
  * @property {Momento|null} pontoDeAtrito — QUANDO foi (ancora a linha do tempo)
  * @property {AssuntoDificil|null} assuntoMaisDificil — O QUE REVER (ou null)
+ * @property {{confianca: string}|null} qualidade — calibra o TOM da tela
+ * @property {boolean} derivadosDisponiveis — a fonte desta sessão calcula os três
+ *   derivados acima? `true` no endpoint, `false` na tabela lida via RLS. A
+ *   diferença é o que separa duas telas MUITO distintas: com `true`, um
+ *   `pontoDeAtrito` nulo quer dizer "o servidor olhou e não achou atrito" (boa
+ *   notícia, e desde ago/2026 é o caso comum). Com `false`, quer dizer apenas
+ *   "não perguntamos" — e aí a tela não conclui nada.
  * @property {boolean} emAndamento — true só na sessão ao vivo
  */
 
@@ -164,6 +204,45 @@ const TOM_POR_RESULTADO = { travou: "apoio", aprendeu: "bom" };
 function numero(valor) {
   const n = Number(valor);
   return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+/**
+ * Igual a `numero`, mas preserva a AUSÊNCIA como `null` em vez de achatá-la em 0.
+ *
+ * Existe por causa do `tempoEfetivoMs`: uma aula gravada antes de o campo existir
+ * chega sem ele, e "não sei" precisa continuar diferente de "zero". A primeira cai
+ * no `duracaoMs`; a segunda escreveria "0 min" no cabeçalho da aula.
+ */
+function numeroOuNull(valor) {
+  if (valor == null) return null;
+  const n = Number(valor);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/**
+ * Quantas leituras iguais o servidor fundiu num mesmo momento (`repeticoes`).
+ * Piso 1: "uma vez" é o normal, e é o que vale pra todo payload que chegue sem o
+ * campo (sessão antiga, tabela lida direto).
+ */
+function repeticoesDoMomento(valor) {
+  const n = Math.round(Number(valor));
+  return Number.isFinite(n) && n > 1 ? n : 1;
+}
+
+/** Os três níveis que o servidor usa em `confianca` (sessão, momento e assunto). */
+const NIVEIS_CONFIANCA = new Set(["alta", "media", "baixa"]);
+
+/**
+ * Nível de confiança saneado, ou `null` quando não veio (ou veio algo que não
+ * conhecemos).
+ *
+ * ⚠️ `null` aqui significa "sem ressalva", NUNCA "ruim": quem não sabe não pode
+ * escurecer o marcador nem amolecer a frase. É a diferença entre uma tela que
+ * pondera e uma tela que duvida de tudo.
+ */
+function nivelDeConfianca(valor) {
+  const t = String(valor == null ? "" : valor).trim().toLowerCase();
+  return NIVEIS_CONFIANCA.has(t) ? t : null;
 }
 
 /** Array de strings não-vazias (materias/topicos vêm de jsonb/text[]). */
@@ -230,38 +309,24 @@ function normalizarMomento(item) {
     rotulo: rotuloParaTela(item.rotulo, tipo, [sinal, resultado]),
     tom,
     materia: texto(item.materia),
+    // ⚠️ `null` aqui é ESPERADO, não é dado faltando. Desde ago/2026 o assunto de
+    // um momento VENCE em 4 min sem ser mencionado, e passada a janela o servidor
+    // se recusa a chutar. NUNCA preencher com `topicos[0]` da sessão: era esse
+    // chute que fazia o mapa dizer "travou em frações" 44 min depois de frações
+    // sair da mesa (o defeito nº 1 da reforma).
     topico: texto(item.topico),
+    // Corroboração (ago/2026), só em `afeto`: 'media' = a câmera bateu com outra
+    // fonte no mesmo assunto; 'baixa' = é só impressão dela, ninguém confirmou.
+    // Vira DISCRIÇÃO no marcador — a palavra "confiança" nunca chega ao pai.
+    confianca: nivelDeConfianca(item.confianca),
+    // A melhor notícia da tela: este atrito ela venceu depois, na mesma aula.
+    superado: item.superado === true,
+    // Intensidade visual, nunca número: "3 caretas" seria placar do humor da
+    // criança, que é o oposto do que esta tela é.
+    repeticoes: repeticoesDoMomento(item.repeticoes),
     sinal,
     resultado,
   };
-}
-
-/**
- * O momento que mais importa pro pai: onde ela precisou de mais ajuda.
- *
- * Espelha a regra do servidor (`acharPontoDeAtrito` em `modules/atencao.js`), nos
- * três níveis e nesta ordem: sinal `travada` da câmera, exercício em que ela
- * travou, e — desde ago/2026 — a compreensão travada lida da conversa. O terceiro
- * vem por último de propósito: é o sinal mais abundante e o menos duro, e na
- * frente afogaria os outros dois em toda sessão.
- *
- * ⚠️ Isto é FALLBACK, não a fonte. O servidor manda `pontoDeAtrito` pronto tanto
- * na sessão ao vivo quanto em cada item do histórico, e o dele sempre ganha (ver
- * `montarSessao`). O cálculo local só cobre a tabela lida direto do Supabase, que
- * guarda os `momentos` e não o derivado. Sem o terceiro nível aqui, o fallback
- * devolveria `null` justamente nas sessões que antes vinham vazias — a maioria.
- *
- * @param {Momento[]} momentos
- * @returns {Momento|null} null quando a aula correu sem atrito — e isso também é
- *   informação, não ausência de dado.
- */
-function acharPontoDeAtrito(momentos) {
-  return (
-    momentos.find((m) => m.sinal === "travada") ||
-    momentos.find((m) => m.tipo === "pratica" && m.resultado === "travou") ||
-    momentos.find((m) => m.tipo === "compreensao" && m.resultado === "travou") ||
-    null
-  );
 }
 
 /**
@@ -288,7 +353,32 @@ function normalizarAssuntoDificil(item) {
     topico: topico || materia,
     materia,
     ocorrencias: numero(item.ocorrencias),
+    // ago/2026: a confiança da melhor fonte que sustenta ESTE assunto. Em
+    // 'baixa' a tela troca "o que mais pediu ajuda foi X" por "parece que foi
+    // X": a frase pondera, e o pai não recebe uma certeza que ninguém tem.
+    confianca: nivelDeConfianca(item.confianca),
   };
+}
+
+/**
+ * Qualidade da leitura da sessão inteira (ago/2026). Só o NÍVEL sobrevive à
+ * normalização, e isso é uma decisão, não uma economia.
+ *
+ * Ele existe pra CALIBRAR O TOM da tela: numa aula sustentada só pela câmera, o
+ * destaque fala em "parece que" em vez de afirmar. Não vira selo, não vira
+ * etiqueta e não aparece escrito em lugar nenhum.
+ *
+ * `fontes` e `camerasSemApoio` são descartados pelo mesmo motivo do `peso` do
+ * assunto difícil: são diagnóstico interno do motor. "1 exercício, 5 conversas,
+ * 1 câmera" não ajuda ninguém a ajudar a filha e soa a vigilância, que é
+ * exatamente o que esta tela não é.
+ *
+ * @returns {{confianca: string}|null}
+ */
+function normalizarQualidade(item) {
+  if (!item || typeof item !== "object") return null;
+  const confianca = nivelDeConfianca(item.confianca);
+  return confianca ? { confianca } : null;
 }
 
 /**
@@ -308,12 +398,15 @@ function chaveDaSessao(inicioEm) {
 function montarSessao({
   inicioEm,
   duracaoMs,
+  tempoEfetivoMs,
   turnos,
   materias,
   topicos,
   momentos,
   pontoDeAtrito,
   assuntoMaisDificil,
+  qualidade,
+  derivadosDisponiveis,
   emAndamento,
 }) {
   const lista = (Array.isArray(momentos) ? momentos : [])
@@ -325,52 +418,80 @@ function montarSessao({
     chave: chaveDaSessao(inicioEm),
     inicioEm: texto(inicioEm),
     duracaoMs: numero(duracaoMs),
+    // Duração SEM os silêncios longos. Quando existe, é o número mais honesto pro
+    // cabeçalho: a correção nº 5 da reforma nasceu de uma aula de 6 min que o
+    // painel anunciava como "47 minutos" só porque a webcam ficou ligada.
+    tempoEfetivoMs: numeroOuNull(tempoEfetivoMs),
     turnos: numero(turnos),
     materias: listaDeTextos(materias),
     topicos: listaDeTextos(topicos),
     momentos: lista,
-    // O do servidor tem prioridade: o critério mora lá, e assim o dia em que ele
-    // mudar a tela acompanha sozinha. O recálculo local é só pra tabela.
-    pontoDeAtrito: normalizarMomento(pontoDeAtrito) || acharPontoDeAtrito(lista),
-    // Este NÃO tem fallback local, de propósito: a regra de peso é do servidor e
-    // uma segunda cópia divergiria em silêncio. Sem o campo, a tela mostra só o
-    // ponto de atrito (é o caso da tabela lida direto do Supabase).
+    // 🔴 NENHUM dos três abaixo tem cópia local (ago/2026). Só passa o que o
+    // servidor mandou; sem ele, fica `null` e a tela não conclui nada. O porquê
+    // está no cabeçalho do arquivo.
+    pontoDeAtrito: normalizarMomento(pontoDeAtrito),
     assuntoMaisDificil: normalizarAssuntoDificil(assuntoMaisDificil),
+    qualidade: normalizarQualidade(qualidade),
+    derivadosDisponiveis: !!derivadosDisponiveis,
     emAndamento: !!emAndamento,
   };
 }
 
-/** Sessão vinda do endpoint (camelCase). */
+/**
+ * Sessão vinda do endpoint (camelCase). É a fonte COMPLETA: o servidor recalcula
+ * os três derivados a cada leitura, tanto na sessão ao vivo quanto em cada item
+ * do `historico[]` (dívida nº 2, resolvida no robô).
+ */
 function normalizarDoEndpoint(sessao, emAndamento = false) {
   if (!sessao || typeof sessao !== "object") return null;
   return montarSessao({
     inicioEm: sessao.inicioEm,
     duracaoMs: sessao.duracaoMs,
+    tempoEfetivoMs: sessao.tempoEfetivoMs,
     turnos: sessao.turnos,
     materias: sessao.materias,
     topicos: sessao.topicos,
     momentos: sessao.momentos,
     pontoDeAtrito: sessao.pontoDeAtrito,
     assuntoMaisDificil: sessao.assuntoMaisDificil,
+    qualidade: sessao.qualidade,
+    derivadosDisponiveis: true,
     emAndamento: emAndamento || sessao.emAndamento,
   });
 }
 
-/** Linha de `sessoes_atencao` (snake_case, como o Postgres devolve). */
+/**
+ * Linha de `sessoes_atencao` (snake_case, como o Postgres devolve). É a fonte
+ * PARCIAL: a coluna guarda os `momentos`, e nenhum dos derivados.
+ */
 function normalizarDaTabela(linha) {
   if (!linha || typeof linha !== "object") return null;
+  const contadores =
+    linha.contadores && typeof linha.contadores === "object" ? linha.contadores : {};
+
   return montarSessao({
     inicioEm: linha.iniciada_em,
     duracaoMs: linha.duracao_ms,
+    // O único campo novo que a tabela guarda, e ele pega CARONA no jsonb
+    // `contadores` em vez de virar coluna (decisão do robô: evita uma migração no
+    // Supabase). Quem lê pelo endpoint recebe `tempoEfetivoMs` no topo do objeto e
+    // nem percebe; quem lê a tabela, como aqui, precisa saber que ele mora ali
+    // dentro.
+    tempoEfetivoMs: contadores.tempoEfetivoMs,
     turnos: linha.turnos,
     materias: linha.materias,
     topicos: linha.topicos,
     momentos: linha.momentos,
-    // A tabela guarda os `momentos` e nenhum dos dois derivados: o ponto de
-    // atrito nós recalculamos (mesma regra), o assunto mais difícil não — ele
-    // aparece quando esta aula vier pelo endpoint.
+    // 🔴 ago/2026: os três ficam `null` e NÃO são recalculados aqui. O critério do
+    // ponto de atrito inverteu e passou a depender de corroboração entre fontes;
+    // replicá-lo no front divergiria em silêncio do servidor, que é justamente o
+    // defeito que a reforma removeu. `derivadosDisponiveis: false` é o que faz a
+    // tela mostrar a linha do tempo SEM cabeçalho conclusivo, em vez de concluir
+    // errado. Esta mesma aula ganha os derivados assim que vier pelo endpoint.
     pontoDeAtrito: null,
     assuntoMaisDificil: null,
+    qualidade: null,
+    derivadosDisponiveis: false,
     emAndamento: false, // o que está no banco, por definição, já terminou
   });
 }
@@ -461,11 +582,18 @@ export async function carregarMapa({ servidorUrl, crianca, mock }) {
  * quando o pai ABRE a tela (e uma vez a mais quando a aula ao vivo termina),
  * nunca a cada render nem a cada tick do poll.
  *
+ * 🩺 ago/2026: `texto: null` ficou RARO. O servidor passou a montar a frase em
+ * código quando a IA falha (fallback determinístico), então rede caindo e JSON
+ * malformado não derrubam mais o card. Sobraram dois casos: nenhuma sessão
+ * (`motivo: 'sem_sessao'`) e sessão sem turno algum. O tratamento de null fica
+ * como está de propósito — um 429 do rate limit ainda derruba a requisição antes
+ * de ela chegar ao fallback, e aí o card precisa saber sair de cena.
+ *
  * @param {string} servidorUrl
  * @param {string} criancaId
  * @returns {Promise<string|null>} o texto, ou null quando não há o que resumir
- *   (sem sessão, IA indisponível ou servidor desligado). Nunca lança — a tela
- *   sem o texto ainda vale sozinha (a linha do tempo é o conteúdo principal).
+ *   (sem sessão, rate limit ou servidor desligado). Nunca lança — a tela sem o
+ *   texto ainda vale sozinha (a linha do tempo é o conteúdo principal).
  */
 export async function carregarResumoDaAula(servidorUrl, criancaId) {
   if (!servidorUrl || !criancaId) return null;

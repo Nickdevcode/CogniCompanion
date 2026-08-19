@@ -9,6 +9,13 @@
      2) COR + FORMA. Círculo = leitura da câmera; losango = exercício conferido.
         Quem não distingue cores continua lendo a linha, e a lista "momento a
         momento" repete tudo em texto.
+     3) TRAÇO + HALO (ago/2026). Cor e forma já estavam ocupadas por tom e origem,
+        então os dois eixos da reforma de confiabilidade entraram em canais novos:
+        TRACEJADO = a câmera percebeu e ninguém confirmou (a linha existe, mas não
+        fecha); ANEL VERDE = o atrito foi vencido depois, na mesma aula. O segundo
+        é a melhor notícia da tela e não podia ficar idêntico a um atrito pendente.
+        Os dois viram FRASE na lista de texto — quem usa leitor de tela não vê
+        traço nem halo.
 
    Usa os tokens de dashboard.css (superfícies, bordas, cores por matéria).
    ========================================================================== */
@@ -33,6 +40,20 @@
   --mp-rail: rgba(8, 12, 56, 0.12);
   --mp-live: #d92d20; /* o ponto "ao vivo" — vermelho aqui é gravação, não erro */
   --mp-live-soft: rgba(217, 45, 32, 0.14);
+
+  /* O verde do balão de detalhe. Constante nos dois temas de propósito: o balão é
+     sempre navy escuro, então `--mp-bom` (escuro, calibrado pra fundo claro) não
+     enxergaria ali dentro. */
+  --mp-bom-no-escuro: #4ed699;
+
+  /* O verde do TEXTO verde, e ele precisa ser mais escuro que `--mp-bom`.
+     Motivo: as duas frases de vitória (ago/2026) moram sobre fundo TINGIDO — o
+     selo "destravou depois" sobre verde a 14%, a linha da vitória sobre laranja a
+     14% —, e o tinte come o contraste que o `--mp-bom` tem sobre o branco. Medido:
+     3,96:1 e 3,97:1 com `--mp-bom`, contra 4,9:1 com este. Sobre bolinha e anel
+     (onde 3:1 basta) continua valendo o `--mp-bom`, que é o MESMO verde de
+     ciências — é por isso que este token existe em vez de escurecer aquele. */
+  --mp-bom-texto: #007337;
 }
 
 [data-theme="dark"] {
@@ -48,6 +69,11 @@
   --mp-rail: rgba(255, 255, 255, 0.14);
   --mp-live: #ff6b5e;
   --mp-live-soft: rgba(255, 107, 94, 0.2);
+
+  /* No escuro o problema se inverte: o texto é o claro e o fundo é o tinto sobre
+     preto, então o verde do tema já passa folgado (5,5:1 medido). Um token só,
+     dois valores, nenhuma regra duplicada lá embaixo. */
+  --mp-bom-texto: var(--mp-bom);
 }
 
 /* Mapeamento tom → par de cores. Um só lugar; todo componente da seção lê daqui. */
@@ -322,6 +348,31 @@
   line-height: 1.5;
   color: var(--dash-text-muted);
 }
+/* "E esse ponto acabou destravando ainda nesta aula." Linha própria, cor própria,
+   ícone próprio: é a única boa notícia de um bloco que fala de dificuldade, e
+   diluída no parágrafo de cima ela simplesmente não seria lida. */
+.mp-atrito__vitoria {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.93rem;
+  line-height: 1.5;
+  color: var(--mp-bom-texto);
+}
+.mp-atrito__vitoria-ico {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.mp-atrito__vitoria-ico svg {
+  width: 17px;
+  height: 17px;
+  /* Alinha o ícone com a primeira LINHA do texto, não com o bloco inteiro. */
+  margin-top: 2px;
+}
 .mp-atrito__acao,
 .mp-tranquila__texto {
   margin-top: 0.4rem;
@@ -329,6 +380,13 @@
   font-size: 0.95rem;
   line-height: 1.55;
   color: var(--dash-text-muted);
+}
+/* "Emperrou e destravou na mesma aula" é a variante mais feliz do estado sem
+   atrito, e ela ganha o contorno cheio em vez do tingido de 14%: com o mapa
+   concluindo menos desde ago/2026, este cartão passou a aparecer muito, e ele não
+   pode parecer o estado em que a tela não achou nada. */
+.mp-tranquila--vitoria {
+  border-color: var(--mp-bom);
 }
 
 /* --------------------------------------------------------------------------
@@ -398,9 +456,13 @@
 .mp-tl__mark:focus-visible {
   z-index: 400;
 }
+/* `--rep` (ago/2026) é a única aparição de `repeticoes` na interface: um episódio
+   que a Cogni leu três vezes seguidas pesa mais na vista. Nunca vira número — "3
+   caretas" seria placar do humor da criança. Teto de 1.27 (ver
+   `escalaPorRepeticoes`), senão o marcador atropela os vizinhos na faixa. */
 .mp-tl__dot {
-  width: 15px;
-  height: 15px;
+  width: calc(15px * var(--rep, 1));
+  height: calc(15px * var(--rep, 1));
   border-radius: 50%;
   background-color: var(--tom, var(--mp-neutro));
   box-shadow: 0 0 0 3px var(--dash-surface), 0 0 0 5px var(--tom-soft, var(--mp-neutro-soft));
@@ -417,11 +479,37 @@
    ago/2026 é o que mais aparece) e a de leitura mais macia — preenchido do mesmo
    tamanho, ele apagaria visualmente o exercício conferido, que é o dado duro. */
 .mp-tl__mark[data-tipo="compreensao"] .mp-tl__dot {
-  width: 12px;
-  height: 12px;
+  width: calc(12px * var(--rep, 1));
+  height: calc(12px * var(--rep, 1));
   background-color: var(--dash-surface);
   border: 2.5px solid var(--tom, var(--mp-neutro));
   box-shadow: 0 0 0 3px var(--dash-surface), 0 0 0 4px var(--tom-soft, var(--mp-neutro-soft));
+}
+
+/* --- As duas ressalvas da reforma (ago/2026) --- */
+
+/* TRACEJADO: a câmera percebeu e nenhuma outra fonte confirmou. O marcador
+   continua exatamente onde está, com o mesmo tom — o que ele perde é o direito de
+   parecer tão firme quanto um exercício conferido. Vazado + tracejado + um pouco
+   menos opaco: a linha existe, mas não fecha.
+
+   Vale só pra `afeto` na prática (é o único tipo que recebe `confianca`), mas a
+   regra é escrita por atributo e não por tipo: se o robô um dia mandar confiança
+   noutra fonte, a tela já pondera sozinha em vez de afirmar. */
+.mp-tl__mark[data-confianca="baixa"] .mp-tl__dot {
+  background-color: transparent;
+  border: 2px dashed var(--tom, var(--mp-neutro));
+  box-shadow: 0 0 0 3px var(--dash-surface);
+  opacity: 0.75;
+}
+
+/* HALO VERDE: o atrito foi vencido depois, na mesma aula. Vem por ÚLTIMO no
+   arquivo de propósito — ele empilha sobre o tracejado (um sinal fraco que acabou
+   destravando é vazado E anelado), e a boa notícia é o que precisa sobreviver a
+   um olhar de três segundos. */
+.mp-tl__mark[data-superado="true"] .mp-tl__dot {
+  box-shadow: 0 0 0 3px var(--dash-surface), 0 0 0 5px var(--mp-bom);
+  opacity: 1;
 }
 .mp-tl__mark:hover .mp-tl__dot,
 .mp-tl__mark:focus-visible .mp-tl__dot {
@@ -529,6 +617,21 @@
   font-size: 0.82rem;
   opacity: 0.8;
 }
+/* A boa notícia primeiro: num balão lido de relance, "destravou depois" é o que
+   tem que sobrar. */
+.mp-tl__tip-nota {
+  margin-top: 0.15rem;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: var(--fw-semibold);
+  color: var(--mp-bom-no-escuro);
+}
+.mp-tl__tip-ressalva {
+  margin-top: 0.15rem;
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.68);
+}
 
 /* --- Régua e legenda --- */
 .mp-tl__axis {
@@ -580,6 +683,19 @@
 .mp-tl__key-dot[data-tipo="compreensao"] {
   background-color: transparent;
   border: 2px solid var(--tom, var(--mp-neutro));
+}
+/* As amostras das duas ressalvas. Só entram na legenda quando a aula tem o
+   símbolo correspondente (ver `legenda()` em mapa-timeline.js) — explicar um
+   marcador que não está na tela é ruído que empurra o resto pra baixo. */
+.mp-tl__key-dot[data-confianca="baixa"] {
+  background-color: transparent;
+  border: 2px dashed var(--tom, var(--mp-neutro));
+  opacity: 0.75;
+}
+.mp-tl__key-dot[data-superado="true"] {
+  box-shadow: 0 0 0 3px var(--mp-bom);
+  /* O anel mora fora da caixa: sem folga, ele encosta no texto do item ao lado. */
+  margin-right: 0.2rem;
 }
 
 /* --------------------------------------------------------------------------
@@ -633,6 +749,18 @@
   background-color: transparent;
   border: 2px solid var(--tom, var(--mp-neutro));
 }
+/* Mesmas duas ressalvas da faixa, na lista (ago/2026). Aqui elas também viram
+   PALAVRA, logo abaixo — esta lista é o que carrega a informação quando cor,
+   forma e posição não chegam. */
+.mp-momento[data-confianca="baixa"] .mp-momento__dot {
+  background-color: transparent;
+  border: 2px dashed var(--tom, var(--mp-neutro));
+  opacity: 0.75;
+}
+.mp-momento[data-superado="true"] .mp-momento__dot {
+  box-shadow: 0 0 0 2.5px var(--mp-bom);
+  opacity: 1;
+}
 .mp-momento__body {
   display: flex;
   flex-wrap: wrap;
@@ -651,6 +779,29 @@
   color: var(--dash-text-muted);
 }
 .mp-momento__where::before {
+  content: "· ";
+}
+/* A vitória é a única coisa da linha que ganha fundo: ela precisa saltar da lista
+   quando o pai passa o olho de cima a baixo. */
+.mp-momento__selo {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--mp-bom-soft);
+  color: var(--mp-bom-texto);
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+}
+/* "só a câmera percebeu": discreta de propósito. Ela existe pra o pai não dar a
+   uma impressão o mesmo peso de um exercício conferido, não pra chamar atenção. */
+.mp-momento__ressalva {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--dash-text-faint);
+}
+.mp-momento__ressalva::before {
   content: "· ";
 }
 
@@ -792,8 +943,8 @@
   /* Faixa curta = marcadores mais perto uns dos outros. Menores, eles continuam
      distinguíveis quando dois momentos acontecem com um minuto de diferença. */
   .mp-tl__dot {
-    width: 13px;
-    height: 13px;
+    width: calc(13px * var(--rep, 1));
+    height: calc(13px * var(--rep, 1));
   }
   /* No toque não existe hover: o balão vira ruído e o caminho é tocar o
      marcador, que destaca a linha correspondente na lista abaixo. */

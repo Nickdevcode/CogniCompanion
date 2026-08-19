@@ -28,11 +28,34 @@
  *   - Aula sem nenhum momento marcado é uma aula boa — "correu tranquila" —, não
  *     uma tela vazia com cara de erro.
  *   - O texto sugere o que fazer junto; nunca aponta defeito.
+ *
+ * 🩺 O que a reforma de ago/2026 mudou AQUI. O motor do robô parou de afirmar o
+ * que os dados não sustentavam, e a consequência pra esta tela é uma só: ela
+ * conclui MENOS, e cada estado precisa parecer intencional em vez de incompleto.
+ *
+ *   1. **"Aula tranquila" deixou de ser exceção.** O `pontoDeAtrito` agora vem
+ *      `null` com muito mais frequência (as aulas que antes ganhavam um ponto
+ *      apoiado só numa careta não ganham mais nenhum). É o caso COMUM, e ele tem
+ *      três variantes de texto conforme o que a linha do tempo mostra logo
+ *      abaixo — inclusive uma pra quando há marcadores de apoio na faixa, onde
+ *      dizer "nenhum momento de atrito" seria a tela se contradizendo em dois
+ *      centímetros.
+ *   2. **Sem derivado, sem cabeçalho.** O histórico lido direto da tabela não
+ *      traz `pontoDeAtrito` nem `assuntoMaisDificil`, e desde ago/2026 o site não
+ *      os recalcula. Nesses cartões a tela mostra a linha do tempo e CALA.
+ *   3. **A vitória virou peça de UI.** `superado` (ela emperrou e destravou
+ *      sozinha, na mesma aula) é a melhor notícia que esta tela tem pra dar, e
+ *      ganhou tratamento próprio pra não ficar igual a um atrito pendente.
  */
 
 import { el, sectionRoot, pageHead } from "./_shared.js";
 import { ICON, materiaIcon } from "../icons.js";
-import { buildTimeline, reposicionarMarcadores, descreverMomento } from "../mapa-timeline.js";
+import {
+  buildTimeline,
+  reposicionarMarcadores,
+  descreverMomento,
+  ondeDoMomento,
+} from "../mapa-timeline.js";
 import { carregarMapa, carregarResumoDaAula } from "../mapa-api.js";
 import {
   formatDuracao,
@@ -80,19 +103,34 @@ function tituloDaSessao(sessao, now) {
 }
 
 /**
- * Linha de contexto: duração + trocas de conversa. Nada de contagem de acertos.
+ * O tempo que vai no cabeçalho da aula, e são três números diferentes conforme o
+ * que a tela pode afirmar:
  *
- * Na aula ao vivo o tempo é dado com os segundos (`6min05`), e não arredondado:
- * é o mesmo número que a régua da linha do tempo mostra na ponta, e ver "6 min"
- * em cima de "5min40" embaixo faria a tela parecer imprecisa justo enquanto ela
- * está sendo observada de perto.
+ *   1. **Ao vivo → o vão, com segundos** (`6min05`). Tem que ser o MESMO número
+ *      que a régua da linha do tempo mostra na ponta: ver "6 min" em cima de
+ *      "5min40" embaixo faria a tela parecer imprecisa justo enquanto ela está
+ *      sendo observada de perto.
+ *   2. **`tempoEfetivoMs` (ago/2026) → o vão SEM os silêncios longos**, e ele vem
+ *      nomeado ("6 min de estudo"). O nome não é enfeite: este número é MENOR que
+ *      o fim da régua, e sem a palavra "estudo" o cabeçalho pareceria contradizer
+ *      a linha do tempo logo abaixo. Ele existe porque o painel chegou a anunciar
+ *      "aula de 47 minutos" para uma aula de 6, só porque a webcam ficou ligada.
+ *   3. **Sessão antiga → o vão arredondado**, como sempre foi. `tempoEfetivoMs`
+ *      é `null` em tudo que foi gravado antes da reforma.
+ */
+function tempoDaSessao(sessao) {
+  if (sessao.emAndamento) return formatTempoNaAula(sessao.duracaoMs);
+  if (sessao.tempoEfetivoMs != null) {
+    return `${formatDuracao(sessao.tempoEfetivoMs)} de estudo`;
+  }
+  return formatDuracao(sessao.duracaoMs);
+}
+
+/**
+ * Linha de contexto: duração + trocas de conversa. Nada de contagem de acertos.
  */
 function metaDaSessao(sessao) {
-  const partes = [
-    sessao.emAndamento
-      ? formatTempoNaAula(sessao.duracaoMs)
-      : formatDuracao(sessao.duracaoMs),
-  ];
+  const partes = [tempoDaSessao(sessao)];
   if (sessao.turnos > 0) {
     partes.push(
       `${sessao.turnos} ${sessao.turnos === 1 ? "troca de conversa" : "trocas de conversa"}`
@@ -155,8 +193,12 @@ function chipsDeAssunto(sessao) {
  *
  * Quando os dois apontam pro mesmo assunto (o caso comum), a segunda linha vira
  * só a hora — repetir o tópico dois parágrafos seguidos soaria a formulário.
- * Sem o assunto (histórico lido direto da tabela, que não guarda o derivado), o
- * bloco continua sendo o que sempre foi: o momento que mais importa.
+ * Quando apontam pra assuntos diferentes, cada linha diz de qual está falando: um
+ * bloco com dois referentes e um "esse ponto" solto confunde mais do que informa.
+ *
+ * ⚠️ Esta função só é chamada com os derivados EM MÃO — quem decide isso é
+ * `cabecalhoDaAula`. Ela nunca vê uma sessão lida direto da tabela, e é por isso
+ * que pode afirmar: tudo que ela escreve saiu de um cálculo do servidor.
  *
  * As frases são construídas SEM pronome e SEM o nome da criança de propósito — o
  * perfil não guarda gênero, e colar um nome numa frase que flexiona produziria
@@ -169,37 +211,55 @@ function destaqueDoAtrito(sessao) {
   const assunto = sessao.assuntoMaisDificil;
   if (!momento && !assunto) return faixaTranquila(sessao);
 
-  const ondeMomento =
-    momento && (momento.topico || (momento.materia ? materiaLabel(momento.materia) : null));
+  const ondeMomento = ondeDoMomento(momento);
   // O assunto a rever manda; sem ele, quem nomeia o alvo é o ponto de atrito.
   const alvo = (assunto && assunto.topico) || ondeMomento;
+  const ponderar = leituraPonderada(sessao);
 
   const linhas = [];
 
   if (assunto) {
+    // "Parece que" não é modéstia: numa aula sustentada só pela câmera, ou num
+    // assunto que só a câmera apontou, afirmar seria o defeito que a reforma
+    // acabou de tirar do servidor. A frase pondera exatamente onde o dado pondera.
     linhas.push(
       el("p", {
         class: "mp-atrito__frase",
-        children: [
-          el("span", { text: "O que mais pediu ajuda nesta aula: " }),
-          el("strong", { class: "mp-atrito__topico", text: assunto.topico }),
-          el("span", { text: "." }),
-        ],
+        children: ponderar
+          ? [
+              el("span", { text: "Parece que o que mais pediu ajuda foi " }),
+              el("strong", { class: "mp-atrito__topico", text: assunto.topico }),
+              el("span", { text: "." }),
+            ]
+          : [
+              el("span", { text: "O que mais pediu ajuda nesta aula: " }),
+              el("strong", { class: "mp-atrito__topico", text: assunto.topico }),
+              el("span", { text: "." }),
+            ],
       })
     );
   }
 
+  // Os dois derivados podem apontar pra assuntos DIFERENTES, e quando apontam o
+  // bloco tem dois referentes na mesma caixa. Daí a ordem das linhas abaixo ser
+  // por referente e não por importância: primeiro tudo que fala do MOMENTO
+  // (quando foi, e se destravou), depois tudo que fala do ASSUNTO (se voltou).
+  // Misturado, "esse ponto" mudaria de dono no meio do parágrafo.
+  const mesmoAssunto = !!(
+    assunto &&
+    ondeMomento &&
+    ondeMomento.toLowerCase() === assunto.topico.toLowerCase()
+  );
+
   if (momento) {
     const quando = formatTempoNaAula(momento.emMs);
-    // Mesmo assunto nas duas leituras: a segunda linha só situa no tempo.
-    const mesmoAssunto =
-      assunto && ondeMomento && ondeMomento.toLowerCase() === assunto.topico.toLowerCase();
     let texto;
     if (!assunto) {
       texto = ondeMomento
         ? `Aos ${quando}, em ${ondeMomento}: ${momento.rotulo}.`
         : `Aos ${quando}: ${momento.rotulo}.`;
     } else if (mesmoAssunto) {
+      // Mesmo assunto nas duas leituras: esta linha só situa no tempo.
       texto = `A primeira vez foi aos ${quando}: ${momento.rotulo}.`;
     } else {
       texto = ondeMomento
@@ -209,6 +269,29 @@ function destaqueDoAtrito(sessao) {
     linhas.push(el("p", { class: "mp-atrito__ancora", text: texto }));
   }
 
+  // A vitória tem linha própria, com ícone e cor próprios. Enfiada no fim do
+  // parágrafo de cima, a única boa notícia de um bloco que fala de dificuldade
+  // simplesmente não seria lida — e ela é, de longe, o que o pai mais quer ler.
+  if (momento && momento.superado) {
+    linhas.push(
+      el("p", {
+        class: "mp-atrito__vitoria",
+        children: [
+          el("span", {
+            class: "mp-atrito__vitoria-ico",
+            svg: ICON.sprout,
+            attrs: { "aria-hidden": "true" },
+          }),
+          el("span", {
+            text: mesmoAssunto
+              ? "E esse ponto acabou destravando ainda nesta aula."
+              : "E esse primeiro tropeço acabou destravando ainda nesta aula.",
+          }),
+        ],
+      })
+    );
+  }
+
   // `ocorrencias` vira texto, nunca número: "voltou algumas vezes" diz o que o
   // pai precisa saber; "3 ocorrências" é placar com outro nome. E o `peso` do
   // payload não chega aqui — ele é ranking interno do servidor.
@@ -216,14 +299,12 @@ function destaqueDoAtrito(sessao) {
     linhas.push(
       el("p", {
         class: "mp-atrito__ancora",
-        text: "Esse ponto voltou algumas vezes ao longo da conversa.",
+        text: `Esse assunto voltou algumas vezes ao longo da conversa.`,
       })
     );
   }
 
-  const sugestao = alvo
-    ? `Um bom assunto pra retomarem juntos hoje: cinco minutinhos sobre ${alvo} já ajudam bastante.`
-    : "Vale puxar esse assunto de novo com calma numa próxima conversa.";
+  const sugestao = sugestaoDeRetomada(alvo, ponderar);
 
   return el("div", {
     class: "mp-atrito",
@@ -245,25 +326,113 @@ function destaqueDoAtrito(sessao) {
 }
 
 /**
- * Aula sem nenhum momento marcado. Isso é uma aula BOA: nenhuma hora em que a
- * Cogni precisou mudar de estratégia. Tem que parecer boa notícia, não bug.
+ * A tela deve PONDERAR em vez de afirmar?
+ *
+ * Duas origens, e basta uma: o assunto a rever apoiado só numa fonte fraca
+ * (`assuntoMaisDificil.confianca === 'baixa'`), ou a aula inteira sustentada só
+ * pela câmera (`qualidade.confianca === 'baixa'`). Nos dois casos o dado existe e
+ * merece ser mostrado — o que não cabe é a certeza.
+ *
+ * ⚠️ Ausência de `confianca` NÃO é motivo pra ponderar: sessão antiga chega sem o
+ * campo, e transformar "não sei o nível" em "parece que" encheria o histórico
+ * inteiro de dúvida que ninguém expressou.
+ */
+function leituraPonderada(sessao) {
+  const doAssunto = sessao.assuntoMaisDificil && sessao.assuntoMaisDificil.confianca;
+  const daSessao = sessao.qualidade && sessao.qualidade.confianca;
+  return doAssunto === "baixa" || daSessao === "baixa";
+}
+
+/** O convite do fim do bloco: firme quando o dado é firme, leve quando não é. */
+function sugestaoDeRetomada(alvo, ponderar) {
+  if (!alvo) return "Vale puxar esse assunto de novo com calma numa próxima conversa.";
+  return ponderar
+    ? `Se der, vale puxar ${alvo} numa conversa hoje: cinco minutinhos já ajudam.`
+    : `Um bom assunto pra retomarem juntos hoje: cinco minutinhos sobre ${alvo} já ajudam bastante.`;
+}
+
+/**
+ * Qual bloco vai em cima da linha do tempo — ou NENHUM. É aqui que a tela decide
+ * o que ela tem direito de afirmar, e a ordem das três perguntas importa.
+ *
+ * @param {import('../mapa-api.js').Sessao} sessao
+ * @returns {HTMLElement|null} null = a aula aparece sem cabeçalho conclusivo
+ */
+function cabecalhoDaAula(sessao) {
+  // 1. Aula sem momento nenhum: não houve atrito, ponto. É a única conclusão que
+  //    a tela pode tirar SEM os derivados, porque ela não depende de critério
+  //    nenhum — depende de a lista estar vazia.
+  if (!sessao.momentos.length) return faixaTranquila(sessao);
+
+  // 2. 🔴 Há momentos, mas ninguém calculou os derivados (histórico lido direto
+  //    de `sessoes_atencao` via RLS — o contorno da dívida nº 3). Aqui o site
+  //    fica QUIETO: `pontoDeAtrito` está nulo porque não foi perguntado, não
+  //    porque não houve atrito. Antes de ago/2026 o site recalculava o campo com
+  //    a regra velha; agora ele diverge do servidor (a câmera saiu da frente da
+  //    fila e só entra se corroborada), e um cabeçalho errado é pior que
+  //    cabeçalho nenhum. A linha do tempo abaixo continua inteira e verdadeira —
+  //    ela mostra os momentos, que é o dado bruto, sem interpretar.
+  if (!sessao.derivadosDisponiveis) return null;
+
+  // 3. Derivados na mão: ou há o que rever, ou a aula correu bem.
+  if (sessao.pontoDeAtrito || sessao.assuntoMaisDificil) return destaqueDoAtrito(sessao);
+  return faixaTranquila(sessao);
+}
+
+/**
+ * Aula sem nada a rever. Desde ago/2026 este é o caso COMUM, não a exceção: o
+ * servidor parou de eleger ponto de atrito apoiado só numa careta, e as sessões
+ * que antes vinham com um ponto duvidoso agora vêm limpas. Por isso ele precisa
+ * parecer intencional e positivo — nunca uma tela que faltou carregar.
+ *
+ * São três textos, e a escolha não é cosmética: é o que impede a tela de se
+ * contradizer com a linha do tempo desenhada logo abaixo.
+ *
+ *   `superado`   ela emperrou e destravou sozinha, na mesma aula. É a MELHOR
+ *                notícia que esta tela tem pra dar, e vem primeiro.
+ *   `houveApoio` há marcadores âmbar na faixa, mas nada se firmou como ponto a
+ *                rever (leitura de câmera sem corroboração, tipicamente). Dizer
+ *                "nenhum momento de atrito" aqui seria negar o que o pai está
+ *                vendo dois centímetros abaixo.
+ *   limpa        nem isso: a aula não teve um minuto de aperto.
  */
 function faixaTranquila(sessao) {
   const assunto = sessao.topicos[0] || (sessao.materias[0] ? materiaLabel(sessao.materias[0]) : null);
+  const vencido = sessao.momentos.find((m) => m.superado);
+  const houveApoio = sessao.momentos.some((m) => m.tom === "apoio" || m.tom === "duvida");
+
+  let ico = ICON.check;
+  let titulo = "A aula correu tranquila";
+  let texto = assunto
+    ? `Nenhum momento de atrito nesta conversa sobre ${assunto}: a Cogni não precisou mudar de estratégia em nenhum minuto.`
+    : "Nenhum momento de atrito nesta conversa: a Cogni não precisou mudar de estratégia em nenhum minuto.";
+
+  if (vencido) {
+    // Sem pronome e sem o nome da criança, como todo o resto da tela: o perfil
+    // não guarda gênero, e "destravou sozinha" erraria a flexão pra metade das
+    // crianças. "Esse ponto destravou" diz o mesmo e não flexiona.
+    const onde = ondeDoMomento(vencido);
+    ico = ICON.sprout;
+    titulo = "Emperrou e destravou na mesma aula";
+    texto = onde
+      ? `Teve um minuto de mais apoio em ${onde}, e logo depois a conversa seguiu sem precisar de ajuda. Não ficou nada pendente pra hoje.`
+      : "Teve um minuto de mais apoio, e logo depois a conversa seguiu sem precisar de ajuda. Não ficou nada pendente pra hoje.";
+  } else if (houveApoio) {
+    titulo = "Nada que peça uma revisão hoje";
+    texto =
+      "Teve minutos em que a Cogni deu mais apoio, marcados na linha do tempo abaixo, " +
+      "mas nenhum assunto ficou pendente pra retomar.";
+  }
+
   return el("div", {
-    class: "mp-tranquila",
+    class: "mp-tranquila" + (vencido ? " mp-tranquila--vitoria" : ""),
     children: [
-      el("span", { class: "mp-tranquila__ico", svg: ICON.check, attrs: { "aria-hidden": "true" } }),
+      el("span", { class: "mp-tranquila__ico", svg: ico, attrs: { "aria-hidden": "true" } }),
       el("div", {
         class: "mp-tranquila__body",
         children: [
-          el("p", { class: "mp-tranquila__titulo", text: "A aula correu tranquila" }),
-          el("p", {
-            class: "mp-tranquila__texto",
-            text: assunto
-              ? `Nenhum momento de atrito nesta conversa sobre ${assunto}: a Cogni não precisou mudar de estratégia em nenhum minuto.`
-              : "Nenhum momento de atrito nesta conversa: a Cogni não precisou mudar de estratégia em nenhum minuto.",
-          }),
+          el("p", { class: "mp-tranquila__titulo", text: titulo }),
+          el("p", { class: "mp-tranquila__texto", text: texto }),
         ],
       }),
     ],
@@ -273,6 +442,18 @@ function faixaTranquila(sessao) {
 /**
  * A linha do tempo em texto — a alternativa acessível ao desenho, e também o que
  * o pai lê no celular sem mirar num marcador de 14px.
+ *
+ * As duas ressalvas de ago/2026 (o traço e o halo da faixa) viram PALAVRA aqui,
+ * porque é esta lista que carrega a informação quando cor, forma e posição não
+ * chegam. Nenhuma delas usa o vocabulário do motor.
+ *
+ * ⚠️ Momento sem `topico` NÃO ganha texto no lugar. Desde ago/2026 o assunto de um
+ * momento vence em 4 min e o servidor devolve `null` de propósito; preencher com
+ * a matéria da sessão, ou pior, com `topicos[0]`, é exatamente o defeito nº 1 que
+ * a reforma consertou ("travou em frações" 44 min depois de frações sair da mesa).
+ * A linha fica sem o complemento, e é o certo: o que ela afirma continua sendo só
+ * o que o servidor afirmou.
+ *
  * @param {import('../mapa-api.js').Sessao} sessao
  */
 function listaDeMomentos(sessao) {
@@ -280,13 +461,16 @@ function listaDeMomentos(sessao) {
 
   const lista = el("ol", {
     class: "mp-momentos",
-    children: sessao.momentos.map((m, i) =>
-      el("li", {
+    children: sessao.momentos.map((m, i) => {
+      const onde = ondeDoMomento(m);
+      return el("li", {
         class: "mp-momento",
         attrs: {
           "data-tom": m.tom,
           "data-tipo": m.tipo,
           "data-indice": String(i),
+          ...(m.confianca === "baixa" ? { "data-confianca": "baixa" } : {}),
+          ...(m.superado ? { "data-superado": "true" } : {}),
           tabindex: "-1", // recebe foco só por programa (clique num marcador)
         },
         children: [
@@ -296,17 +480,21 @@ function listaDeMomentos(sessao) {
             class: "mp-momento__body",
             children: [
               el("span", { class: "mp-momento__what", text: m.rotulo }),
-              m.topico || m.materia
+              onde ? el("span", { class: "mp-momento__where", text: onde }) : null,
+              m.superado
+                ? el("span", { class: "mp-momento__selo", text: "destravou depois" })
+                : null,
+              m.confianca === "baixa"
                 ? el("span", {
-                    class: "mp-momento__where",
-                    text: m.topico || materiaLabel(m.materia),
+                    class: "mp-momento__ressalva",
+                    text: "só a câmera percebeu",
                   })
                 : null,
             ],
           }),
         ],
-      })
-    ),
+      });
+    }),
   });
 
   return el("div", {
@@ -368,7 +556,7 @@ function cardDaSessao({ sessao, now, entradaAPartirDe }) {
         class: "mp-sessao__body",
         children: [
           chipsDeAssunto(sessao),
-          destaqueDoAtrito(sessao),
+          cabecalhoDaAula(sessao),
           timeline,
           listaBloco,
         ],
@@ -379,13 +567,42 @@ function cardDaSessao({ sessao, now, entradaAPartirDe }) {
   return { node, timeline, meta };
 }
 
-/** Resumo curto de uma aula pro item do histórico (sem placar, sem sinal cru). */
+/**
+ * Resumo curto de uma aula pro cartão do histórico (sem placar, sem sinal cru).
+ *
+ * 🔴 O caso sem derivados é o que mais importa aqui, e era o mais perigoso: com o
+ * `pontoDeAtrito` sempre nulo na leitura via tabela, o `return "correu tranquila"`
+ * de antes transformaria TODAS as aulas do histórico numa boa notícia inventada —
+ * e é justamente durante a aula ao vivo (quando o endpoint devolve `historico: []`)
+ * que o pai olha esses cartões. Sem os derivados, o cartão diz o que ele sabe: o
+ * assunto da aula.
+ */
 function resumoDoItem(sessao) {
-  if (sessao.pontoDeAtrito) {
-    const onde = sessao.pontoDeAtrito.topico || materiaLabel(sessao.pontoDeAtrito.materia);
-    return `${sessao.pontoDeAtrito.rotulo} · ${onde}`;
+  if (!sessao.derivadosDisponiveis) {
+    if (sessao.topicos.length) return sessao.topicos[0];
+    if (sessao.materias.length) return materiaLabel(sessao.materias[0]);
+    return "aula registrada";
   }
-  return "correu tranquila";
+  if (sessao.pontoDeAtrito) {
+    const onde = ondeDoMomento(sessao.pontoDeAtrito);
+    return onde ? `${sessao.pontoDeAtrito.rotulo} · ${onde}` : sessao.pontoDeAtrito.rotulo;
+  }
+  if (sessao.momentos.some((m) => m.superado)) return "emperrou e destravou";
+  if (!sessao.momentos.length) return "correu tranquila";
+  // Houve marcadores de apoio, mas nenhum virou ponto a rever. "Correu tranquila"
+  // aqui contradiria a faixa que o pai vê ao abrir o cartão.
+  return "sem pontos pendentes";
+}
+
+/**
+ * A cor do cartão do histórico. `neutro` quando não há derivado: cinza é a
+ * ausência de veredito, e é honesto — verde diria "correu bem", que é uma
+ * conclusão que ninguém tirou.
+ */
+function tomDoItem(sessao) {
+  if (!sessao.derivadosDisponiveis) return "neutro";
+  if (sessao.pontoDeAtrito) return sessao.pontoDeAtrito.tom;
+  return "bom";
 }
 
 /**
@@ -419,7 +636,7 @@ function blocoHistorico({ sessoes, chaveSelecionada, now, onEscolher }) {
             attrs: {
               type: "button",
               "aria-pressed": selecionada ? "true" : "false",
-              "data-tom": s.pontoDeAtrito ? s.pontoDeAtrito.tom : "bom",
+              "data-tom": tomDoItem(s),
             },
             children: [
               el("span", {

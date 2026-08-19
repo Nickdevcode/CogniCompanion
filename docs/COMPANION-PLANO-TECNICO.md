@@ -233,7 +233,7 @@ Um dado, três coelhos. 🎯
 | `turnos` | int | quantas trocas de conversa aconteceram |
 | `materias` | text[] | matérias tocadas na sessão |
 | `topicos` | text[] | tópicos finos tocados na sessão |
-| `contadores` | jsonb | `{ travada, confusa, engajada, acertos, tropecos, entendeu, precisouAjuda }`. Os dois últimos (ago/2026) vêm do marco de **compreensão** e são contados **à parte** de `acertos`/`tropecos` de propósito: um é veredito conferido, o outro é leitura da conversa. Somar tudo num placar só daria ao pai um número que nenhuma das fontes sustenta sozinha |
+| `contadores` | jsonb | `{ travada, confusa, engajada, acertos, tropecos, entendeu, precisouAjuda, tempoEfetivoMs }`. `entendeu`/`precisouAjuda` (ago/2026) vêm do marco de **compreensão** e são contados **à parte** de `acertos`/`tropecos` de propósito: um é veredito conferido, o outro é leitura da conversa. Somar tudo num placar só daria ao pai um número que nenhuma das fontes sustenta sozinha. **`tempoEfetivoMs` pega carona aqui** e não é um contador — ver a reforma de confiabilidade |
 | `momentos` | jsonb | **o coração**: a linha do tempo já cruzada (ver formato abaixo) |
 | `criado_em` | timestamptz | default now() |
 
@@ -244,15 +244,19 @@ Um dado, três coelhos. 🎯
 [
   { "emMs": 252000, "tipo": "afeto", "sinal": "travada",
     "rotulo": "precisou de mais ajuda",
-    "materia": "matematica", "topico": "fracoes equivalentes" },
+    "materia": "matematica", "topico": "fracoes equivalentes",
+    "repeticoes": 1, "confianca": "media", "superado": true },
   { "emMs": 300000, "tipo": "pratica", "resultado": "aprendeu",
     "rotulo": "resolveu sozinha",
     "materia": "matematica", "topico": "fracoes equivalentes" },
   { "emMs": 340000, "tipo": "compreensao", "resultado": "travou",
-    "rotulo": "pediu uma mão aqui",
-    "materia": "matematica", "topico": "mmc" }
+    "rotulo": "pediu uma mão",
+    "materia": "matematica", "topico": "mmc", "superado": false }
 ]
 ```
+
+> [!note] `repeticoes`, `confianca` e `superado` são de ago/2026 — ver a **reforma de confiabilidade** mais abaixo
+> `confianca` e `superado` são **derivados e recalculados na leitura**: eles aparecem no payload do endpoint mesmo em sessões antigas, que foram gravadas sem eles. Quem lê a tabela direto (via RLS) recebe os `momentos` crus, **sem** esses dois campos.
 
 > [!important] ⭐ `tipo: "compreensao"` é NOVO (ago/2026) — e é a razão de o mapa deixar de viver vazio
 > Antes existiam só dois tipos, e os dois exigiam uma condição rara: `afeto` só marca com **webcam ligada + MediaPipe baixado + rosto enquadrado + evidência forte**, e `pratica` só marca quando o ciclo de exercícios **propôs e conferiu** uma questão. Uma aula inteira de explicação e dúvida produzia **zero momentos** — e o resumo, honestamente, dizia "correu tranquila".
@@ -267,10 +271,6 @@ Um dado, três coelhos. 🎯
 
 > [!warning] Vocabulário: `travada` NUNCA aparece cru na tela
 > Vale a mesma regra da trilha de aprendizado. O `sinal` é dado interno; o que se mostra ao pai é o `rotulo`, que já vem pronto e escrito em linguagem de apoio ("precisou de mais ajuda", "estava embalada"). Não invente rótulo no front, e não traduza `sinal` por conta própria.
-
-> ⚠️ **Uma divergência combinada (18/ago/2026) — rótulo com gênero.** `criancas` não tem campo de gênero, e dois rótulos saem do robô no **feminino**: `estava embalada` e `resolveu sozinha`. Pra metade das crianças o Mapa descrevia a aula na flexão errada, linha por linha. O **site** passou a exibi-los sem flexão — `estava embalada` → *"estava no embalo"*, `resolveu sozinha` → *"resolveu sem ajuda"* — na mesma tabela em que já corrigia os acentos (`ROTULOS_ACENTUADOS`, em `js/dashboard/mapa-api.js`). Isso **não muda o contrato**: o `rotulo` gravado no `jsonb` continua sendo o do servidor, e o site aceita as duas grafias (masculina e feminina) como chave.
->
-> 👉 **O ideal é o robô parar de flexionar na origem** — aí a tabela do site vira redundante e some sozinha. Qualquer rótulo NOVO deve nascer sem gênero (nomeie o fato, não a criança: "resolveu sem ajuda" em vez de "resolveu sozinho/a"). Enquanto isso, a rede está montada dos dois lados.
 
 ### ~~`pareamentos`~~ — DESCARTADA
 > A tabela `pareamentos` do plano original **não é usada** (foi dropada). Em vez de um código temporário numa tabela à parte, o código vive **no próprio perfil** (`criancas.codigo_pareamento`): é fixo, nasce com o perfil e não expira. Mais simples e bate com o modelo single-child. Ver o fluxo de pareamento no contrato de dados abaixo.
@@ -600,6 +600,97 @@ Por isso existe um segundo campo derivado, que responde **"o que rever"**:
 
 ---
 
+---
+
+## 🩺 Reforma de confiabilidade do Mapa (ago/2026) — 🔴 **exige trabalho no site**
+
+> [!important] Esta é a mudança mais importante que o Mapa já teve, e ela **muda o que o payload significa** — não só o que ele contém.
+> Nenhum campo antigo sumiu e nenhum mudou de tipo, então **a tela não quebra se vocês não fizerem nada**. Mas ela vai passar a mostrar menos conclusões, e o motivo importa: as que sumiram eram as erradas.
+
+### O relato que originou tudo
+
+> *"Sinto que o mapa da aula não é confiável. Às vezes ele dá uma mentida, às vezes ele inventa."*
+
+Estava certo. Uma auditoria do motor (`server/modules/atencao.js`) encontrou **seis** defeitos independentes, todos silenciosos, todos com o mesmo padrão: **o mapa afirmava com confiança algo que os dados não sustentavam.** Nenhum deles gerava erro, log ou tela quebrada — só uma frase errada no painel do pai.
+
+| # | O que o pai lia | Causa | Correção |
+| --- | --- | --- | --- |
+| 1 | *"ela travou em frações aos 47min"* — 44 min **depois** de frações sair da mesa | O assunto de um momento era o último tópico visto até ali, **sem prazo de validade** | O assunto **vence** em 4 min (renovado a cada turno que fala dele). Vencido, o momento fica com `topico: null` |
+| 2 | Uma careta de 2s ganhava de um **exercício conferido errado** | A câmera era o **primeiro** critério do `pontoDeAtrito` | A ordem virou a da confiança na fonte: exercício → conversa → câmera |
+| 3 | *"penou muito em mmc"* depois de **um** mau humor de 2 min | O cooldown do cliente é por *percepção*; `triste`→`brava`→`triste` são três percepções que viram o mesmo sinal `travada` | Sinal repetido em 1 min **engrossa** o mesmo momento (campo `repeticoes`) em vez de criar quatro |
+| 4 | Todo `emMs` da sessão **deslocado** | A câmera **abria a sessão** — o eixo do tempo começava quando a webcam via um rosto, não quando a aula começava | Só um **turno de conversa** abre aula. Careta fora de aula é ignorada |
+| 5 | *"aula de 47 minutos"* de uma aula de 6 | O TTL de ociosidade olhava o último marco de **qualquer** tipo, então webcam ligada segurava a sessão viva | O relógio da aula é o **último turno**. E nasceu `tempoEfetivoMs` |
+| 6 | *"ela penou em frações"* — sobre um assunto que ela **destravou na própria aula** | Só somávamos atrito; nunca olhávamos o que veio depois | Atrito **superado** sai da conta do que rever |
+
+### As duas ideias novas
+
+**🤝 Corroboração — a câmera parou de concluir sozinha.**
+A leitura facial continua na linha do tempo: o cruzamento afeto × assunto *é* a ideia da feature, e a demo pra banca não perde nada. O que ela perde é o direito de **concluir** sozinha. Um `crianca-triste` pode ser tédio, sono, uma briga com o irmão fora do quadro ou o detector errando — então ele só entra no `pontoDeAtrito` e no `assuntoMaisDificil` quando **outra fonte, no mesmo assunto e por perto no tempo (3 min)**, disse a mesma coisa. Careta não corrobora careta.
+
+**🔗 Um assunto só.**
+`"tabuada"` e `"tabuada do 7"` agora somam no mesmo balde — usando a **mesma chave** que a trilha de aprendizado do robô já usa. Antes, cada jeito que a IA escrevia o mesmo tema abria um balde próprio, o peso se fragmentava e o "assunto mais difícil" saía quase por sorteio. O `topico` devolvido é o **rótulo mais frequente do grupo** (não a chave normalizada — o pai lê o nome como ele foi dito na aula).
+
+### 🆕 Campos novos no payload
+
+Todos **derivados e recalculados na leitura** — inclusive para o `historico[]` e para a última sessão do `/resumo`. Nada disso é persistido (exceto `tempoEfetivoMs`, ver abaixo).
+
+```json
+{
+  "tempoEfetivoMs": 360000,
+  "qualidade": {
+    "confianca": "alta",
+    "fontes": { "exercicio": 2, "conversa": 5, "camera": 1 },
+    "camerasSemApoio": 1
+  },
+  "momentos": [
+    { "emMs": 252000, "tipo": "afeto", "sinal": "travada",
+      "rotulo": "precisou de mais ajuda",
+      "materia": "matematica", "topico": "fracoes equivalentes",
+      "repeticoes": 3, "confianca": "media", "superado": false }
+  ],
+  "assuntoMaisDificil": {
+    "topico": "mmc", "materia": "matematica",
+    "peso": 6, "ocorrencias": 3, "confianca": "alta"
+  }
+}
+```
+
+| Campo | Onde | O que é | Sugestão de uso |
+| --- | --- | --- | --- |
+| `momentos[].confianca` | só em `tipo: "afeto"` | `'media'` = a câmera bateu com outra fonte no mesmo assunto. `'baixa'` = é só impressão | Marcador **mais discreto** (contorno em vez de preenchido, opacidade menor) quando for `'baixa'`. Nunca escrever a palavra "confiança" pro pai |
+| `momentos[].superado` | em todo momento de atrito | `true` = ela venceu isso **depois**, na mesma aula | É a **melhor notícia da tela**. Vale um tratamento próprio: *"aqui ela emperrou — e destravou sozinha"* |
+| `momentos[].repeticoes` | só em `tipo: "afeto"` | Quantas leituras iguais couberam no episódio. `1` é o normal | **Não mostre como número.** Se quiser usar, use como intensidade visual (marcador levemente maior) |
+| `tempoEfetivoMs` | na sessão | Duração **sem** os silêncios longos (cada intervalo entre turnos entra capado em 3 min) | Prefira este no cabeçalho quando ele existir. `null` em sessões antigas → use `duracaoMs` |
+| `qualidade.confianca` | na sessão | `'alta'` (houve exercício conferido) · `'media'` (houve conversa) · `'baixa'` (só câmera) | Serve pra **calibrar o tom** da tela, não pra virar selo. Numa sessão `'baixa'`, evite cabeçalho conclusivo |
+| `assuntoMaisDificil.confianca` | no campo derivado | Idem, mas da melhor fonte que sustenta **aquele** assunto | Se for `'baixa'`, prefira *"parece que…"* a *"o ponto do dia foi…"* |
+
+> [!note] `tempoEfetivoMs` pega **carona** no jsonb `contadores`
+> Ele é persistido como `contadores.tempoEfetivoMs` em vez de virar coluna nova. Não é elegante — um jsonb chamado "contadores" com um campo de tempo dentro —, mas evita uma migração no Supabase, e o custo real de uma migração neste projeto não é o `ALTER TABLE`: é o período em que o robô grava um campo que a tabela ainda não tem, **em silêncio**, até alguém lembrar de rodar o SQL. O endpoint já normaliza isso e devolve `tempoEfetivoMs` no topo do objeto — **se vocês lerem pelo endpoint, nem percebem**. Quem lê a tabela direto (o histórico via RLS) precisa saber que ele mora ali dentro.
+
+### ⚠️ O que MUDA na tela mesmo sem vocês mexerem em nada
+
+1. **`pontoDeAtrito` vai ser `null` com mais frequência** — e mais ainda no histórico antigo. Isso é a correção funcionando: as sessões que antes vinham com um ponto de atrito apoiado **só** numa careta agora não vêm com nenhum. O estado vazio ("correu tranquila") vai aparecer mais, e agora ele é verdade.
+2. **O histórico é REINTERPRETADO na leitura.** O `jsonb` gravado não muda, mas `pontoDeAtrito`, `assuntoMaisDificil` e `qualidade` são recalculados com o critério novo toda vez que a linha é servida. Aulas gravadas antes da reforma param de repetir as leituras erradas de ontem. **Consequência:** se vocês tinham cache/snapshot desses derivados no front, invalidem.
+3. **`assuntoMaisDificil` pode trocar de tópico** numa sessão que vocês já viram — por causa do agrupamento de assunto e do desconto do atrito superado. É esperado.
+4. **A ordem do `pontoDeAtrito` inverteu.** Se o front ainda tem o recálculo local como fallback (dívida nº 2, já resolvida na origem), **ele agora diverge do servidor**. A regra local era: primeiro `sinal: 'travada'` → depois `resultado: 'travou'`. A do servidor é o contrário, com a câmera por último e **só se corroborada**.
+
+> [!warning] 🔴 A recomendação é **deletar** o recálculo local do `pontoDeAtrito`
+> Ele não dá pra replicar direito: a regra nova depende de `confianca` e `superado`, que por sua vez dependem de agrupar tópico com a **mesma chave da trilha do robô** (normalização + canonização de conceito). Reimplementar isso no front é convidar as duas cópias a divergirem em silêncio — exatamente o que a dívida nº 2 já tinha resolvido.
+>
+> O servidor manda o campo pronto na sessão ao vivo **e** em cada item do `historico[]`. Para o histórico lido direto da tabela via RLS (o contorno da dívida nº 3), a saída certa é **não calcular**: mostre a timeline sem cabeçalho conclusivo, ou peça o histórico ao endpoint. Um `pontoDeAtrito` calculado com a regra velha é pior que nenhum.
+
+### O resumo em texto também foi refeito
+
+O `GET /api/mapa-aula/resumo` continua com o mesmo contrato (`{ texto, emAndamento }`), mas por dentro mudou de figura:
+
+- **O molde é decidido em código, não pelo modelo.** O prompt antigo exigia três partes (estudou → onde precisou de ajuda → sugestão); sem atrito na sessão, o modelo preenchia a parte do meio do nada. Agora o servidor manda o **molde A** (houve ponto em aberto) ou o **molde B** (não houve — e citar dificuldade é proibido).
+- **Verificador pós-geração.** Reprova texto que cite matéria fora da sessão, use palavra proibida (`travou`, `dificuldade`, `desempenho`…) ou fale de dificuldade no molde B. Reprovou → refaz uma vez com o motivo.
+- **Fallback determinístico.** Falhou de novo, ou a OpenAI está fora do ar? A frase é montada **em código** com os mesmos dados.
+
+> [!tip] Efeito prático pro site: **`texto: null` praticamente acabou**
+> Antes, qualquer falha (rede, JSON malformado, rate limit da OpenAI) devolvia `null` e o card do resumo sumia de cena. Agora só há dois casos de `null`: **sem sessão nenhuma** (`motivo: 'sem_sessao'`, que já era tratado) e a sessão sem turno algum. Se o card tem um estado de "não deu pra gerar", ele passa a ser raríssimo — mas **mantenham**, porque um 429 do rate limit ainda derruba a requisição inteira antes de chegar no fallback.
+
+
 ## 📝 Correção Visual do Caderno (ago/2026) — **não é tarefa pro site**
 
 > [!note] Registrado aqui só pra ninguém construir por engano
@@ -643,6 +734,11 @@ O critério virou a função `acharPontoDeAtrito` (`server/modules/atencao.js`),
 > [!tip] O recálculo do front pode sair — e agora sem o risco que você apontou
 > Era essa a preocupação certa: o contorno não ia quebrar, ia **divergir calado**. Agora não há segunda cópia da regra pra divergir. Se preferirem manter o recálculo como fallback, mantenham a prioridade que vocês já documentaram (**o campo do servidor ganha**) — aí o dia em que o critério mudar aqui, a tela acompanha sozinha.
 
+> [!warning] 🔴 **ago/2026 — aquele "dia em que o critério mudar" chegou.** O recálculo local **precisa sair**.
+> A regra do `pontoDeAtrito` inverteu (a câmera saiu da frente e foi pro fim, e só entra se corroborada) e passou a depender de `confianca` e `superado` — dois campos derivados que exigem agrupar tópico com a **mesma chave da trilha de aprendizado do robô**. Isso não dá pra replicar no front sem recriar a normalização inteira, e uma reimplementação parcial é justamente o cenário de divergência silenciosa.
+>
+> **Onde o servidor manda pronto:** sessão ao vivo e cada item do `historico[]` do endpoint. **Onde não tem:** o histórico lido direto de `sessoes_atencao` via RLS (o contorno da dívida nº 3). Nesse caso, a saída certa é **não calcular** — mostre a timeline sem cabeçalho conclusivo. Um `pontoDeAtrito` com a regra velha é pior que nenhum: ele reintroduz exatamente as leituras erradas que a reforma removeu. Detalhes na seção "Reforma de confiabilidade do Mapa".
+
 ### 🤝 Acordos entre as duas pontas (contrato que não está em código)
 
 Coisas que **um lado assume** sobre o outro e que não dá pra descobrir lendo o payload. Mudou aqui, avisa lá — nesta lista, o silêncio é que quebra.
@@ -652,6 +748,8 @@ Coisas que **um lado assume** sobre o outro e que não dá pra descobrir lendo o
 | ~~**O critério do `pontoDeAtrito`**~~ | ~~O site, que replica a regra no front~~ | ✅ **Resolvido na origem** — o servidor agora manda o campo no histórico, então não há segunda cópia da regra pra divergir. Continua valendo o aviso se o critério mudar, mas agora o silêncio não custa nada: a tela acompanha sozinha |
 | **O piso da sessão**: menos de **60s** (`MINIMO_PARA_GRAVAR_MS`) **ou** zero turnos não vira linha em `sessoes_atencao` | O **site**, que escreve o estado vazio como *"quando ela conversar alguns minutinhos com a Cogni, o mapa aparece aqui"* | Confirmado ✅. Se o piso mudar, o robô avisa — o texto do estado vazio muda junto, senão o site promete ao pai algo que não acontece |
 | **`RATE_LIMIT_WINDOW_MS` = 10s** com limite 10 no `limiteResumo`, compartilhado por 5 rotas | O **site**, onde um 429 é silencioso (o card do resumo some de cena) | Se a janela crescer (10 min, p.ex.), Mapa e Resumo Semanal passam a brigar pela mesma cota. O robô avisa antes de mexer na janela; a rota do caderno já saiu desse balde |
+| **`momentos[].topico` pode ser `null` mesmo com a sessão inteira tendo tópicos** (ago/2026) | O **site**, que desenha o assunto embaixo de cada marcador | O assunto de um momento **vence em 4 min** sem ser mencionado. Um momento sem `topico` não é bug nem dado faltando: é o servidor se recusando a chutar. Na tela, algo neutro ("um momento da aula") — **nunca** cair no primeiro item de `topicos[]` pra preencher, que é literalmente o bug que a reforma consertou |
+| **Os derivados (`pontoDeAtrito`, `assuntoMaisDificil`, `qualidade`) são recalculados a cada leitura** | O **site**, se cachear a resposta do endpoint | O mesmo `id` de sessão pode devolver derivados **diferentes** depois de uma mudança de critério no robô. É intencional (é o que reinterpreta o histórico antigo). Cache de `momentos` é seguro; cache de derivado, não |
 
 ---
 
@@ -793,6 +891,9 @@ Ver a seção "Matérias (lista fixa)" acima. O que precisa mudar:
 ### 2. Mapa da aula: novo tipo de momento + `assuntoMaisDificil` 🔴 **exige trabalho no site**
 
 Ver as duas caixas na seção do Mapa. Resumo: tratar `tipo: "compreensao"` na timeline (senão os momentos mais frequentes somem da tela em silêncio), preferir o `pontoDeAtrito` que agora vem no `historico[]`, e considerar exibir o `assuntoMaisDificil` no cabeçalho da aula.
+
+> [!important] 🩺 **E depois disso veio a reforma de confiabilidade (ago/2026)** — seção própria, logo após a do Mapa.
+> Seis correções no motor + o resumo em texto refeito. Nenhum campo antigo sumiu, então **a tela não quebra**; mas o `pontoDeAtrito` passa a ser `null` com mais frequência (de propósito), o histórico é **reinterpretado na leitura**, e o **recálculo local do `pontoDeAtrito` agora diverge do servidor** — a recomendação é deletá-lo. Campos novos pra tela: `confianca`, `superado`, `repeticoes`, `tempoEfetivoMs` e `qualidade`.
 
 ### 3. Onboarding conversacional 🟢 **nada a fazer no site**
 
@@ -1652,10 +1753,8 @@ Notas de implementação:
 > [!important] Três frentes. **Duas** têm tarefa pro site (1 e 2); a terceira é 100% robô e está aqui só como contexto.
 >
 > 1. **Prioridade dos cards** — o robô mudou a regra. 🟢 O site **não** precisa mexer em nada (a `ordem` que ele já grava passou a valer mais).
-> 2. **Prioridade dos planos** — ✅ **feita no site em 16/ago/2026**: drag and drop na faixa de planos, `ordem` fracionária, o selo "1º" e a válvula do `42703`. Ver "✅ O que o site construiu". Falta só 🔑 **o SQL que o Nicolas roda**.
+> 2. **Prioridade dos planos** — 🔴 **tarefa do site**: drag and drop na faixa de planos + a coluna nova. E 🔑 **um SQL que o Nicolas roda**.
 > 3. **A trilha de aprendizado** — 🟢 nada a fazer no site. O bloco do Painel continua igual.
->
-> 🗓️ E o **item H** (o fuso do prazo) foi junto: `formatPrazo` comparava `Date.parse` de um `date` sem hora, então no Brasil o prazo de amanhã aparecia como "hoje" e o de hoje como "atrasado 1 dia", em vermelho. ✅ Corrigido — dia contra dia, como texto.
 
 ### Frente 1 — o card que o pai arrastou pro topo volta a ser o primeiro
 
@@ -1767,33 +1866,11 @@ Isso vale onde quer que o site liste planos vigentes (`getPlanos`, a faixa de ch
 
 Com isso a tela consegue provar que o arraste chegou ao robô, em vez de a ordem certa poder ser coincidência. Continua **best-effort**: servidor desligado, engula o erro e siga (o Realtime cobre).
 
-#### ✅ O que o site construiu (16/ago/2026) — e os 5 desvios do plano
+#### ⚠️ A pendência da rodada 4 continua de pé
 
-| # | Onde | O que ficou de pé |
-| --- | --- | --- |
-| 1 | `js/dashboard/dnd.js` | `criarQuadro` ganhou **`eixo`** (`vertical`/`horizontal`) e **`item`** (a palavra dos anúncios). Com **uma coluna** ele é lista simples: hit-test folgado nos dois eixos, índice pelo meio horizontal, placeholder com `width`, e todas as setas movendo posição. **Nenhum segundo módulo** |
-| 2 | `js/dashboard/sections/mesa.js` | A faixa virou fila: wrapper `.mesa-fila` como raiz do dnd, chips com `data-dnd-*`, selo "1º", dica do gesto, e `gravarOrdemDoPlano`/`reindexarFila` |
-| 3 | `js/dashboard/format.js` | `porPrioridade` + `ordenarPlanos` + `filaDePlanos` + `posicaoNaFila`. `planosVigentes` corta o teto **pela fila**; `motivoNaoVigente` diz a posição do plano em vez de "o mais antigo" |
-| 4 | `js/dashboard/supabase-data.js` | `getPlanos` ordenado com a **válvula 42703**; `reordenarPlano` (1 UPDATE, sem tocar em `atualizado_em`) e `reindexarPlanos` |
-| 5 | `js/dashboard/servidor.js` | O ping do refresh passou a **ler a resposta** e logar a fila que o robô enxerga (item 6, a confirmação opcional) |
+`js/dashboard/format.js` → `planoVigente(planos, now)` ainda escolhe **um** plano, e por isso `motivoNaoVigente()` faz a tela dizer *"A Cogni não está seguindo este plano agora"* sobre um plano que **está** sendo seguido. Como a frente 2 mexe exatamente nesse arquivo, é a hora de resolver as duas juntas.
 
-**Os cinco desvios**, todos deliberados:
-
-1. **A pendência da rodada 4 já estava meio resolvida.** `planoVigente` (singular) não existia mais — `planosVigentes` já devolvia todos e o aviso já valia só pros não-vigentes. O que faltava era o **critério do teto** (era recência, virou `ordem`) e o texto do motivo. O plano descrevia um bug maior do que o que restava.
-2. **O arraste ficou só na aba "Ativos"** (a saída 1 do item 5), **e** o não-vigente daquela aba ganha a frase da saída 2 no card. As duas juntas, porque "Ativos" não é sinônimo de "vigente": um ativo pode ter vencido, ou ser o 6º.
-3. **O selo "1º" só aparece com 2+ vigentes.** Com um plano só não há fila, e o selo viraria decoração permanente.
-4. **No card do plano é UMA pílula, não duas.** O plano previa o "1º" convivendo com o ✨ de "está seguindo" — no chip da faixa ele convive mesmo, mas no card duas pílulas começando com "a Cogni" diziam quase a mesma coisa. Como *"começa por aqui"* já implica *"está seguindo"*, o primeiro recebe a frase mais específica, com o mesmo ✨ e um preenchimento mais forte.
-5. **Dois consertos que o plano não previa**, e que só apareceram com o item arrastável sendo um `<button>`: o dnd descartava o gesto que nascia num botão (que era **o próprio chip**), e o `click` disparado depois de soltar abria o plano recém-arrastado. Junto veio um bug de layout **pré-existente**: o card do plano é `.mesa-plano`, não `.pl-card`, então nunca recebeu o `flex-wrap` do mobile — sobravam ~99px pro conteúdo e o texto quebrava palavra por palavra.
-
-> 🗓️ **O bug de fuso (item H) era real e está corrigido.** Verificado: `new Date('2026-08-17')` no Brasil devolve **16/ago 21:00**, então `formatPrazo` lia o prazo de amanhã como "hoje" e o de hoje como "atrasado 1 dia" — em vermelho. Agora a comparação é dia contra dia, como texto (`chaveDeDia`), inclusive no rótulo longo ("até 27 de agosto"), que mostrava o dia anterior.
-
-> 🧪 **Como foi verificado.** `format.js` num harness Node com `TZ=America/Sao_Paulo` (16 casos: fila, empate sem a coluna, teto pela ordem, e os prazos às 15h e às 23h30). A tela num **preview isolado** com Playwright, mock em memória e o `mesa.js` de verdade: arraste por ponteiro (1 UPDATE, `ordem: 500`), teclado (Espaço/setas/Espaço), Escape, o 42703 devolvendo o chip pro lugar com o toast certo, o modo Selecionar desligando o arraste, as outras abas sem arraste, o clique pós-arraste não abrindo o plano — **e a regressão do Kanban** (arraste entre colunas e `←/→` por teclado continuam idênticos, com o anúncio ainda citando o nome da coluna).
-
-#### ⚠️ A pendência da rodada 4 — ✅ resolvida nesta rodada
-
-A regra correta é: *vigente = `status ∈ {ativo, em_andamento}` **e** não vencido (`criado_em + duracao_dias`). **Todos** os que passarem estão sendo seguidos, até o teto de **5**; passando disso ganham os de **menor `ordem`** (e não mais os mais recentes).* O aviso de "não está seguindo" vale — e só — para `rascunho`, `pausado`, `concluido`, vencido, **e o 6º plano em diante da fila**.
-
-✅ **É exatamente o que `format.js` faz agora.** Uma correção de rumo, porém: o plano descrevia `planoVigente(planos, now)` escolhendo **um** plano, e essa função **já não existia** — a rodada 4 tinha trocado por `planosVigentes` (plural), e o aviso já valia só pros não-vigentes. O que sobrou de pendência, e foi resolvido aqui, era o **critério do teto** (cortava por recência, agora corta pela fila do pai) e o **texto do motivo**, que dizia *"ficou de fora por ser o mais antigo"* — agora ele diz a posição real do plano na fila e sugere a saída que depende só do pai: arrastar.
+Regra correta: *vigente = `status ∈ {ativo, em_andamento}` **e** não vencido (`criado_em + duracao_dias`). **Todos** os que passarem estão sendo seguidos, até o teto de **5**; passando disso ganham os de **menor `ordem`** (e não mais os mais recentes).* O aviso de "não está seguindo" vale — e só — para `rascunho`, `pausado`, `concluido`, vencido, **e o 6º plano em diante da fila**.
 
 ---
 
@@ -1852,6 +1929,26 @@ Cobertura nova: **`npm run teste:trilha`** (19 casos — a fila de vencidos, as 
 
 ---
 
+## 🎁 A Cogni convida pro Companion (18/ago/2026)
+
+**O que muda pro site: nada.** É registro de contrato — a coluna nova existe e o site não deve exibi-la.
+
+O problema: um app de acompanhamento só entra na vida da família se alguém contar que ele existe, e esse alguém nunca era a Cogni (o prompt mandava, explicitamente, nunca puxar o assunto). O código de pareamento nascia com o perfil e morria sem ser dito. Agora ela **puxa o assunto nas primeiras interações** — e, se a criança topar, dita o código caractere a caractere.
+
+O que segura isso de virar propaganda é **estado durável**, e é por isso que existe coluna:
+
+```sql
+alter table criancas add column if not exists companion_convite jsonb;
+```
+
+Formato: `{"vezes": 1, "ultimoEm": "2026-08-18T19:32:31.774Z"}`. `null` = nunca convidada. Teto de **2 convites no total**, no máximo 1 por sessão, nunca 2 no mesmo dia — e o convite só conta se a Cogni de fato falou do app (o servidor confere a resposta dela).
+
+O gatilho de desligamento é o **pareamento**: `criancas.responsavel_id` preenchido = nada de convite. O servidor passou a ler esse campo (só a existência, como booleano — o id do pai não circula pelo robô) e ele entra na lista de campos que o refresh do Supabase traz. Ou seja: **o pai pareia no site e o robô para de convidar na conversa seguinte**, sem esperar reboot.
+
+Motor e cobertura: `server/modules/brain/companion-gancho.js`, `npm run teste:companion` (28 casos, offline).
+
+---
+
 ## 🔑 O que o Nicolas fornece (manual)
 
 1. **Conta Supabase + credenciais** (URL, anon key, service_role key) — passo a passo no chat na Fase 0.
@@ -1867,8 +1964,11 @@ Cobertura nova: **`npm run teste:trilha`** (19 casos — a fila de vencidos, as 
 6. ⭐ **Rodada 3 — link externo (16/ago/2026)**, uma coisa manual só: o **SQL** que acrescenta `link` ao `CHECK` de `planos_estudo.origem` (entregue no chat). Ele derruba **todas** as constraints de check que citam `origem` naquela tabela antes de recriar — porque o nome da constraint pode ter mudado entre as rodadas, e um `drop constraint if exists` com o nome errado deixaria a antiga barrando `link` em silêncio. **Nenhuma variável de ambiente nova, nenhuma dependência npm nova** — a leitura de link usa `fetch` e `node:dns`, que já vêm no runtime.
    > 🩹 Se o site subir antes do SQL, o insert do plano de pedido morreria com `23514` (check_violation) **depois** de o pai revisar tarefa por tarefa. O `criarPlanoComTarefas` (`supabase-data.js`) detecta esse código e regrava com a origem `manual`: perde-se o **selo**, não o trabalho. A rede some sozinha quando o SQL roda — a primeira tentativa passa a funcionar.
 
+8. ⭐ **Rodada 7 — a Cogni convida pro Companion (18/ago/2026)**, uma coisa manual só: o **SQL** que cria `criancas.companion_convite` (entregue no chat, e também na seção "🎁 A Cogni convida"). Idempotente (`add column if not exists`), sem backfill — `null` significa "nunca convidada". **Nenhuma variável de ambiente nova, nada a fazer no site.**
+   > 🩹 Se o robô subir antes do SQL: a válvula de coluna ausente já cobre (o log avisa uma vez e o resto do perfil continua sincronizando). O efeito colateral é só este: a contagem de convites não sobrevive a um restart do servidor, então a Cogni pode convidar de novo depois de um reinício.
+
 7. ⭐ **Rodada 5 — prioridade dos planos (16/ago/2026)**, uma coisa manual só: o **SQL** que cria `planos_estudo.ordem` + o índice (entregue no chat, e também na seção "🥇 Rodada 5"). Idempotente (`add column if not exists`), **sem backfill** — todos nascem em `1000` e o comportamento só muda no primeiro arraste. **Nenhuma variável de ambiente nova.**
-   > 🩹 Se o robô ou o site subirem antes do SQL: o servidor **detecta e se vira sozinho** (a válvula desliga a ordenação e avisa uma vez — verificado contra o banco real). ✅ **E o site também**: a leitura tem a mesma válvula (`getPlanos` refaz a consulta sem o `ORDER BY ordem` e avisa uma vez), e o arraste trata o `42703` como *"a prioridade ainda não está disponível"* — com o chip **voltando pro lugar**, porque uma faixa reordenada por cima de uma escrita recusada é a tela mentindo. Verificado no preview, simulando o erro.
+   > 🩹 Se o robô ou o site subirem antes do SQL: o servidor **detecta e se vira sozinho** (a válvula desliga a ordenação e avisa uma vez — verificado contra o banco real). Já no site, o `update` de `ordem` numa coluna inexistente falha com `42703`, então o arraste precisa tratar isso como *"a prioridade ainda não está disponível"* em vez de erro genérico, e não deixar a lista visualmente reordenada mentindo pro pai.
 
 (O Claude gerencia os `.env`. Credenciais rotacionadas depois pelo Nicolas.)
 

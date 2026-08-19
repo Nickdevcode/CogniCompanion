@@ -21,10 +21,24 @@
  *     o que mais aparece.
  *   - **Nada de `sinal` cru na tela.** O que aparece é sempre o `rotulo`, já
  *     saneado em `mapa-api.js`.
+ *
+ * 🩺 ago/2026 — dois eixos novos, e nenhum dos dois é cor nem forma (as duas já
+ * estão ocupadas por tom e origem):
+ *
+ *   - **Traço.** Marcador de câmera que ninguém corroborou (`confianca: 'baixa'`)
+ *     é desenhado VAZADO e TRACEJADO, com menos peso. Tracejado é a metáfora
+ *     certa: a linha existe, mas não fecha. É o único jeito de a leitura facial
+ *     continuar na tela sem afirmar sozinha.
+ *   - **Halo.** Atrito que ela venceu depois (`superado: true`) ganha um anel
+ *     verde em volta. Não é enfeite: é a melhor notícia da tela, e sem isso ele
+ *     fica visualmente idêntico a um atrito que continua pendente.
+ *
+ * `repeticoes` entra só como TAMANHO (um episódio que se repetiu pesa mais na
+ * vista), nunca como número: "3 caretas" seria placar do humor da criança.
  */
 
 import { el } from "./sections/_shared.js";
-import { formatTempoNaAula } from "./format.js";
+import { formatTempoNaAula, materiaLabel } from "./format.js";
 
 /**
  * Descrição de cada tom, usada só na legenda (o momento em si já traz o `rotulo`
@@ -37,6 +51,35 @@ const LEGENDA_TONS = [
   // marcadores precisam dizer a mesma coisa, senão a legenda deixa de explicá-los.
   { tom: "bom", texto: "estava no embalo" },
 ];
+
+/**
+ * Onde o momento aconteceu, pronto pra tela: o tópico, ou a matéria com o nome
+ * legível ("Matemática", não "matematica").
+ *
+ * ⚠️ Devolve `null` sem inventar nada — e é o ponto mais sensível do arquivo. Um
+ * momento sem tópico é ESPERADO desde ago/2026 (o assunto vence em 4 min), e a
+ * tentação de preencher com `sessao.topicos[0]` é literalmente o defeito nº 1 que
+ * a reforma consertou: o mapa dizia "travou em frações" 44 min depois de frações
+ * sair da mesa. Quem chama decide o que escrever no lugar; ninguém chuta aqui.
+ *
+ * @param {import('./mapa-api.js').Momento} momento
+ * @returns {string|null}
+ */
+function ondeDoMomento(momento) {
+  if (!momento) return null;
+  if (momento.topico) return momento.topico;
+  return momento.materia ? materiaLabel(momento.materia) : null;
+}
+
+/**
+ * Quanto o marcador cresce quando o mesmo episódio se repetiu. Teto de 3 passos
+ * porque a diferença entre "voltou muito" e "voltou muitíssimo" não muda nada pro
+ * pai — e um marcador grande demais atropelaria os vizinhos na faixa.
+ */
+function escalaPorRepeticoes(repeticoes) {
+  const extra = Math.min(Math.max((Number(repeticoes) || 1) - 1, 0), 3);
+  return (1 + extra * 0.09).toFixed(2);
+}
 
 /** Posição do momento na faixa, em % (0–100). Sessão de duração 0 não divide. */
 function posicaoPercentual(emMs, duracaoMs) {
@@ -56,13 +99,27 @@ function alinhamentoDoBalao(pos) {
   return "mid";
 }
 
-/** Frase completa do momento — a mesma que o leitor de tela ouve e o balão mostra. */
+/**
+ * Frase completa do momento — a mesma que o leitor de tela ouve, e a base do que
+ * o balão mostra.
+ *
+ * As ressalvas viram FRASE, não adjetivo: quem navega por teclado ou leitor de
+ * tela não vê o traço nem o halo, e sem elas a versão sonora afirmaria com mais
+ * certeza do que a versão visual. Nenhuma delas usa a palavra "confiança".
+ */
 function descreverMomento(momento) {
   const quando = formatTempoNaAula(momento.emMs);
-  const onde = momento.topico || momento.materia;
-  return onde
-    ? `Aos ${quando}: ${momento.rotulo}, em ${onde}.`
-    : `Aos ${quando}: ${momento.rotulo}.`;
+  const onde = ondeDoMomento(momento);
+  const frases = [
+    onde
+      ? `Aos ${quando}: ${momento.rotulo}, em ${onde}.`
+      : `Aos ${quando}: ${momento.rotulo}.`,
+  ];
+  if (momento.superado) frases.push("Destravou depois, ainda nesta aula.");
+  if (momento.confianca === "baixa") {
+    frases.push("Foi o que a câmera percebeu, sem outra confirmação.");
+  }
+  return frases.join(" ");
 }
 
 /**
@@ -77,6 +134,7 @@ function descreverMomento(momento) {
 function marcador({ momento, duracaoMs, indice, novo, onSelecionar }) {
   const pos = posicaoPercentual(momento.emMs, duracaoMs);
   const descricao = descreverMomento(momento);
+  const onde = ondeDoMomento(momento);
 
   const btn = el("button", {
     class: "mp-tl__mark" + (novo ? " is-novo" : ""),
@@ -90,7 +148,14 @@ function marcador({ momento, duracaoMs, indice, novo, onSelecionar }) {
       // posições precisam ser recalculadas sem recriar os marcadores (ver
       // `reposicionarMarcadores`) — recriar tiraria o foco do teclado a cada 10s.
       "data-em-ms": String(momento.emMs),
-      style: `--pos:${pos.toFixed(2)}%; --i:${indice}`,
+      // Só marcamos a ressalva, nunca a certeza: `data-confianca` existe apenas
+      // no caso 'baixa'. Assim um payload sem o campo (aula antiga, tabela lida
+      // direto) desenha o marcador cheio, que é o comportamento de sempre.
+      ...(momento.confianca === "baixa" ? { "data-confianca": "baixa" } : {}),
+      ...(momento.superado ? { "data-superado": "true" } : {}),
+      style:
+        `--pos:${pos.toFixed(2)}%; --i:${indice}; ` +
+        `--rep:${escalaPorRepeticoes(momento.repeticoes)}`,
       "aria-label": descricao,
     },
     children: [
@@ -102,10 +167,16 @@ function marcador({ momento, duracaoMs, indice, novo, onSelecionar }) {
         children: [
           el("span", { class: "mp-tl__tip-when", text: formatTempoNaAula(momento.emMs) }),
           el("span", { class: "mp-tl__tip-what", text: momento.rotulo }),
-          momento.topico || momento.materia
+          onde ? el("span", { class: "mp-tl__tip-where", text: onde }) : null,
+          // A boa notícia vem antes da ressalva: se o balão for lido de relance,
+          // que sobre "destravou depois".
+          momento.superado
+            ? el("span", { class: "mp-tl__tip-nota", text: "destravou depois" })
+            : null,
+          momento.confianca === "baixa"
             ? el("span", {
-                class: "mp-tl__tip-where",
-                text: momento.topico || momento.materia,
+                class: "mp-tl__tip-ressalva",
+                text: "o que a câmera percebeu",
               })
             : null,
         ],
@@ -158,12 +229,21 @@ export function reposicionarMarcadores(raiz, duracaoMs) {
   if (fim) fim.textContent = formatTempoNaAula(duracaoMs);
 }
 
-/** Legenda: o que cada forma e cada cor querem dizer. */
-function legenda() {
-  const amostra = (tom, tipo) =>
+/**
+ * Legenda: o que cada forma e cada cor querem dizer.
+ *
+ * Os dois últimos itens são CONDICIONAIS, e por um motivo de higiene: o traço e o
+ * halo (ago/2026) não aparecem em toda aula, e explicar um símbolo que não está na
+ * tela é ruído que empurra pra baixo o que importa. A legenda cresce só quando a
+ * aula tem o que explicar.
+ *
+ * @param {import('./mapa-api.js').Momento[]} momentos
+ */
+function legenda(momentos) {
+  const amostra = (tom, tipo, extras = {}) =>
     el("span", {
       class: "mp-tl__key-dot",
-      attrs: { "data-tom": tom, "data-tipo": tipo, "aria-hidden": "true" },
+      attrs: { "data-tom": tom, "data-tipo": tipo, "aria-hidden": "true", ...extras },
     });
 
   const itens = LEGENDA_TONS.map((l) =>
@@ -186,6 +266,32 @@ function legenda() {
       children: [amostra("apoio", "compreensao"), el("span", { text: "lido na conversa" })],
     })
   );
+
+  if (momentos.some((m) => m.superado)) {
+    itens.push(
+      el("li", {
+        class: "mp-tl__key-item",
+        children: [
+          amostra("apoio", "afeto", { "data-superado": "true" }),
+          el("span", { text: "destravou depois" }),
+        ],
+      })
+    );
+  }
+
+  // "sem confirmação" e não "baixa confiança": o pai precisa saber que aquele
+  // marcador é mais frouxo que os outros, não receber o vocabulário do motor.
+  if (momentos.some((m) => m.confianca === "baixa")) {
+    itens.push(
+      el("li", {
+        class: "mp-tl__key-item",
+        children: [
+          amostra("apoio", "afeto", { "data-confianca": "baixa" }),
+          el("span", { text: "só a câmera percebeu" }),
+        ],
+      })
+    );
+  }
 
   return el("div", {
     class: "mp-tl__key",
@@ -243,8 +349,8 @@ export function buildTimeline({ sessao, entradaAPartirDe = Infinity, onSeleciona
 
   return el("div", {
     class: "mp-tl" + (aoVivo ? " is-live" : ""),
-    children: [trilha, eixo(duracaoMs), momentos.length ? legenda() : null],
+    children: [trilha, eixo(duracaoMs), momentos.length ? legenda(momentos) : null],
   });
 }
 
-export { descreverMomento };
+export { descreverMomento, ondeDoMomento };

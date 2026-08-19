@@ -272,7 +272,9 @@ Quatro cuidados que sustentam a tela:
   1 tropeço" é boletim com outro nome. O cabeçalho mostra só duração e trocas de conversa. Pelo mesmo
   motivo, o `peso` do assunto mais difícil é descartado (é ranking interno) e as `ocorrencias` viram frase
   — *"esse ponto voltou algumas vezes"* —, nunca contagem.
-- 😌 **Aula sem nenhum momento é boa notícia**, não tela vazia: aparece como *"a aula correu tranquila"*.
+- 😌 **Aula sem nada a rever é boa notícia**, não tela vazia. Desde ago/2026 esse é o caso **comum**, e
+  ele tem três textos conforme o que a linha do tempo mostra logo abaixo (ver "Quando o mapa aprendeu a
+  não concluir").
 - ♿ **Não depende de cor nem de posição.** Cada marcador é um `<button>` com o momento inteiro no
   `aria-label`, a lista repete tudo em texto, e tocar um marcador destaca a linha correspondente (no
   celular não existe hover).
@@ -281,6 +283,38 @@ Quatro cuidados que sustentam a tela:
 > aula ao vivo, `/api/mapa-aula` devolve `historico: []` (ele prioriza a sessão que está em RAM). Sem a
 > tabela, as aulas anteriores sumiriam da tela **exatamente durante a demonstração ao vivo** — e o
 > histórico também continua valendo com o robô desligado.
+
+#### 🩺 Quando o mapa aprendeu a não concluir (ago/2026)
+
+> *"Sinto que o mapa da aula não é confiável. Às vezes ele dá uma mentida, às vezes ele inventa."*
+
+O relato estava certo. Uma auditoria do motor no robô achou **seis** defeitos independentes, todos
+silenciosos, todos com o mesmo padrão: **o mapa afirmava com confiança algo que os dados não sustentavam.**
+Uma careta de 2s ganhava de um exercício conferido errado; um assunto grudava no momento sem prazo de
+validade e virava *"travou em frações"* 44 min depois de frações sair da mesa; a webcam ligada segurava a
+sessão viva e transformava uma aula de 6 min em *"aula de 47 minutos"*.
+
+Tudo isso foi corrigido **no servidor**. Nenhum campo antigo sumiu nem mudou de tipo, então a tela não
+quebrou — mas ela ficou desalinhada, e o realinhamento inteiro cabe numa frase: **a tela passou a concluir
+menos, e cada estado a menos precisou parecer intencional.**
+
+| O que mudou no site | Por quê |
+| --- | --- |
+| 🔴 **O recálculo local do `pontoDeAtrito` foi DELETADO** | O critério do servidor inverteu (era câmera → exercício → conversa, virou exercício → conversa → **câmera só se corroborada**) e passou a depender de agrupar tópico com a mesma chave de conceito da trilha do robô. Replicar isso no front seria recriar a normalização inteira; replicar pela metade seria divergir em silêncio — o defeito que a reforma acabou de remover |
+| 🤝 **Marcador tracejado** | Leitura de câmera que nenhuma outra fonte confirmou (`confianca: 'baixa'`). Vazado e tracejado: a linha existe, mas não fecha. A palavra "confiança" **nunca** aparece pro pai — na tela isso vira *"só a câmera percebeu"* |
+| 🌱 **Halo verde + selo "destravou depois"** | `superado: true` = ela emperrou e destravou **sozinha**, na mesma aula. É a melhor notícia que a tela tem pra dar, e sem tratamento próprio ficava visualmente igual a um atrito pendente |
+| ⏱️ **"14 min de estudo"** | `tempoEfetivoMs` é a duração **sem** os silêncios longos. Vem nomeado de propósito: ele é menor que o fim da régua da linha do tempo, e sem a palavra "estudo" o cabeçalho pareceria contradizer o desenho |
+| 🤔 **"Parece que…" em vez de "o ponto do dia foi…"** | Numa aula sustentada só pela câmera, ou num assunto que só ela apontou, a frase pondera exatamente onde o dado pondera |
+| 🤐 **Histórico sem derivado não ganha cabeçalho** | O histórico lido direto de `sessoes_atencao` (o contorno de quando o endpoint devolve `historico: []`) não traz `pontoDeAtrito`. Aí a tela mostra a linha do tempo e **cala** — inclusive nos cartõezinhos, que antes diriam *"correu tranquila"* pra toda aula do histórico |
+
+> ⚠️ **`topico: null` num momento é ESPERADO, não é bug.** O assunto de um momento agora vence em 4 min sem
+> ser mencionado; passada a janela, o servidor se recusa a chutar. A tela deixa o complemento de fora — e
+> **nunca** cai no primeiro item de `topicos[]` pra preencher, que é literalmente o defeito nº 1 da lista.
+
+> 🚫 **Nada de derivado pode ser cacheado.** `pontoDeAtrito`, `assuntoMaisDificil` e `qualidade` são
+> recalculados pelo servidor **a cada leitura** — é assim que uma aula gravada antes da reforma para de
+> repetir a leitura errada de ontem. O mesmo `id` de sessão pode devolver derivados diferentes depois de uma
+> mudança de critério no robô. Cachear `momentos` seria seguro; cachear derivado, não.
 
 ### 🗒️ Mesa de Estudos — o plano vira um quadro que anda sozinho
 

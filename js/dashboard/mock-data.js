@@ -660,8 +660,20 @@ const resumoSemanal = {
  * A terceira sessão não tem nenhum momento marcado: é o caso "correu tranquila",
  * que precisa parecer uma aula boa e não uma tela quebrada.
  *
- * Não há `assuntoMaisDificil` aqui, e isso está certo: a coluna guarda os
- * `momentos`, e o campo é derivado pelo servidor na leitura do endpoint.
+ * Não há `assuntoMaisDificil`, `pontoDeAtrito`, `qualidade`, `superado` nem
+ * `confianca` aqui, e isso está CERTO: a coluna guarda os `momentos` e nada mais.
+ * Todos esses campos são derivados e recalculados pelo servidor a cada leitura do
+ * endpoint — é assim que uma aula gravada antes da reforma de ago/2026 para de
+ * repetir a leitura errada de ontem. Uma sessão lida daqui chega à tela com
+ * `derivadosDisponiveis: false`, e a tela mostra a linha do tempo sem cabeçalho
+ * conclusivo (ver `cabecalhoDaAula` em sections/mapa.js).
+ *
+ * Os dois campos de ago/2026 que a tabela DE FATO guarda estão aqui:
+ *   - `contadores.tempoEfetivoMs` — a duração sem os silêncios longos, de carona
+ *     no jsonb `contadores` pra evitar uma coluna nova no Supabase. Repare que ele
+ *     é MENOR que `duracao_ms` em toda sessão: é esse o ponto dele.
+ *   - `momentos[].repeticoes` — quantas leituras iguais o robô fundiu num mesmo
+ *     momento. Nasce durante a aula, então vai pro jsonb junto.
  */
 const sessoesAtencao = [
   {
@@ -682,6 +694,8 @@ const sessoesAtencao = [
       // conferido, o outro é leitura da conversa (ver o plano técnico).
       entendeu: 1,
       precisouAjuda: 1,
+      // 17 min de vão, 14 de conversa de verdade: o resto foram silêncios.
+      tempoEfetivoMs: 14 * 60000,
     },
     momentos: [
       {
@@ -715,6 +729,9 @@ const sessoesAtencao = [
         rotulo: "ficou em duvida",
         materia: "portugues",
         topico: "redação",
+        // Duas leituras iguais em menos de 1 min viraram UM momento (a correção
+        // nº 3 da reforma). Na tela isso é só um marcador levemente maior.
+        repeticoes: 2,
       },
       {
         emMs: 10 * 60000 + 5000,
@@ -775,6 +792,7 @@ const sessoesAtencao = [
       tropecos: 2,
       entendeu: 0,
       precisouAjuda: 2,
+      tempoEfetivoMs: 11 * 60000,
     },
     momentos: [
       {
@@ -816,6 +834,7 @@ const sessoesAtencao = [
         rotulo: "precisou de mais ajuda",
         materia: "matematica",
         topico: "tabuada do 7",
+        repeticoes: 3,
       },
       {
         emMs: 13 * 60000 + 40000,
@@ -836,7 +855,14 @@ const sessoesAtencao = [
     turnos: 6,
     materias: ["ciencias"],
     topicos: ["sistema solar"],
-    contadores: { travada: 0, confusa: 0, engajada: 0, acertos: 0, tropecos: 0 },
+    contadores: {
+      travada: 0,
+      confusa: 0,
+      engajada: 0,
+      acertos: 0,
+      tropecos: 0,
+      tempoEfetivoMs: 12 * 60000,
+    },
     momentos: [], // aula sem atrito → a tela mostra "correu tranquila"
     criado_em: "2026-05-24T16:34:00-03:00",
   },
