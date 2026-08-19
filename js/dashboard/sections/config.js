@@ -124,7 +124,7 @@ function toggle(checked, onChange, ariaLabel) {
 function blocoPerfil(crianca, onAbrirDetalhe) {
   const bloco = el("section", { class: "dash-card cfg-block cfg-block--perfil" });
   bloco.appendChild(
-    blocoHead(ICON.user, "Perfil da criança", "Quem usa o Cogni em casa.")
+    blocoHead(ICON.user, "Perfil da criança", "Quem conversa com a Cogni em casa.")
   );
 
   const body = el("div", { class: "cfg-block__body" });
@@ -533,7 +533,7 @@ function blocoConta(responsavel) {
 function blocoTema() {
   const bloco = el("section", { class: "dash-card cfg-block cfg-block--tema" });
   bloco.appendChild(
-    blocoHead(ICON.bulb, "Aparência", "Escolha o tema do painel.")
+    blocoHead(ICON.bulb, "Aparência", "Vale só neste aparelho.")
   );
 
   const isDark = () =>
@@ -597,8 +597,8 @@ function blocoVinculo({ crianca, servidorUrl, user, onDesvinculado }) {
   bloco.appendChild(
     blocoHead(
       ICON.robot,
-      "Vínculo com o Cogni",
-      "O perfil do robô conectado a este painel."
+      "Vínculo com a Cogni",
+      "Qual perfil do robô este painel está lendo."
     )
   );
 
@@ -796,8 +796,12 @@ export async function renderConfig(ctx) {
 
   root.appendChild(
     pageHead({
-      title: "Configurações da família",
-      subtitle: "Gerencie o perfil, a conta e as preferências do Cogni.",
+      title: "Configurações",
+      // "Gerencie o perfil, a conta e as preferências" é a frase que vem de fábrica
+      // em qualquer painel — não diz nada que os próprios cards não digam melhor.
+      // Esta diz a única coisa que o pai precisa saber antes de descer a tela: o que
+      // ele muda aqui muda o jeito da Cogni falar com a criança.
+      subtitle: "O que você ajusta aqui a Cogni leva pra dentro da conversa.",
     })
   );
 

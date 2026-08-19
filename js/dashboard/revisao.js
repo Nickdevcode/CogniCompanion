@@ -221,10 +221,13 @@ export function montarRevisao({ proposta, materiais, pedido = "", ctx, close, ao
         campo("Título do plano", inTitulo),
         el("div", {
           class: "pl-form__grid",
-          children: [campo("Foco (matéria)", selFoco), campo("Duração (dias)", inDuracao)],
+          children: [campo("Matéria", selFoco), campo("Dura quantos dias", inDuracao)],
         }),
-        campo("Conteúdo do plano", txtConteudo, {
-          dica: "Esse texto é injetado no que a Cogni sabe sobre o plano.",
+        // Mesmos rótulos do formulário manual (`mesa.js`): as duas telas editam o
+        // mesmo plano, e chamar o campo de dois nomes diferentes é o tipo de coisa
+        // que faz o pai achar que são campos diferentes.
+        campo("O que a Cogni deve trabalhar", txtConteudo, {
+          dica: "Ela lê isto antes de puxar o assunto com a criança.",
         }),
       ],
     })

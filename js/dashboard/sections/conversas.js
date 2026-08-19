@@ -20,6 +20,7 @@ import {
   formatDiaRelativo,
   agruparConversasPorDia,
   primeiroNome,
+  sujeito,
 } from "../format.js";
 
 /* --------------------------------------------------------------------------
@@ -155,13 +156,13 @@ function vazio(temFiltro) {
       el("span", { class: "cv-empty__ico", svg: ICON.search }),
       el("p", {
         class: "cv-empty__title",
-        text: temFiltro ? "Nenhuma conversa encontrada" : "Ainda sem conversas",
+        text: temFiltro ? "Nada com esse filtro" : "Ainda sem conversas",
       }),
       el("p", {
         class: "cv-empty__text",
         text: temFiltro
           ? "Tente outro termo de busca ou ajuste os filtros."
-          : "As conversas da criança com a Cogni aparecerão aqui.",
+          : "A primeira conversa com a Cogni aparece aqui no mesmo dia.",
       }),
     ],
   });
@@ -265,13 +266,17 @@ function filtroMateria(state, onChange) {
    -------------------------------------------------------------------------- */
 export async function renderConversas(ctx) {
   const root = sectionRoot("conversas");
-  const nome = primeiroNome(ctx.crianca && ctx.crianca.nome) || "a criança";
+  const primeiro = primeiroNome(ctx.crianca && ctx.crianca.nome);
+  const nome = sujeito(primeiro);
   const state = createState();
 
   // Cabeçalho + mascote
   const head = pageHead({
     title: "Diário de conversas",
-    subtitle: `Acompanhe as conversas do ${nome} com a Cogni, dia a dia.`,
+    // "do {nome}" chutava o gênero da criança (o perfil não guarda um); "de {nome}"
+    // vale pros dois. E a frase passou a dizer o que a tela faz de diferente do
+    // resto do painel: aqui está a conversa INTEIRA, não o resumo dela.
+    subtitle: `Tudo que ${nome} perguntou à Cogni, e o que ela respondeu.`,
   });
   head.appendChild(
     el("img", {

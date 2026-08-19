@@ -28,7 +28,12 @@
     "resumo   dica"
     "bilhete  bilhete";
   gap: clamp(1rem, 2vw, 1.5rem);
-  align-items: start;
+  /* Sem `align-items: start`: os cards da mesma linha esticam pra mesma altura.
+     Com `start`, "O plano de agora" parava na altura do próprio conteúdo e sobrava
+     um buraco de ~100px do lado de "Última conversa" — e o Início, que é a primeira
+     tela do painel, abria com dois vazios no meio do grid. Esticar funciona porque
+     o card já é uma coluna flex com o corpo em `flex: 1`: quem cresce é o corpo, e
+     o link do rodapé desce e ancora na base, alinhado com o do card vizinho. */
 }
 .ini-card--conversa {
   grid-area: conversa;
@@ -183,8 +188,11 @@
   font-size: 0.78rem;
 }
 .ini-msg--crianca .ini-msg__name {
-  color: #5d78ff;
+  color: var(--dash-crianca-ink);
 }
+/* ⚠️ Aqui a tinta escura NÃO serve: diferente do Diário, o balão da Cogni no
+   Início é navy preenchido, e `--dash-accent-ink` (dourado escuro) sobre navy dá
+   3,5:1. Sobre fundo escuro quem passa é o dourado da marca. */
 .ini-msg--cogni .ini-msg__name {
   color: var(--brand-gold);
 }
@@ -238,7 +246,7 @@
   font-family: var(--font-body);
   font-weight: var(--fw-semibold);
   font-size: 0.8rem;
-  color: var(--dash-accent);
+  color: var(--dash-accent-ink);
   margin-bottom: 0.25rem;
 }
 .ini-plano__title {
@@ -349,7 +357,11 @@
 .ini-counter__value {
   font-family: var(--font-display);
   font-weight: var(--fw-black);
-  font-size: 1.6rem;
+  /* Fluido, porque o terceiro contador não é um número: é "1h 27min", que em 1,6rem
+     não cabe na caixa de 1/3 da largura no celular e quebrava em "1h" / "27min" —
+     duas linhas onde os vizinhos têm uma, e a fileira inteira perdia o alinhamento. */
+  font-size: clamp(1.15rem, 4.4vw, 1.6rem);
+  white-space: nowrap;
   color: var(--dash-text);
   line-height: 1;
 }
@@ -414,9 +426,8 @@
   .ini-counter {
     padding: 0.85rem 0.3rem;
   }
-  .ini-counter__value {
-    font-size: 1.35rem;
-  }
+  /* O tamanho já é fluido (ver `.ini-counter__value`): esta regra fixa brigaria
+     com o clamp em vez de ajudar. Sobrou o respiro interno. */
 }
 
 /* --------------------------------------------------------------------------

@@ -158,9 +158,11 @@ function chipsDeAssunto(sessao) {
  * Sem o assunto (histórico lido direto da tabela, que não guarda o derivado), o
  * bloco continua sendo o que sempre foi: o momento que mais importa.
  *
- * As frases são construídas SEM pronome e SEM o nome da criança de propósito — os
- * rótulos do servidor vêm no feminino genérico ("estava embalada", "resolveu
- * sozinha"), e colar um nome neles produziria concordância errada na cara do pai.
+ * As frases são construídas SEM pronome e SEM o nome da criança de propósito — o
+ * perfil não guarda gênero, e colar um nome numa frase que flexiona produziria
+ * concordância errada na cara do pai. (Desde ago/2026 os próprios rótulos que
+ * vinham no feminino já chegam neutros aqui: quem os troca é o
+ * `ROTULOS_ACENTUADOS` do `mapa-api.js`, e o porquê está escrito lá.)
  */
 function destaqueDoAtrito(sessao) {
   const momento = sessao.pontoDeAtrito;

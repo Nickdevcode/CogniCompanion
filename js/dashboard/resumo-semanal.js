@@ -115,7 +115,11 @@ export function cardResumoSemanal({ servidorUrl, crianca, mock }) {
       class: "dash-card__head",
       children: [
         el("span", { class: "dash-card__head-ico", svg: ICON.heart }),
-        el("span", { class: "dash-card__head-title", text: "Resumo da semana da Cogni" }),
+        // O card dos contadores no Início se chamava "Resumo da semana" também; os dois
+        // lado a lado eram indistinguíveis pelo título. Este é o texto que a Cogni
+        // escreve — e "bilhete" é como o resto da tela já o chamava ("Ler o bilhete
+        // completo", `ini-bilhete__*`, o próprio comentário do módulo).
+        el("span", { class: "dash-card__head-title", text: "O bilhete da semana" }),
       ],
     })
   );
@@ -202,7 +206,7 @@ function renderConteudo(body, footHost, resumo) {
     body.appendChild(
       el("p", {
         class: "ini-bilhete__text is-vazio",
-        text: "O resumo da semana aparecerá aqui assim que a Cogni tiver novidades pra contar.",
+        text: "O bilhete chega no fim da primeira semana de conversas.",
       })
     );
     return;
@@ -247,7 +251,7 @@ function renderConteudo(body, footHost, resumo) {
 /** Abre o modal com o bilhete completo + chips de matérias/tópicos da semana. */
 function abrirModalResumo(resumo) {
   openModal({
-    title: "Resumo da semana da Cogni",
+    title: "O bilhete da semana",
     size: "md",
     content: () => {
       const wrap = el("div", { class: "rs-modal" });

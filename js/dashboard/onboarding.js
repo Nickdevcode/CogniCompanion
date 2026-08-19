@@ -168,12 +168,17 @@ function telaBoasVindas(nome) {
       el("span", { class: "ob-eyebrow", text: saud }),
       el("h1", {
         class: "ob-title",
-        text: "Bem-vindo(a) ao Cogni Companion",
+        // "Bem-vindo(a)" com o "(a)" pendurado é a saudação que avisa que o site não
+        // sabe com quem está falando. "Boas-vindas" resolve sem parêntese — e é o que
+        // o `aria-label` desta mesma tela já dizia.
+        text: "Boas-vindas ao Cogni Companion",
       }),
       el("p", {
         class: "ob-lead",
         text:
-          "Aqui você acompanha de pertinho a jornada de aprendizado do seu filho com a Cogni — conversas, progresso e planos de estudo, tudo em um só lugar.",
+          // Sem "jornada" (não diz nada) e sem "seu filho" (o painel serve pras duas
+          // metades das famílias): a frase agora lista o que existe de verdade aqui.
+          "Aqui você acompanha de pertinho o que a Cogni ensinou hoje: as conversas, o que ficou fácil, o que travou — e os planos que ela vai seguir.",
       }),
       el("button", {
         class: "dash-btn dash-btn--primary ob-cta",
@@ -198,7 +203,7 @@ function telaComoFunciona() {
     {
       ico: ICON.chat,
       titulo: "Acompanhe as conversas",
-      desc: "Veja o que seu filho conversou com a Cogni, dia a dia.",
+      desc: "Cada pergunta e cada resposta, dia a dia.",
     },
     {
       ico: ICON.chart,
@@ -213,7 +218,7 @@ function telaComoFunciona() {
     {
       ico: ICON.robot,
       titulo: "Conecte ao robô",
-      desc: "Um código vincula o painel ao perfil do seu filho na Cogni.",
+      desc: "Um código de 6 caracteres liga este painel ao perfil que está no robô.",
     },
   ];
 
@@ -291,7 +296,7 @@ function telaPareamento({ user, servidorUrl, onPareado }) {
           "aria-hidden": "true",
         },
       }),
-      el("h2", { class: "ob-title ob-title--sm", text: "Conecte ao perfil do seu filho" }),
+      el("h2", { class: "ob-title ob-title--sm", text: "Ligue este painel ao robô" }),
       el("p", {
         class: "ob-lead",
         text:

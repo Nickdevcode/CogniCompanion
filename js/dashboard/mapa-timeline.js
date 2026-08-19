@@ -33,7 +33,9 @@ import { formatTempoNaAula } from "./format.js";
 const LEGENDA_TONS = [
   { tom: "apoio", texto: "precisou de mais ajuda" },
   { tom: "duvida", texto: "ficou em dúvida" },
-  { tom: "bom", texto: "estava embalada" },
+  // Mesma frase neutra do `ROTULOS_ACENTUADOS` (mapa-api.js) — a legenda e os
+  // marcadores precisam dizer a mesma coisa, senão a legenda deixa de explicá-los.
+  { tom: "bom", texto: "estava no embalo" },
 ];
 
 /** Posição do momento na faixa, em % (0–100). Sessão de duração 0 não divide. */

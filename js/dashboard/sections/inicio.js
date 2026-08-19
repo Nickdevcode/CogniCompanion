@@ -30,6 +30,8 @@ import {
   tempoTotal,
   primeiroNome,
   planosVigentes,
+  sujeito,
+  deQuem,
 } from "../format.js";
 
 /* --------------------------------------------------------------------------
@@ -106,7 +108,9 @@ function cardUltimaConversa(conversas, nomeCrianca, now, onVerTodas) {
     body.appendChild(
       el("p", {
         class: "ini-empty",
-        text: "Ainda não há conversas registradas.",
+        text:
+          "Nada por aqui ainda. A primeira conversa com a Cogni aparece neste " +
+          "card no mesmo dia.",
       })
     );
   } else {
@@ -158,7 +162,10 @@ function cardUltimaConversa(conversas, nomeCrianca, now, onVerTodas) {
 /** Card "Próximo plano de estudo" — destaca o plano ativo. */
 function cardProximoPlano(plano, onVerPlano) {
   const card = el("article", { class: "dash-card ini-card ini-card--plano" });
-  card.appendChild(cardHead(ICON.calendar, "Próximo plano de estudo"));
+  // "Próximo" era mentira: o card mostra o PRIMEIRO DA FILA, ou seja, o plano por
+  // onde a Cogni começa hoje — não um que ainda vai começar. O pai lia "próximo" e
+  // ia procurar na Mesa qual seria "o de agora".
+  card.appendChild(cardHead(ICON.calendar, "O plano de agora"));
 
   const body = el("div", { class: "ini-card__body ini-plano__body" });
 
@@ -166,7 +173,9 @@ function cardProximoPlano(plano, onVerPlano) {
     body.appendChild(
       el("p", {
         class: "ini-empty",
-        text: "Nenhum plano ativo no momento. Que tal criar um?",
+        text:
+          "Nenhum plano valendo agora. Na Mesa de Estudos dá pra criar um em um " +
+          "minuto — é o que a Cogni puxa nas conversas.",
       })
     );
     card.appendChild(body);
@@ -230,7 +239,9 @@ function cardProximoPlano(plano, onVerPlano) {
 /** Card "Resumo da semana" — 3 contadores (conversas · matérias · tempo). */
 function cardResumoSemana(conversas, now, onRelatorio) {
   const card = el("article", { class: "dash-card ini-card ini-card--resumo" });
-  card.appendChild(cardHead(ICON.chart, "Resumo da semana"));
+  // Havia dois cards chamados "Resumo da semana" no mesmo Início (este e o bilhete
+  // da IA logo abaixo). Este é o dos números; o outro é o texto.
+  card.appendChild(cardHead(ICON.chart, "A semana em números"));
 
   // Janela dos últimos 7 dias a partir do "agora" de referência.
   const limite = new Date(now);
@@ -242,10 +253,13 @@ function cardResumoSemana(conversas, now, onRelatorio) {
   const tempo = formatDuracao(tempoTotal(semana));
 
   const body = el("div", { class: "ini-card__body ini-resumo__body" });
+  // Onde havia "continue incentivando essa jornada" agora há o recorte dos números.
+  // A frase antiga não dizia nada que o pai não soubesse, e ocupava a linha em que
+  // cabia a única informação que faltava: de quando são estes números.
   body.appendChild(
     el("p", {
       class: "ini-resumo__lead",
-      text: "Acompanhe o ritmo da semana e continue incentivando essa jornada.",
+      text: "Os últimos 7 dias.",
     })
   );
 
@@ -271,7 +285,7 @@ function cardResumoSemana(conversas, now, onRelatorio) {
   );
 
   card.appendChild(body);
-  card.appendChild(cardFootLink("Ver relatório completo", onRelatorio));
+  card.appendChild(cardFootLink("Ver tudo no Aprendizado", onRelatorio));
   return card;
 }
 
@@ -282,12 +296,15 @@ function cardResumoSemana(conversas, now, onRelatorio) {
 
 export async function renderInicio(ctx) {
   const root = sectionRoot("inicio");
-  const nome = primeiroNome(ctx.crianca && ctx.crianca.nome) || "a criança";
+  // Pode vir vazio (criança sem nome no perfil): quem resolve o fallback são o
+  // `sujeito()` e o `deQuem()`, que também são o que mantém as frases sem gênero.
+  const primeiro = primeiroNome(ctx.crianca && ctx.crianca.nome);
+  const nome = sujeito(primeiro);
 
   // Cabeçalho com mascote ao lado (decorativo).
   const head = pageHead({
-    title: `Como tá indo o ${nome}?`,
-    subtitle: "Um resumo do dia: conversas, plano de estudo e dicas da Cogni.",
+    title: `O dia ${deQuem(primeiro)}`,
+    subtitle: "O que rolou hoje: a conversa mais recente, o plano de agora e o que a Cogni notou.",
   });
   head.appendChild(
     el("img", {
@@ -392,13 +409,15 @@ function conviteRosto(crianca, nome) {
         children: [
           el("p", {
             class: "dash-rosto-convite__titulo",
-            text: "Deixa o " + nome + " desenhar o rosto da Cogni",
+            // Sem artigo antes do nome: o perfil não guarda gênero, e "Deixa o Ana"
+            // era o que a metade das famílias lia na primeira tela do painel.
+            text: nome + " pode desenhar o rosto da Cogni",
           }),
           el("p", {
             class: "dash-rosto-convite__sub",
             text:
-              "Esta parte é da criança: ela escolhe os olhos e a Cogni muda de " +
-              "cara na hora.",
+              "Esta tela é a única do painel feita pra criança usar — passa o " +
+              "aparelho e a Cogni muda de cara na hora.",
           }),
         ],
       }),

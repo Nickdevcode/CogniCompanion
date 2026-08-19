@@ -45,23 +45,40 @@ function escolherPasso(max) {
 }
 
 /**
+ * Dois sistemas de coordenadas, e o motivo é legibilidade no celular.
+ *
+ * 🔴 O gráfico tinha um viewBox só, de 720×240 (3:1). Num card de 280px de largura
+ * — que é o que sobra num aparelho de 360 — a caixa vira 280×93, o SVG escala em
+ * 0,39 e os rótulos de 12px do viewBox chegam na tela com **4,6px de altura**.
+ * Não é "pequeno": é ilegível, e ocupava um terço da tela pra não informar nada.
+ *
+ * A saída não é esticar (o `preserveAspectRatio="none"` transformaria os pontos em
+ * elipses e a fonte em texto achatado): é trocar o SISTEMA. Num viewBox de 360×260
+ * a mesma caixa de 280px escala em 0,78 e o rótulo chega com ~9px — legível, e a
+ * proporção mais alta ainda dá altura pra curva ter forma.
+ *
+ * A proporção vai no `style` do próprio SVG porque ela agora depende do modo; o
+ * `aspect-ratio` do CSS fica como valor de partida.
+ */
+const MEDIDAS = {
+  amplo: { W: 720, H: 240, padL: 44, padR: 16, padT: 24, padB: 28 },
+  compacto: { W: 360, H: 260, padL: 40, padR: 12, padT: 22, padB: 26 },
+};
+
+/**
  * @param {object} cfg
  * @param {Array<{label:string, value:number}>} cfg.points
  * @param {(v:number)=>string} [cfg.formatValue]
  * @param {string} [cfg.ariaLabel]
+ * @param {boolean} [cfg.compacto] — telas estreitas (ver MEDIDAS)
  * @returns {SVGElement}
  */
-export function buildLineChart({ points, formatValue, ariaLabel } = {}) {
+export function buildLineChart({ points, formatValue, ariaLabel, compacto } = {}) {
   const data = Array.isArray(points) ? points : [];
   const fmt = formatValue || ((v) => String(v));
 
   // Sistema de coordenadas interno (viewBox). O SVG escala via CSS.
-  const W = 720;
-  const H = 240;
-  const padL = 44; // espaço pros rótulos do eixo Y
-  const padR = 16;
-  const padT = 24; // espaço pro tooltip do pico
-  const padB = 28; // espaço pros rótulos do eixo X
+  const { W, H, padL, padR, padT, padB } = MEDIDAS[compacto ? "compacto" : "amplo"];
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
@@ -86,8 +103,9 @@ export function buildLineChart({ points, formatValue, ariaLabel } = {}) {
     role: "img",
     "aria-label": ariaLabel || "Gráfico de evolução",
   });
-  // viewBox cuida do escalonamento; deixamos a altura ao CSS.
+  // viewBox cuida do escalonamento; a altura sai da proporção do modo escolhido.
   svg.setAttribute("width", "100%");
+  svg.style.aspectRatio = `${W} / ${H}`;
 
   // --- Grade horizontal + rótulos do eixo Y ---
   const grid = svgEl("g", { class: "lc__grid" });

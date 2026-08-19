@@ -30,10 +30,25 @@
 
   --dash-text: #20273d;           /* texto padrão do painel */
   --dash-text-muted: #5b637a;     /* legendas, descrições */
-  --dash-text-faint: #8b92a6;     /* placeholders, metadados */
+  /* Era #8b92a6 — 3,1:1 sobre o branco do card e 2,7:1 sobre o fundo da página,
+     abaixo do mínimo de 4,5:1. E não é texto decorativo: é onde moram "visto há 4
+     dias", o eixo do gráfico e a hora da mensagem. Escurecido até passar sem virar
+     o `--dash-text-muted` (a hierarquia de três degraus continua de pé). */
+  --dash-text-faint: #676d80;     /* placeholders, metadados */
 
   --dash-accent: var(--brand-gold);
   --dash-accent-soft: rgba(240, 163, 21, 0.14);
+  /* O dourado da marca como TEXTO não passa em contraste: #f0a315 sobre branco dá
+     2,1:1 (o mínimo pra texto normal é 4,5:1), e some no celular sob o sol — que é
+     exatamente onde o pai lê o painel. `--dash-accent` continua sendo o dourado de
+     verdade pra ícone, traço e preenchimento (onde o mínimo é 3:1 e ele passa);
+     `--dash-accent-ink` é a versão que vale escrever. Mesmo desenho do
+     `--st-rascunho`, que já era um dourado escurecido pelo mesmo motivo. */
+  --dash-accent-ink: #9c5c00;
+  /* Azul do nome da criança nos balões. Era o literal #5d78ff repetido em dois
+     arquivos, e ele dava 3,5:1 sobre a superfície clara. Virou token pelos dois
+     motivos: passar em contraste e existir num lugar só. */
+  --dash-crianca-ink: #4960e5;
   --dash-navy: var(--brand-navy);
 
   /* Item de navegação ativo (na sidebar): pílula navy, texto claro */
@@ -54,28 +69,39 @@
      ela comunica a ÁREA, que é a leitura que sobrevive de relance.
 
      As 7 cores originais não mudaram: nenhuma tela existente muda de cara. */
-  --mat-portugues: #e8730f;
-  --mat-portugues-soft: rgba(232, 115, 15, 0.12);
+  /* ⚠️ Sete destas mudaram em ago/2026 por CONTRASTE, não por gosto: como texto
+     sobre branco, laranja/verde/ciano da paleta original ficavam entre 2,9:1 e
+     4,2:1 — abaixo do mínimo de 4,5:1. O alvo usado foi 4,8:1 (e não 4,5 na
+     unha): as mesmas cores também aparecem sobre `--dash-surface-2` e sobre o
+     próprio `-soft`, que são um degrau mais escuros que o branco puro. Cada uma
+     foi escurecida em OKLCH (mesma
+     matiz, mesmo croma, só a luminosidade desce), então as FAMÍLIAS POR ÁREA
+     continuam de pé: o leitor ainda lê "isto é ciências da natureza" de relance.
+     O par `-soft` acompanha a cor nova pra o token continuar sendo um par só —
+     a 12% de opacidade a diferença de fundo é imperceptível, mas duas fontes de
+     verdade pra mesma matéria não são. */
+  --mat-portugues: #c14f00;
+  --mat-portugues-soft: rgba(193, 79, 0, 0.12);
   --mat-matematica: #2563eb;
   --mat-matematica-soft: rgba(37, 99, 235, 0.12);
-  --mat-ciencias: #18a058;
-  --mat-ciencias-soft: rgba(24, 160, 88, 0.12);
-  --mat-fisica: #839414;
-  --mat-fisica-soft: rgba(131, 148, 20, 0.12);
-  --mat-quimica: #188b74;
-  --mat-quimica-soft: rgba(24, 139, 116, 0.12);
+  --mat-ciencias: #00843f;
+  --mat-ciencias-soft: rgba(0, 132, 63, 0.12);
+  --mat-fisica: #6b7900;
+  --mat-fisica-soft: rgba(107, 121, 0, 0.12);
+  --mat-quimica: #00816b;
+  --mat-quimica-soft: rgba(0, 129, 107, 0.12);
   --mat-biologia: #3d8226;
   --mat-biologia-soft: rgba(61, 130, 38, 0.12);
-  --mat-historia: #8b5cf6;
-  --mat-historia-soft: rgba(139, 92, 246, 0.12);
-  --mat-geografia: #0ea5b7;
-  --mat-geografia-soft: rgba(14, 165, 183, 0.12);
+  --mat-historia: #8352ec;
+  --mat-historia-soft: rgba(131, 82, 236, 0.12);
+  --mat-geografia: #007e8f;
+  --mat-geografia-soft: rgba(0, 126, 143, 0.12);
   --mat-filosofia: #4532bd;
   --mat-filosofia-soft: rgba(69, 50, 189, 0.12);
   --mat-sociologia: #9f36ab;
   --mat-sociologia-soft: rgba(159, 54, 171, 0.12);
-  --mat-idiomas: #d6409f;
-  --mat-idiomas-soft: rgba(214, 64, 159, 0.12);
+  --mat-idiomas: #c93293;
+  --mat-idiomas-soft: rgba(201, 50, 147, 0.12);
   --mat-artes: #b6164b;
   --mat-artes-soft: rgba(182, 22, 75, 0.12);
   --mat-educacao-fisica: #c1451f;
@@ -86,15 +112,15 @@
   /* Cores por status de plano (usadas em Início e Planos) */
   /* `rascunho`: plano que a IA montou de uma foto e o pai ainda não aprovou.
      Dourado da marca de propósito — não é um estado de erro, é um convite. */
-  --st-rascunho: #b07607;
+  --st-rascunho: #925a00;
   --st-rascunho-soft: rgba(240, 163, 21, 0.16);
-  --st-ativo: #18a058;
-  --st-ativo-soft: rgba(24, 160, 88, 0.12);
-  --st-andamento: #2563eb;
+  --st-ativo: #00732f;
+  --st-ativo-soft: rgba(0, 115, 47, 0.12);
+  --st-andamento: #1a57de;
   --st-andamento-soft: rgba(37, 99, 235, 0.12);
-  --st-pausado: #e8730f;
-  --st-pausado-soft: rgba(232, 115, 15, 0.12);
-  --st-concluido: #64748b;
+  --st-pausado: #ad3d00;
+  --st-pausado-soft: rgba(173, 61, 0, 0.12);
+  --st-concluido: #55647b;
   --st-concluido-soft: rgba(100, 116, 139, 0.12);
 }
 
@@ -117,6 +143,10 @@
 
   --dash-accent: var(--brand-gold);
   --dash-accent-soft: rgba(240, 163, 21, 0.18);
+  /* Sobre superfície escura o dourado passa folgado (8:1+), então a tinta é ele
+     mesmo — o token existe pra que a regra de texto seja UMA só nos dois temas. */
+  --dash-accent-ink: var(--brand-gold);
+  --dash-crianca-ink: #8fa3ff;
   --dash-navy: #10142e;
 
   /* No dark, o item ativo fica dourado pra destacar sobre superfície escura */
@@ -354,7 +384,7 @@
   font-size: 0.78rem;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--dash-accent);
+  color: var(--dash-accent-ink);
   margin-top: 3px;
 }
 
@@ -521,7 +551,7 @@
   font-size: 0.62rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--dash-accent);
+  color: var(--dash-accent-ink);
   margin-top: 2px;
 }
 
@@ -640,6 +670,13 @@
 /* --- Conteúdo da seção --- */
 .dash-main {
   flex: 1;
+  width: 100%;
+  /* Num monitor de 1920 sobram 1664px de conteúdo depois da sidebar, e aí as
+     linhas de texto do Diário e do Mapa passam de 150 caracteres — muito além dos
+     ~75 em que o olho ainda acha o começo da linha seguinte. O teto centraliza o
+     conteúdo em vez de esticá-lo; até 1440 nada muda (a conta dá 1184px). */
+  max-width: 1500px;
+  margin-inline: auto;
   padding: clamp(1.5rem, 3vw, 2.5rem) clamp(1.25rem, 3vw, 2.5rem) clamp(2.5rem, 5vw, 4rem);
   outline: none;
 }
@@ -970,6 +1007,46 @@
 }
 
 /* ==========================================================================
+   ALVO DE TOQUE MÍNIMO (dedo, não mouse)
+
+   Medido no painel: o ✕ de limpar a busca tem 28×28, o botão de copiar o código
+   38×38, o interruptor do tema 48×28 e as abas Semanal/Mensal 27px de altura.
+   No mouse isso não incomoda; no polegar cada erro é um toque que faz outra
+   coisa — e o ✕ da busca fica a 12px da borda do campo, então errar significa
+   focar o input e abrir o teclado.
+
+   A folga é dada por um pseudo-elemento CENTRADO, e não por padding: padding
+   mudaria o desenho de todos eles (a bolinha do ✕ viraria um disco de 44px). O
+   `::after` é invisível, não ocupa espaço no fluxo e carrega o clique porque é
+   filho do próprio botão.
+
+   Só em `pointer: coarse` — no desktop os controles continuam do tamanho que
+   foram desenhados.
+   ========================================================================== */
+@media (pointer: coarse) {
+  .cv-search__clear,
+  .cfg-codigo__copy,
+  .cfg-switch,
+  .ap-seg__btn,
+  .dash-modal__close {
+    position: relative;
+  }
+  .cv-search__clear::after,
+  .cfg-codigo__copy::after,
+  .cfg-switch::after,
+  .ap-seg__btn::after,
+  .dash-modal__close::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* ==========================================================================
    RESPONSIVO
    ========================================================================== */
 
@@ -984,6 +1061,14 @@
 
 /* --- Mobile: sidebar vira drawer; surge header com marca + tab bar --- */
 @media (max-width: 900px) {
+  :root,
+  [data-theme="light"],
+  [data-theme="dark"] {
+    /* Altura da tab bar. Lida por ela mesma e pelo respiro do conteúdo — ver
+       `.dash-main` abaixo. */
+    --dash-tabbar-h: 68px;
+  }
+
   .dash-shell {
     grid-template-columns: 1fr;
   }
@@ -1052,13 +1137,22 @@
     visibility: visible;
   }
 
-  /* Espaço pra tab bar não cobrir o conteúdo */
+  /* Espaço pra tab bar não cobrir o conteúdo.
+
+     A altura vive num token e é aplicada nos DOIS lugares (aqui e no `min-height`
+     da própria barra). Antes era um `72px` solto aqui e a barra tinha a altura que
+     o conteúdo desse: bastava mexer no ícone ou no rótulo pra os dois números
+     divergirem, e o último card de cada tela ficava meio escondido — o tipo de
+     defeito que só aparece no fim da rolagem, que é onde ninguém testa. */
   .dash-main {
-    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px) + 1.5rem);
+    padding-bottom: calc(
+      var(--dash-tabbar-h) + env(safe-area-inset-bottom, 0px) + 1.5rem
+    );
   }
 
   /* Tab bar inferior */
   .dash-tabbar {
+    min-height: var(--dash-tabbar-h);
     position: fixed;
     bottom: 0;
     left: 0;
@@ -1079,6 +1173,10 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    /* São 7 abas: em 320px cada uma fica com ~45px de largura, e aí a altura é a
+       única dimensão que ainda dá pra garantir. 48px é o piso confortável. */
+    min-height: 48px;
     gap: 3px;
     padding: 0.4rem 0.2rem;
     border-radius: 12px;
@@ -1113,5 +1211,158 @@
 @media (max-width: 420px) {
   .dash-tabbar__label {
     font-size: 0.62rem;
+  }
+}
+
+/* ==========================================================================
+   MODAL NO CELULAR — o diálogo centralizado vira FOLHA (bottom sheet)
+
+   🔴 O problema, medido: o modal "Criar plano com a Cogni" tem 1136px de conteúdo
+   e a tela do celular tem ~740. Como quem rolava era o OVERLAY inteiro, o
+   cabeçalho ("Criar plano com a Cogni" + o ✕) e as ações ("Montar o plano")
+   saíam da tela juntos — o pai chegava no fim do formulário sem saber mais onde
+   estava nem como fechar, e o botão que ele foi buscar ficava a uma rolagem de
+   distância do campo que ele acabou de preencher.
+
+   A folha resolve os três de uma vez: o diálogo ocupa a largura inteira e trava
+   a altura, o CORPO é quem rola, e cabeçalho e ações ficam ancorados. É também o
+   gesto que o celular já ensina — a folha sobe de baixo, de onde o polegar está.
+
+   👉 A segunda condição é o CELULAR DEITADO. Em 844×390 a largura passa dos 700 e
+   o modal voltaria a ser o diálogo centralizado — só que com 390px de altura, que
+   é onde o problema é pior de todos. O recorte (≤950px de largura E ≤560px de
+   altura) pega o aparelho na horizontal sem pegar notebook nenhum.
+   ========================================================================== */
+@media (max-width: 700px), (max-width: 950px) and (max-height: 560px) {
+  .dash-modal__overlay {
+    align-items: flex-end;
+    padding: 0;
+    /* Quem rola agora é o `__body`.
+       ⚠️ `clip`, e não `hidden`: `hidden` continua sendo um CONTAINER DE ROLAGEM —
+       ele só esconde a barra. E isso morde de verdade: o `openModal` foca o
+       primeiro campo 60ms depois de abrir, enquanto a folha ainda está subindo, e
+       o navegador rola o ancestral rolável mais próximo pra trazer o campo pra
+       dentro. Medido no celular deitado (844×390): a folha terminava a animação
+       145px acima de onde deveria, com o cabeçalho fora da tela e o rodapé
+       flutuando no meio. `clip` recorta sem criar container, e não há o que rolar.
+       (`hidden` fica como degrau pra quem não tem `clip`.) */
+    overflow: hidden;
+    overflow: clip;
+  }
+
+  /* As variantes de largura (sm/md/lg) não valem numa tela de 360px: todas viram
+     a largura inteira. Ficam declaradas juntas pra nenhuma escapar por
+     especificidade. */
+  .dash-modal,
+  .dash-modal--sm,
+  .dash-modal--md,
+  .dash-modal--lg {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    /* Sobra uma fresta do fundo no topo: é ela que diz "isto está POR CIMA da
+       tela, dá pra voltar" — uma folha colada no topo vira uma página nova. */
+    max-height: 92dvh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 22px 22px 0 0;
+    border-bottom: 0;
+  }
+
+  /* Entrada: sobe de baixo, em vez do "cresce no meio" do desktop. */
+  .dash-modal {
+    transform: translateY(100%) scale(1);
+  }
+  .dash-modal__overlay.is-open .dash-modal {
+    transform: translateY(0) scale(1);
+  }
+
+  /* Puxador: dá a leitura de "folha" antes de qualquer texto ser lido, e marca a
+     zona de onde o polegar arrasta pra fechar nos apps que o pai já usa. */
+  .dash-modal__head {
+    position: relative;
+    flex: 0 0 auto;
+    padding: 1.35rem 1.15rem 0.9rem;
+  }
+  .dash-modal__head::before {
+    content: "";
+    position: absolute;
+    top: 0.55rem;
+    left: 50%;
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background-color: var(--dash-border-strong);
+    transform: translateX(-50%);
+  }
+  .dash-modal__title {
+    font-size: 1.15rem;
+  }
+
+  .dash-modal__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 1.15rem 1.15rem calc(1.15rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* A folha desliza; com movimento reduzido ela só aparece. */
+@media (max-width: 700px) and (prefers-reduced-motion: reduce),
+  (max-width: 950px) and (max-height: 560px) and (prefers-reduced-motion: reduce) {
+  .dash-modal {
+    transform: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   A barra de ações da folha gruda no rodapé.
+
+   É o segundo metade do conserto: sem isto, "Montar o plano" continua no fim de
+   um formulário de 1100px e o pai rola a tela inteira duas vezes (uma pra
+   preencher, outra pra achar o botão). Grudado, ele está sempre a um polegar de
+   distância — que é onde o botão de confirmar mora em qualquer app de celular.
+
+   `position: sticky` no ÚLTIMO filho de um container que rola: ele acompanha o
+   conteúdo enquanto há espaço e para no rodapé quando acaba. Precisa de fundo
+   próprio (senão o texto passa por baixo) e das margens negativas pra o fundo
+   chegar até a borda da folha, já que o `__body` tem padding lateral.
+
+   As quatro classes são as quatro barras de ação que existem em modal no painel:
+   formulário de plano, montar o plano, revisão do que a IA leu, e perfil.
+   -------------------------------------------------------------------------- */
+@media (max-width: 700px), (max-width: 950px) and (max-height: 560px) {
+  .dash-modal__body .pl-form__actions,
+  .dash-modal__body .cap__acoes,
+  .dash-modal__body .cap__rodape,
+  .dash-modal__body .cfg-form__actions {
+    position: sticky;
+    bottom: calc(-1.15rem - env(safe-area-inset-bottom, 0px));
+    z-index: 2;
+    margin: 0.5rem -1.15rem calc(-1.15rem - env(safe-area-inset-bottom, 0px));
+    padding: 0.85rem 1.15rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+    background-color: var(--dash-surface);
+    border-top: 1px solid var(--dash-border);
+  }
+  /* Os botões dividem a linha inteira: dois alvos grandes valem mais que dois
+     pequenos encostados na direita, e no polegar a diferença é entre acertar e
+     tocar no backdrop. */
+  .dash-modal__body .pl-form__actions .dash-btn,
+  .dash-modal__body .pl-form__actions .pl-btn,
+  .dash-modal__body .cap__acoes .dash-btn,
+  .dash-modal__body .cap__rodape .dash-btn,
+  .dash-modal__body .cfg-form__actions .dash-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 46px;
+  }
+  /* A contagem de material ("2 de 5 · 1,2 MB de 4,5 MB") toma a linha de cima
+     inteira em vez de espremer o botão. */
+  .dash-modal__body .cap__acoes .cap__contagem {
+    flex: 1 0 100%;
+    margin-right: 0;
+    text-align: center;
   }
 }

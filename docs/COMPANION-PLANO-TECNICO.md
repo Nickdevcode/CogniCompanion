@@ -268,6 +268,10 @@ Um dado, três coelhos. 🎯
 > [!warning] Vocabulário: `travada` NUNCA aparece cru na tela
 > Vale a mesma regra da trilha de aprendizado. O `sinal` é dado interno; o que se mostra ao pai é o `rotulo`, que já vem pronto e escrito em linguagem de apoio ("precisou de mais ajuda", "estava embalada"). Não invente rótulo no front, e não traduza `sinal` por conta própria.
 
+> ⚠️ **Uma divergência combinada (18/ago/2026) — rótulo com gênero.** `criancas` não tem campo de gênero, e dois rótulos saem do robô no **feminino**: `estava embalada` e `resolveu sozinha`. Pra metade das crianças o Mapa descrevia a aula na flexão errada, linha por linha. O **site** passou a exibi-los sem flexão — `estava embalada` → *"estava no embalo"*, `resolveu sozinha` → *"resolveu sem ajuda"* — na mesma tabela em que já corrigia os acentos (`ROTULOS_ACENTUADOS`, em `js/dashboard/mapa-api.js`). Isso **não muda o contrato**: o `rotulo` gravado no `jsonb` continua sendo o do servidor, e o site aceita as duas grafias (masculina e feminina) como chave.
+>
+> 👉 **O ideal é o robô parar de flexionar na origem** — aí a tabela do site vira redundante e some sozinha. Qualquer rótulo NOVO deve nascer sem gênero (nomeie o fato, não a criança: "resolveu sem ajuda" em vez de "resolveu sozinho/a"). Enquanto isso, a rede está montada dos dois lados.
+
 ### ~~`pareamentos`~~ — DESCARTADA
 > A tabela `pareamentos` do plano original **não é usada** (foi dropada). Em vez de um código temporário numa tabela à parte, o código vive **no próprio perfil** (`criancas.codigo_pareamento`): é fixo, nasce com o perfil e não expira. Mais simples e bate com o modelo single-child. Ver o fluxo de pareamento no contrato de dados abaixo.
 

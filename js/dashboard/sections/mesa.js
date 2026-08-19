@@ -111,6 +111,9 @@ const toast = (msg, type) => {
 
 export async function renderMesa(ctx) {
   const raiz = sectionRoot("mesa");
+  // "a criança" é o fallback quando o perfil ainda não tem nome — e é o que
+  // permite escrever as frases sem artigo (o perfil não guarda gênero, então
+  // "o {nome}" acertava metade das famílias e errava a outra).
   const primeiroNome = ((ctx.crianca && ctx.crianca.nome) || "a criança").split(/\s+/)[0];
   const agora = ctx.now || new Date();
 
@@ -184,7 +187,7 @@ export async function renderMesa(ctx) {
   raiz.appendChild(
     pageHead({
       title: "Mesa de Estudos",
-      subtitle: `O que o ${primeiroNome} vai estudar — e como está indo.`,
+      subtitle: `O que ${primeiroNome} vai estudar — e como está indo.`,
       action: el("div", { class: "mesa-acoes", children: [btnCogni, btnNovo] }),
     })
   );
@@ -1505,25 +1508,29 @@ export async function renderMesa(ctx) {
             rows: "4",
             maxlength: "600",
             placeholder:
-              "Descreva o objetivo do plano. Esse texto orienta a Cogni nas conversas.",
+              "Ex.: revisar frações — principalmente somar com denominadores diferentes.",
           },
         });
         if (editando) txt.value = plano.conteudo || "";
 
         const fTitulo = campoForm("Título do plano", inTitulo);
-        const fDuracao = campoForm("Duração (dias)", inDuracao);
+        const fDuracao = campoForm("Dura quantos dias", inDuracao);
         form.append(
           fTitulo,
           el("div", {
             class: "pl-form__grid",
             children: [
-              campoForm("Foco (matéria)", selFoco),
+              campoForm("Matéria", selFoco),
               fDuracao,
               campoForm("Status", selStatus),
             ],
           }),
-          campoForm("Conteúdo do plano", txt, {
-            dica: "Esse texto é injetado no que a Cogni sabe sobre o plano.",
+          // "Esse texto é injetado no que a Cogni sabe sobre o plano" era o commit
+          // message vazando pra tela: "injetado" é palavra de quem escreveu o
+          // system prompt, não de quem tem uma filha com prova na sexta. O que o pai
+          // precisa saber é o efeito — que a Cogni LÊ isto antes de puxar o assunto.
+          campoForm("O que a Cogni deve trabalhar", txt, {
+            dica: "Ela lê isto antes de puxar o assunto com a criança.",
           })
         );
 

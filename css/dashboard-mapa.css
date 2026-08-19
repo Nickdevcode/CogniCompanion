@@ -16,14 +16,19 @@
 :root,
 [data-theme="light"] {
   /* Tons dos momentos. Nomes pelo que significam pro pai, não pelo sinal cru. */
-  --mp-apoio: #e8730f;
-  --mp-apoio-soft: rgba(232, 115, 15, 0.14);
-  --mp-duvida: #8b5cf6;
-  --mp-duvida-soft: rgba(139, 92, 246, 0.14);
-  --mp-bom: #18a058;
-  --mp-bom-soft: rgba(24, 160, 88, 0.14);
-  --mp-neutro: #64748b;
-  --mp-neutro-soft: rgba(100, 116, 139, 0.14);
+  /* Escurecidos em ago/2026 pelo mesmo motivo da paleta de matérias: além da
+     bolinha do tom (onde 3:1 basta), estas cores pintam TEXTO — o resumo de cada
+     aula na lista ("precisou de mais ajuda · tabuada do 7") saía a 3,05:1. Os
+     valores são os mesmos das matérias equivalentes, então laranja de apoio e
+     laranja de português continuam sendo o mesmo laranja. */
+  --mp-apoio: #c14f00;
+  --mp-apoio-soft: rgba(193, 79, 0, 0.14);
+  --mp-duvida: #8352ec;
+  --mp-duvida-soft: rgba(131, 82, 236, 0.14);
+  --mp-bom: #00843f;
+  --mp-bom-soft: rgba(0, 132, 63, 0.14);
+  --mp-neutro: #63738a;
+  --mp-neutro-soft: rgba(99, 115, 138, 0.14);
 
   --mp-rail: rgba(8, 12, 56, 0.12);
   --mp-live: #d92d20; /* o ponto "ao vivo" — vermelho aqui é gravação, não erro */
@@ -289,8 +294,9 @@
   font-size: 0.75rem;
   font-weight: var(--fw-semibold);
   letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--dash-text-faint);
+  /* `muted` e não `faint`: este rótulo mora sobre o fundo tingido do card de
+     atrito (laranja a 14%), que come o contraste que o faint tem sobre o branco. */
+  color: var(--dash-text-muted);
 }
 .mp-atrito__frase,
 .mp-tranquila__titulo {

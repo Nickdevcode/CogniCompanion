@@ -1,5 +1,5 @@
 /**
- * dica.js — "Dica do Cogni" (Início), com fonte ESTÁVEL.
+ * dica.js — "Dica da Cogni" (Início), com fonte ESTÁVEL.
  *
  * Espelha a arquitetura do Resumo Semanal (jun/2026). A "dica de agora" tem duas
  * fontes que se complementam:
@@ -50,7 +50,7 @@ export async function buscarDica(servidorUrl, criancaId) {
     return dados.dica;
   } catch (err) {
     // Robô off / CORS: silencioso de propósito. A tabela cobre o conteúdo.
-    console.debug("[Companion] Dica do Cogni: endpoint indisponível, usando a salva.", err);
+    console.debug("[Companion] Dica da Cogni: endpoint indisponível, usando a salva.", err);
     return null;
   }
 }
@@ -71,7 +71,7 @@ export async function resolverDicaAtual({ servidorUrl, crianca, mock }) {
   // Tabela: tolera falha (RLS/rede) sem derrubar — o endpoint ainda pode cobrir.
   const daTabelaP = mock
     ? mock.getDicaAtual().catch((err) => {
-        console.debug("[Companion] Dica do Cogni: leitura da tabela falhou.", err);
+        console.debug("[Companion] Dica da Cogni: leitura da tabela falhou.", err);
         return null;
       })
     : Promise.resolve(null);
@@ -90,7 +90,7 @@ export async function resolverDicaAtual({ servidorUrl, crianca, mock }) {
 }
 
 /**
- * Card "Dica do Cogni" pro Início. Lê a dica estável (tabela) e refresca pelo
+ * Card "Dica da Cogni" pro Início. Lê a dica estável (tabela) e refresca pelo
  * endpoint; enquanto carrega, mostra um placeholder discreto. `onMais` é o clique
  * do rodapé.
  * @param {object} cfg
@@ -107,7 +107,7 @@ export function cardDica({ servidorUrl, crianca, mock, onMais }) {
       class: "dash-card__head",
       children: [
         el("span", { class: "dash-card__head-ico", svg: ICON.bulb }),
-        el("span", { class: "dash-card__head-title", text: "Dica do Cogni" }),
+        el("span", { class: "dash-card__head-title", text: "Dica da Cogni" }),
       ],
     })
   );

@@ -452,17 +452,26 @@ export function criarQuadro({
     st.ponto = { x: e.clientX, y: e.clientY };
     st.modo = "pendente";
 
-    // Captura na RAIZ (ver a decisão 2 no topo do arquivo).
-    try {
-      raiz.setPointerCapture(e.pointerId);
-    } catch (err) {
-      /* ponteiro já foi embora: o gesto simplesmente não começa */
-    }
-
-    raiz.addEventListener("pointermove", aoMover, { passive: false });
-    raiz.addEventListener("pointerup", aoSubir);
-    raiz.addEventListener("pointercancel", aoAbortarGesto);
-    raiz.addEventListener("lostpointercapture", aoAbortarGesto);
+    /*
+     * 🔴 A captura de ponteiro NÃO acontece aqui — ela espera o `promover()`.
+     *
+     * O motivo é um bug que valia a tela inteira no desktop: com a captura ativa
+     * no momento do `pointerup`, o navegador entrega o `click` seguinte ao
+     * ELEMENTO QUE CAPTUROU (a raiz do quadro), e não ao que está debaixo do
+     * cursor. Ou seja: nem o chip da faixa abria o plano, nem o card do quadro
+     * abria a tarefa — no mouse, a Mesa inteira ficava sem clique. E ninguém
+     * percebia testando no celular, porque o toque monta o `click` por outro
+     * caminho (compatibilidade de touch) e continuava funcionando.
+     *
+     * Capturar só quando o gesto vira arraste de verdade resolve sem custo: até
+     * lá o ponteiro andou no máximo 8px, e os listeners moram no `window`, que
+     * recebe o evento com ou sem captura. A decisão 2 do topo do arquivo continua
+     * valendo — quando a captura acontece, ela é na RAIZ.
+     */
+    window.addEventListener("pointermove", aoMover, { passive: false });
+    window.addEventListener("pointerup", aoSubir);
+    window.addEventListener("pointercancel", aoAbortarGesto);
+    window.addEventListener("lostpointercapture", aoAbortarGesto);
     document.addEventListener("touchmove", bloquearScroll, { passive: false });
 
     if (st.toque) {
@@ -502,6 +511,14 @@ export function criarQuadro({
     window.clearTimeout(st.timerToque);
     if (st.modo !== "pendente" || !st.card) return;
     const card = st.card;
+
+    // Captura na RAIZ (decisão 2 no topo do arquivo), e só AGORA: ver a nota no
+    // `aoDescer` sobre o `click` que a captura precoce roubava do card.
+    try {
+      raiz.setPointerCapture(st.pid);
+    } catch (err) {
+      /* ponteiro já foi embora: seguimos sem captura, o gesto ainda funciona */
+    }
 
     // LEITURA primeiro, escrita depois — misturar as duas custa um reflow por linha.
     const r = card.getBoundingClientRect();
@@ -837,10 +854,10 @@ export function criarQuadro({
     window.clearTimeout(st.timerToque);
     if (st.raf) cancelAnimationFrame(st.raf);
     st.raf = 0;
-    raiz.removeEventListener("pointermove", aoMover);
-    raiz.removeEventListener("pointerup", aoSubir);
-    raiz.removeEventListener("pointercancel", aoAbortarGesto);
-    raiz.removeEventListener("lostpointercapture", aoAbortarGesto);
+    window.removeEventListener("pointermove", aoMover);
+    window.removeEventListener("pointerup", aoSubir);
+    window.removeEventListener("pointercancel", aoAbortarGesto);
+    window.removeEventListener("lostpointercapture", aoAbortarGesto);
     document.removeEventListener("touchmove", bloquearScroll);
     // `releasePointerCapture` lança se o ponteiro já foi embora.
     try {

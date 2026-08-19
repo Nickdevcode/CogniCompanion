@@ -42,6 +42,11 @@
   border-radius: var(--radius-pill);
 }
 .pl-tab {
+  /* 34px de altura era o que sobrava do padding; num dedo o alvo confortável
+     começa em 40. O texto não muda de tamanho — muda a área. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
   padding: 0.5rem 1.1rem;
   border-radius: var(--radius-pill);
   font-family: var(--font-body);
@@ -650,6 +655,12 @@
   font-size: 0.72rem;
   font-weight: var(--fw-semibold);
   line-height: 1;
+}
+/* No tema escuro `--st-rascunho` é o dourado cheio da marca, e #fff em cima dele
+   dá 2,1:1 — o número simplesmente some. Navy sobre dourado passa de 8:1. É a
+   mesma conta (e a mesma decisão) do selo "1º" da faixa de planos, lá embaixo. */
+[data-theme="dark"] .pl-tab__badge {
+  color: var(--brand-navy);
 }
 .pl-tab.is-active .pl-tab__badge {
   background-color: #fff;
@@ -1650,6 +1661,22 @@ body.dnd-arrastando {
   justify-content: center;
   min-height: 3rem;
 }
+/* A regra do 2×2 acima foi escrita pensando no modal de 720px do desktop. Na
+   folha do celular cada botão fica com ~150px, e aí "Escolher arquivo" quebra em
+   duas linhas justamente o que o 2×2 existia pra evitar. Apertar o padding e o
+   corpo devolve os ~30px que faltavam — mais barato que gastar 80px de rolagem
+   empilhando os quatro. */
+@media (max-width: 700px), (max-width: 950px) and (max-height: 560px) {
+  .cap__botao {
+    gap: 0.4rem;
+    padding: 0.65rem 0.55rem;
+    font-size: 0.92rem;
+  }
+  .cap__botao svg {
+    width: 16px;
+    height: 16px;
+  }
+}
 /* Os <input type="file"> ficam fora da tela, mas continuam no fluxo:
    `display: none` impediria o `.click()` programático em alguns navegadores.
    Eles carregam `tabindex="-1"` e `aria-hidden` no JS — só `opacity: 0` os
@@ -2215,6 +2242,95 @@ body.dnd-arrastando {
   }
 }
 
+/* ==========================================================================
+   AS TRÊS FAIXAS QUE ROLAM DE LADO GANHAM BORDA DESBOTADA
+
+   No celular a Mesa tem três roladores horizontais empilhados — as abas, a fila
+   de planos e o quadro. Todos cortavam o conteúdo RETO na borda: "Concluíd",
+   "Tabuada com a Cogn", metade da coluna "Fazendo". Um corte reto não convida a
+   rolar: lê como layout quebrado — que é exatamente a impressão que a tela dava.
+
+   A borda desbotada é o convite. Ela é feita com `mask-image`, e não com sombra
+   de fundo, por um motivo concreto: os chips e as colunas são OPACOS e cobrem o
+   fundo do container inteiro, então qualquer sombra pintada atrás deles fica
+   invisível. O `mask` age sobre o conteúdo, não atrás dele.
+
+   As duas distâncias são propriedades registradas (`@property`), então o
+   navegador sabe interpolá-las — e aí a máscara acompanha a rolagem por uma
+   animação ligada ao próprio scroll, sem um listener sequer.
+
+   👉 Sem suporte a `animation-timeline`, os valores iniciais valem: desbota só a
+   DIREITA. É o estado certo pra rolagem no começo, que é onde a faixa passa a
+   maior parte do tempo — a degradação erra só na ponta final, e erra de menos.
+   ========================================================================== */
+@property --rol-ini {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --rol-fim {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 26px;
+}
+
+@media (max-width: 860px) {
+  .pl-tabs,
+  .mesa-seletor,
+  .mesa-board {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 var(--rol-ini),
+      #000 calc(100% - var(--rol-fim)),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 var(--rol-ini),
+      #000 calc(100% - var(--rol-fim)),
+      transparent 100%
+    );
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .pl-tabs,
+    .mesa-seletor,
+    .mesa-board {
+      animation: rolador-bordas linear both;
+      animation-timeline: scroll(self inline);
+    }
+  }
+
+  /* No modo "Selecionar" a faixa quebra em linhas em vez de rolar — desbotar ali
+     prometeria uma rolagem que não existe. */
+  .mesa-seletor.is-selecionando {
+    -webkit-mask-image: none;
+    mask-image: none;
+    animation: none;
+  }
+
+  /* Um respiro depois do último item: encostado na borda ele parece cortado
+     mesmo estando inteiro. */
+  .mesa-seletor::after,
+  .pl-tabs::after {
+    content: "";
+    flex: 0 0 0.35rem;
+  }
+}
+
+@keyframes rolador-bordas {
+  from {
+    --rol-ini: 0px;
+    --rol-fim: 26px;
+  }
+  to {
+    --rol-ini: 26px;
+    --rol-fim: 0px;
+  }
+}
+
 /* 320px: o menor aparelho que o painel precisa aguentar. */
 @media (max-width: 380px) {
   .mesa-col {
@@ -2223,8 +2339,11 @@ body.dnd-arrastando {
   .mesa-chip-plano {
     max-width: 200px;
   }
-  .cap__botao {
-    flex-basis: 100%;
+  /* Era `flex-basis: 100%` no botão — e `.cap__botoes` é `grid`, então a
+     declaração nunca teve efeito nenhum. A intenção (um por linha quando nem
+     apertado cabe) mora na coluna do grid. */
+  .cap__botoes {
+    grid-template-columns: 1fr;
   }
   /* Em 320px o campo de link e o "Juntar" lado a lado deixam o campo com ~120px —
      e um endereço de vídeo não cabe em 120px nem de longe. O botão desce e ocupa a

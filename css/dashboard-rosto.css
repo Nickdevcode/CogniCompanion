@@ -218,6 +218,13 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  /* Sem teto, o slider herdava a largura da seção: ~900px num monitor de 1440.
+     Dois problemas nisso. O ajuste vira absurdamente fino (a faixa inteira do olho
+     tem 34px de variação espalhados em 900px de arrasto), e os rótulos das pontas
+     — "fininho" e "largo" — ficam tão longe do controle que param de explicá-lo.
+     Com o teto eles voltam a ficar colados no trilho, que é onde a informação
+     serve. Esta tela é da CRIANÇA: o alvo é acertar de primeira, não calibrar. */
+  max-width: 520px;
 }
 
 /* Rótulos das pontas: dão sentido ao arrastar sem mostrar um número sequer.
@@ -419,8 +426,12 @@
     flex-direction: column;
     align-items: flex-start;
   }
+  /* Empilhado, o preview em 100% vira um retângulo preto de ~320×150 no topo do
+     convite — ele domina o card e empurra a frase ("… pode desenhar o rosto da
+     Cogni") pra fora do primeiro olhar. O preview existe pra a criança RECONHECER
+     a carinha atual, e pra isso 240px bastam. */
   .dash-rosto-convite__tela {
-    width: 100%;
+    width: min(100%, 240px);
   }
 }
 

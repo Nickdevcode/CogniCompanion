@@ -372,7 +372,13 @@
   grid-template-columns: 2fr 1fr;
   gap: clamp(1rem, 2vw, 1.5rem);
   margin-bottom: clamp(1.5rem, 3vw, 2rem);
-  align-items: stretch;
+  /* Era `stretch`, e aí o card do gráfico esticava até a altura do card de dicas
+     (que tem 320px de histórico rolável). Só que o gráfico é um SVG de proporção
+     fixa: ele NÃO cresce junto. O resultado era um vão de ~200px entre a curva e a
+     faixa "Muito bem! …" — um buraco no meio do card mais importante da tela.
+     Com `start` cada card para na própria altura; a base fica um pouco irregular,
+     que é o preço certo a pagar. */
+  align-items: start;
 }
 
 /* Card do gráfico */
@@ -403,7 +409,7 @@
   border-radius: var(--radius-pill);
 }
 .ap-seg__btn {
-  padding: 0.35rem 0.9rem;
+  padding: 0.45rem 0.9rem;
   border-radius: var(--radius-pill);
   font-family: var(--font-body);
   font-size: 0.85rem;
@@ -566,7 +572,7 @@
   font-size: 0.72rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--dash-accent);
+  color: var(--dash-accent-ink);
 }
 .ap-dica-now__text {
   font-family: var(--font-body);
@@ -575,12 +581,61 @@
   color: var(--dash-text);
 }
 
-/* Histórico: lista rolável (cabe na coluna estreita ao lado do gráfico) */
+@property --dicas-ini {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --dicas-fim {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 22px;
+}
+@supports (animation-timeline: scroll()) {
+  .ap-dicas__scroll {
+    animation: dicas-bordas linear both;
+    animation-timeline: scroll(self block);
+  }
+}
+@keyframes dicas-bordas {
+  from {
+    --dicas-ini: 0px;
+    --dicas-fim: 22px;
+  }
+  to {
+    --dicas-ini: 22px;
+    --dicas-fim: 0px;
+  }
+}
+
+/* Histórico: lista rolável (cabe na coluna estreita ao lado do gráfico).
+
+   A borda de baixo desbota em vez de cortar reto. O corte reto pegava a terceira
+   dica no meio da frase, e uma frase cortada não é a mesma coisa que uma frase que
+   continua: ela lê como texto que sumiu. Mesma mecânica das faixas da Mesa —
+   propriedades registradas + animação ligada à rolagem —, aqui na vertical.
+
+   Sem suporte a `animation-timeline`, vale o valor inicial: desbota só embaixo, que
+   é o estado certo no topo da lista. */
 .ap-dicas__scroll {
   flex: 1;
   min-height: 0;
   max-height: 320px;
   overflow-y: auto;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--dicas-ini),
+    #000 calc(100% - var(--dicas-fim)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--dicas-ini),
+    #000 calc(100% - var(--dicas-fim)),
+    transparent 100%
+  );
   /* scrollbar discreta sem reservar goteira larga */
   scrollbar-width: thin;
   scrollbar-color: var(--dash-border) transparent;
@@ -706,11 +761,14 @@
 }
 
 @media (max-width: 520px) {
-  .ap-mats {
-    grid-template-columns: 1fr;
-  }
+  /* Eram `1fr` — uma coluna. Só que estes cards são um ícone + duas linhas curtas
+     ("Ciências · 37 min"): esticados na largura inteira do celular sobrava metade
+     do card vazia, e as quatro matérias empurravam a trilha de aprendizado uma
+     tela pra baixo. Duas colunas cabem até em 320px (o `minmax` derruba pra uma se
+     não couber) e a tela ganha ~180px de rolagem de volta. */
+  .ap-mats,
   .ap-stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
   }
   .ap-chart__head {
     flex-direction: column;

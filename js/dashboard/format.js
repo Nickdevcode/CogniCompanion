@@ -732,6 +732,42 @@ export function primeiroNome(nome) {
 }
 
 /**
+ * Como chamar a criança numa frase, SEM chutar o gênero dela.
+ *
+ * 🔴 Por que isto existe. O contrato de `criancas` não tem campo de gênero — e o
+ * painel escrevia "o {nome}" na mão em sete lugares ("Como tá indo o Ana?",
+ * "Deixa o Ana desenhar o rosto da Cogni"). Metade das famílias abria o painel e
+ * a primeira frase da tela estava errada sobre a filha delas. Não é detalhe de
+ * redação: é o app dizendo, na abertura, que não sabe com quem está falando.
+ *
+ * A saída não é adivinhar nem pedir mais um campo no cadastro — é escrever frases
+ * que não precisam do artigo. Português dá duas construções neutras de graça:
+ *
+ *   - **sujeito sem artigo** — "Pedro estudou 20min" / "Ana estudou 20min" ✅
+ *   - **`de` + nome** — "o dia de Pedro" / "o dia de Ana" ✅
+ *     (o coloquial "do Pedro"/"da Ana" é o que tem gênero; "de" não tem)
+ *
+ * O `mapa.js` já fazia assim desde ago/2026 — estas funções só transformam aquela
+ * decisão local na regra da casa, com o fallback de quando não há nome.
+ *
+ * @param {string} nome — primeiro nome já extraído (pode vir vazio)
+ * @returns {string} o sujeito da frase ("Pedro" ou "a criança")
+ */
+export function sujeito(nome) {
+  return nome || "a criança";
+}
+
+/**
+ * A forma possessiva neutra: "de Pedro" / "da criança".
+ * Use em "o dia {de Pedro}", "as conversas {de Pedro}".
+ * @param {string} nome — primeiro nome já extraído (pode vir vazio)
+ * @returns {string}
+ */
+export function deQuem(nome) {
+  return nome ? `de ${nome}` : "da criança";
+}
+
+/**
  * Idade em anos a partir do campo `idade` (já numérico no contrato).
  * Mantido como função pra centralizar o rótulo "X anos".
  */

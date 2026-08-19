@@ -31,6 +31,7 @@ import {
   tempoTotal,
   dayKey,
   primeiroNome,
+  sujeito,
 } from "../format.js";
 
 /* --------------------------------------------------------------------------
@@ -425,8 +426,8 @@ function blocoTrilha({ crianca, nome, now }) {
       el("p", {
         class: "ap-section-head__note",
         text: total
-          ? `Não é nota: é o que a Cogni guarda pra retomar os assuntos com o ${nome} nos próximos dias.`
-          : `Conforme o ${nome} estuda, a Cogni anota os assuntos aqui pra retomá-los depois.`,
+          ? `Não é nota: é o que a Cogni guarda pra retomar com ${nome} nos próximos dias.`
+          : `Conforme ${nome} estuda, a Cogni anota os assuntos aqui pra retomá-los depois.`,
       }),
     ],
   });
@@ -446,13 +447,13 @@ function blocoTrilha({ crianca, nome, now }) {
             itens: praticando,
             vazio: total
               ? "Nada pendente de reforço no momento. 🎉"
-              : "Os assuntos em que a Cogni estiver ajudando aparecerão aqui.",
+              : "Quando a Cogni ajudar num assunto, ele fica listado aqui.",
             now,
             dominado: false,
           }),
           cardTrilha({
             titulo: "Já domina",
-            subtitulo: "Acertou sozinho mais de uma vez",
+            subtitulo: "Acertou mais de uma vez sem ajuda",
             iconSvg: ICON.check,
             variante: "dominou",
             itens: dominados,
@@ -529,7 +530,7 @@ function cardDicasCogni({ servidorUrl, crianca, now, dicas, mock }) {
         : [
             el("p", {
               class: "ap-empty",
-              text: "As próximas dicas da Cogni aparecerão aqui.",
+              text: "As dicas anteriores ficam guardadas aqui.",
             }),
           ])
     );
@@ -589,11 +590,14 @@ function contador(valor, rotulo, iconSvg) {
 
 export async function renderAprendizado(ctx) {
   const root = sectionRoot("aprendizado");
-  const nome = primeiroNome(ctx.crianca && ctx.crianca.nome) || "a criança";
+  const primeiro = primeiroNome(ctx.crianca && ctx.crianca.nome);
+  const nome = sujeito(primeiro);
 
   const head = pageHead({
-    title: "Painel de aprendizado",
-    subtitle: `Acompanhe o progresso do ${nome} e veja como ele está aprendendo com a Cogni.`,
+    title: "Aprendizado",
+    // Sem "ele": o perfil não guarda gênero. E sem "acompanhe o progresso", que é
+    // a frase que qualquer painel do mundo escreveria — esta diz o que TEM na tela.
+    subtitle: `Quanto tempo, em quê, e o que a Cogni já marcou pra retomar com ${nome}.`,
   });
   head.appendChild(
     el("img", {
@@ -631,7 +635,7 @@ export async function renderAprendizado(ctx) {
       ? el("div", { class: "ap-mats", children: mats.map(cardMateria) })
       : el("p", {
           class: "ap-empty ap-empty--lead",
-          text: `O tempo dedicado a cada matéria aparece aqui assim que o ${nome} conversar com a Cogni.`,
+          text: `O tempo por matéria aparece aqui assim que ${nome} conversar com a Cogni.`,
         })
   );
 
@@ -660,7 +664,7 @@ export async function renderAprendizado(ctx) {
       : [
           el("p", {
             class: "ap-empty",
-            text: "Os assuntos que a criança explorar aparecerão aqui.",
+            text: "Cada assunto novo que aparecer nas conversas entra nesta lista.",
           }),
         ],
   });
@@ -676,7 +680,18 @@ export async function renderAprendizado(ctx) {
   const chartHost = el("div", { class: "ap-chart__canvas" });
   const resumoFaixa = el("div", { class: "ap-chart__note" });
 
+  /**
+   * Abaixo de 620px o gráfico troca de sistema de coordenadas (ver MEDIDAS em
+   * `linechart.js`): no viewBox largo, os rótulos chegariam na tela com ~4,6px.
+   * O `matchMedia` fica vivo enquanto a seção estiver no DOM — girar o aparelho
+   * atravessa esse limite, e um gráfico ilegível até a próxima navegação seria o
+   * mesmo defeito com um passo a mais.
+   */
+  const telaEstreita = window.matchMedia("(max-width: 620px)");
+  let modoAtual = "semanal";
+
   function renderChart(modo) {
+    modoAtual = modo;
     const serie =
       modo === "mensal"
         ? serieSemanal(conversas, ctx.now, 4)
@@ -684,6 +699,7 @@ export async function renderAprendizado(ctx) {
     chartHost.replaceChildren(
       buildLineChart({
         points: serie,
+        compacto: telaEstreita.matches,
         formatValue: (v) => `${v}min`,
         ariaLabel:
           modo === "mensal"
@@ -709,6 +725,17 @@ export async function renderAprendizado(ctx) {
       el("p", { text: texto })
     );
   }
+
+  // Se auto-remove quando a seção some: o router troca o conteúdo do outlet sem
+  // avisar ninguém, e um listener por navegação vaza um gráfico por visita.
+  const aoTrocarLargura = () => {
+    if (!document.contains(chartHost)) {
+      telaEstreita.removeEventListener("change", aoTrocarLargura);
+      return;
+    }
+    renderChart(modoAtual);
+  };
+  telaEstreita.addEventListener("change", aoTrocarLargura);
 
   const segWeek = el("button", {
     class: "ap-seg__btn is-active",

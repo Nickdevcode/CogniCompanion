@@ -94,7 +94,7 @@ O painel lê de **duas fontes**, e ambas já estão integradas:
 | Fonte | O quê | Como |
 | --- | --- | --- |
 | 🗄️ **Supabase** | Criança, conversas (Diário), planos de estudo, perfil, **trilha de aprendizado**, **aulas do Mapa** | `@supabase/supabase-js` (anon key + RLS). Conversas, trilha e aulas são **só leitura** pelo site; planos têm CRUD |
-| 🖥️ **Servidor local da Cogni** | Resumo Semanal (IA), Dica do Cogni (IA), **Mapa da aula ao vivo + seu resumo** (IA), rosto do robô, pareamento/despareamento | `fetch` nos endpoints `/api/...` (precisa do robô/servidor ligado) |
+| 🖥️ **Servidor local da Cogni** | Resumo Semanal (IA), Dica da Cogni (IA), **Mapa da aula ao vivo + seu resumo** (IA), rosto do robô, pareamento/despareamento | `fetch` nos endpoints `/api/...` (precisa do robô/servidor ligado) |
 
 ### 🎛️ A chave que liga tudo: `USAR_SUPABASE`
 
@@ -263,8 +263,11 @@ vereditos dos exercícios**, e grava a aula fechada em `sessoes_atencao`. O site
 Quatro cuidados que sustentam a tela:
 
 - 🗣️ **`travada`/`travou` nunca aparecem.** O que vai pra tela é o `rotulo` que o servidor manda pronto
-  ("precisou de mais ajuda", "estava embalada"). E se um rótulo vier **igual** ao sinal — o que acontece
+  ("precisou de mais ajuda", "estava no embalo"). E se um rótulo vier **igual** ao sinal — o que acontece
   quando o robô ganha um sinal novo e esquece de nomeá-lo —, o site troca por um neutro em vez de vazar.
+  Desde ago/2026 a tabela do `mapa-api.js` também **tira o gênero** de dois rótulos que o robô manda no
+  feminino: `estava embalada` → *"estava no embalo"* e `resolveu sozinha` → *"resolveu sem ajuda"*
+  (ver "A revisão de design do painel"). O `rotulo` cru no banco continua o do servidor.
 - 🚫 **Não é placar.** Os `contadores` chegam no payload e **de propósito não viram números**: "2 acertos ×
   1 tropeço" é boletim com outro nome. O cabeçalho mostra só duração e trocas de conversa. Pelo mesmo
   motivo, o `peso` do assunto mais difícil é descartado (é ranking interno) e as `ocorrencias` viram frase
@@ -594,6 +597,119 @@ Faltando qualquer uma, a função responde **503** com mensagem clara em vez de 
 > **O ✨ dos campos também**: no modo de demonstração ele devolve um texto de exemplo local, o que
 > já basta pra conferir o desfazer, o corte no teto, o botão apagado sem contexto e o "escrevendo…".
 
+### 🔍 A revisão de design do painel (18/ago/2026)
+
+Uma passada inteira no Companion — desktop, celular e os dois temas — atrás do que estava **errado**,
+não do que dava pra enfeitar. Saíram quatro categorias de achado, e a mais cara delas não era de design.
+
+#### 🖱️ O bug que fazia a Mesa não responder ao mouse
+
+**A Mesa de Estudos inteira estava sem clique no desktop.** Clicar num plano da faixa não trocava o
+quadro; a tela ficava presa no primeiro plano da fila. No celular funcionava — e é por isso que ninguém
+tinha visto.
+
+A causa é uma linha do `dnd.js`: ele chamava `raiz.setPointerCapture()` já no `pointerdown`, pra não
+perder o ponteiro se o dedo saísse da área durante o arraste. Só que **com a captura ativa no
+`pointerup`, o navegador entrega o `click` seguinte ao elemento que capturou** (a raiz do quadro), e não
+ao que está debaixo do cursor. O `<button>` do chip nunca via o próprio clique. No toque continuava
+funcionando porque ali o `click` nasce de outro caminho (compatibilidade de touch), que ignora a captura.
+
+O conserto é *quando*, não *onde*: a captura passou pro `promover()` — o instante em que o gesto vira
+arraste de verdade. Até lá o ponteiro andou no máximo 8px, e os listeners mudaram de `raiz` pra `window`,
+que recebe o evento com captura ou sem. A decisão de sempre capturar **na raiz** (e nunca no card) segue
+valendo, palavra por palavra.
+
+> 🧪 Verificado nos quatro caminhos, um por um: chip abre o plano no mouse, arraste de card entre colunas
+> no mouse, arraste por teclado com o anúncio do leitor de tela, e toque.
+
+#### 🚻 O painel achava que toda criança era menino
+
+`criancas` **não tem campo de gênero** — e sete frases da interface escreviam o artigo na mão:
+*"Como tá indo **o** Ana?"*, *"Deixa **o** Ana desenhar o rosto da Cogni"*, *"veja como **ele** está
+aprendendo"*. Para metade das famílias, a **primeira frase da primeira tela** estava errada sobre a
+filha delas. E o Mapa da aula piorava: dois rótulos vinham do robô no feminino (*"estava embalada"*,
+*"resolveu sozinha"*), então pra outra metade a aula era descrita na flexão errada, linha por linha.
+
+A saída não é adivinhar nem pedir mais um campo no cadastro — é escrever frases que **não precisam de
+flexão**. O português dá duas construções neutras de graça, e o `format.js` agora as encapsula:
+
+| Helper | Devolve | Onde |
+| --- | --- | --- |
+| `sujeito(nome)` | `"Pedro"` · `"a criança"` | *"Conforme **Pedro** estuda…"* |
+| `deQuem(nome)` | `"de Pedro"` · `"da criança"` | *"O dia **de Pedro**"* (o coloquial "do/da" é que tem gênero) |
+
+E os rótulos do Mapa viraram fato em vez de adjetivo: **"estava no embalo"** e **"resolveu sem ajuda"**.
+A troca mora no `ROTULOS_ACENTUADOS` do `mapa-api.js`, junto com a dos acentos — o `rotulo` cru continua
+sendo o do servidor no banco; quem muda é a **tela**.
+
+> 🤖 De quebra, a própria Cogni tinha dois gêneros no painel: 155 *"a Cogni"* contra 15 *"o Cogni"* —
+> e o card do Início dizia *"Dica **do** Cogni"* no título com *"**A** Cogni está pensando…"* no corpo.
+> Ficou tudo no feminino, menos **"o Cogni Companion"**, que é o nome do app.
+
+#### 📱 Criar um plano no celular
+
+O modal de criar plano tem **1136px de conteúdo** e a tela do celular tem ~740. Como quem rolava era o
+overlay inteiro, o cabeçalho e o botão *"Montar o plano"* saíam de cena juntos: o pai chegava no fim do
+formulário sem saber onde estava, e o botão que ele foi buscar ficava a uma rolagem de distância do campo
+que acabou de preencher.
+
+Agora, abaixo de 700px de largura (**e no celular deitado**, que é onde era pior), todo modal do painel
+vira uma **folha**: largura inteira, 92dvh de altura, puxador no topo, o **corpo** é quem rola, e a barra
+de ações gruda no rodapé com os botões dividindo a linha. Vale pros quatro modais — criar com a Cogni,
+escrever à mão, revisar o que a IA leu e o perfil da criança.
+
+> 🐛 Um detalhe custou medição pra achar: `overflow: hidden` no overlay **continua sendo um container de
+> rolagem** — ele só esconde a barra. E o `openModal` foca o primeiro campo 60ms depois de abrir, enquanto
+> a folha ainda sobe; o navegador rolava esse container pra trazer o campo pra dentro, e a folha terminava
+> **145px acima** do lugar, com o cabeçalho fora da tela. `overflow: clip` recorta sem criar container.
+
+E as três faixas que rolam de lado na Mesa (as abas, a fila de planos, o quadro) cortavam o conteúdo
+**reto** na borda — *"Concluíd"*, *"Tabuada com a Cogn"*, metade da coluna "Fazendo". Corte reto não
+convida a rolar: lê como layout quebrado. Agora a borda **desbota**, com `mask-image` movido por
+`animation-timeline: scroll()` — sem um listener sequer. Sem suporte, vale o valor inicial: desbota só a
+direita, que é o estado certo no começo da rolagem.
+
+> Por que máscara e não sombra de fundo: os chips e as colunas são **opacos** e cobrem o fundo do
+> container, então sombra pintada atrás deles fica invisível. A máscara age sobre o conteúdo.
+
+#### 🎨 39 textos abaixo do contraste mínimo
+
+Uma varredura automática mediu **todo** texto das 7 seções nos 2 temas, compondo o alpha de cada camada
+de fundo. Deu **39 reprovações** no mínimo de 4,5:1 do WCAG AA. E não eram detalhes decorativos: era o
+eixo do gráfico, o *"visto há 4 dias"* da trilha, a hora da mensagem, o nome da matéria no Diário e o
+*"Desvincular este perfil"* — texto de ação destrutiva, que o pai precisa **ler** antes de tocar.
+
+| O que era | O que virou |
+| --- | --- |
+| `--dash-text-faint: #8b92a6` (3,1:1) | `#676d80` — os três degraus de cinza continuam de pé |
+| Dourado da marca como **texto** (2,1:1) | `--dash-accent-ink`, um dourado escuro só pra escrever (o `--dash-accent` segue sendo o dourado de ícone e traço, onde 3:1 basta) |
+| 7 das 14 matérias, entre 2,9:1 e 4,2:1 | escurecidas em **OKLCH** — mesma matiz, mesmo croma, só a luminosidade desce. As famílias por área continuam legíveis de relance |
+| `#5d78ff` do nome da criança, repetido em 2 arquivos | `--dash-crianca-ink`: um token, um valor por tema |
+| `#d64545` do "Desvincular", igual nos dois temas | uma cor por tema (escura no claro, clara no escuro) |
+
+O alvo usado foi **4,8:1**, e não 4,5 na unha: as mesmas cores aparecem sobre `--dash-surface-2` e sobre
+o próprio `-soft`, que são um degrau mais escuros que o branco puro. Na remedição: **zero** reprovações.
+
+> ✋ E os alvos de toque: o ✕ de limpar a busca tinha 28×28, o interruptor do tema 48×28, as abas
+> Semanal/Mensal 27px de altura. A folga vem de um pseudo-elemento centrado (44×44) e só em
+> `pointer: coarse` — padding mudaria o desenho de todos eles, e no desktop não há problema a resolver.
+
+#### 🧹 O resto, em uma linha cada
+
+| Onde | O quê |
+| --- | --- |
+| 📊 **Gráfico de evolução** | Num card de 280px os rótulos chegavam com **4,6px** de altura. Ganhou um viewBox compacto (360×260) que entra abaixo de 620px, e o `matchMedia` fica vivo pra girar o aparelho não deixar o gráfico ilegível |
+| 🕳️ **Buracos no grid** | O Início parava cada card na própria altura e abria dois vazios no meio do bento; o card do gráfico esticava até a altura do vizinho e deixava ~200px de nada entre a curva e a faixa de resumo; em Configurações sobrava um retângulo vazio ao lado de "Aparência" |
+| ⏱️ **Mapa da aula sem teto** | As duas únicas chamadas do painel sem `AbortSignal.timeout` — e o Mapa **bloqueia o render**, então o pai olhava "Carregando…" até o navegador desistir sozinho |
+| 📏 **Telas largas** | Em 1920 as linhas do Diário passavam de 150 caracteres; teto de 1500px no conteúdo e de 68ch no balão |
+| 🎚️ **Sliders do rosto** | Herdavam a largura da seção (~900px): a faixa inteira do olho tem 34px de variação espalhados nisso, e os rótulos das pontas ficavam longe demais pra explicar o controle |
+| 📐 **Tab bar** | A altura era um `72px` solto no respiro do conteúdo, e a barra tinha a altura que desse; virou um token lido nos dois lugares |
+| ✍️ **Dev-speak na tela** | *"Esse texto é injetado no que a Cogni sabe sobre o plano"* — "injetado" é palavra de quem escreveu o system prompt, não de quem tem uma filha com prova na sexta. Virou *"Ela lê isto antes de puxar o assunto com a criança"* |
+| 🗣️ **Frases de fábrica** | *"continue incentivando essa jornada"*, *"Gerencie o perfil, a conta e as preferências"*, *"Bem-vindo(a)"* — trocadas por frases que dizem algo que a tela não diz sozinha |
+| 🏷️ **Dois cards, um nome** | O Início tinha **dois** cards chamados "Resumo da semana" lado a lado. Viraram "A semana em números" e "O bilhete da semana". E "Próximo plano de estudo" mostrava o plano de **agora** — virou "O plano de agora" |
+
+---
+
 ### 🗃️ Arquivos do painel
 
 | Arquivo | Função |
@@ -602,8 +718,8 @@ Faltando qualquer uma, a função responde **503** com mensagem clara em vez de 
 | `js/dashboard/mock-data.js` | **Fonte de dados** (roteia mock ↔ Supabase pela flag `USAR_SUPABASE`) |
 | `js/dashboard/supabase-data.js` | Implementação real das queries/escritas no Supabase |
 | `js/dashboard/onboarding.js` | Boas-vindas + pareamento por código (tela cheia, com motion) |
-| `js/dashboard/resumo-semanal.js` | Card + modal do "Resumo da semana da Cogni" (bilhete por IA) |
-| `js/dashboard/dica.js` | Card "Dica do Cogni" (Início + Aprendizado), gerada por IA no servidor local (`/api/dica`) |
+| `js/dashboard/resumo-semanal.js` | Card + modal do **"O bilhete da semana"** (resumo por IA) |
+| `js/dashboard/dica.js` | Card **"Dica da Cogni"** (Início + Aprendizado), gerada por IA no servidor local (`/api/dica`) |
 | `js/dashboard/router.js` | Roteamento por hash (SPA leve) |
 | `js/dashboard/rosto-preview.js` | Desenho do rosto do robô em SVG (módulo puro, sem rede) |
 | `js/dashboard/rosto-api.js` | Leitura/gravação do rosto: PUT ao vivo no robô + persistência no Supabase |
@@ -730,7 +846,7 @@ Cogni Software/
 │   │   ├── supabase-data.js# Queries/escritas reais no Supabase
 │   │   ├── onboarding.js   # Boas-vindas + pareamento por código
 │   │   ├── resumo-semanal.js # Bilhete da semana (IA, servidor local)
-│   │   ├── dica.js         # Dica do Cogni (IA, servidor local)
+│   │   ├── dica.js         # Dica da Cogni (IA, servidor local)
 │   │   ├── mapa-api.js     # Mapa da aula: ao vivo (servidor) + histórico (Supabase)
 │   │   ├── mapa-timeline.js# A linha do tempo da aula (marcadores acessíveis)
 │   │   ├── dnd.js          # Drag and drop do quadro (Pointer Events + teclado)

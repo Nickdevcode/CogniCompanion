@@ -28,20 +28,53 @@
 const LIMITE_HISTORICO = 10;
 
 /**
- * Rótulos que o servidor produz hoje (`ROTULO_SINAL` e os literais de prática em
- * `modules/atencao.js` do repo do robô), mapeados pra a mesma frase com os
- * acentos que o português exige.
+ * Teto de espera pelo servidor local — o MESMO de `servidor.js` e `rosto-api.js`.
  *
- * Isto NÃO é traduzir sinal nem inventar rótulo: a frase é idêntica, palavra por
- * palavra. O repo do robô é escrito sem acentuação (convenção de lá), e o pai não
- * pode ler "ficou em duvida" no painel. Rótulo que não estiver aqui passa como
- * veio — não adivinhamos texto que não conhecemos.
+ * 🔴 Estas duas chamadas eram as únicas do painel sem teto, e o Mapa é a seção que
+ * mais sofre com isso: o primeiro `carregarMapa()` BLOQUEIA o render (a seção só
+ * devolve o nó depois dele), então enquanto o `fetch` não resolve o pai olha o
+ * spinner "Carregando…" e mais nada. Com o robô desligado em casa a conexão é
+ * recusada na hora e ninguém percebe — mas basta o pai abrir o painel no 4G, ou
+ * numa rede com portal cativo, pra o `127.0.0.1` (ou o IP que ele tenha
+ * configurado) ficar pendurado até o navegador desistir sozinho. E o histórico do
+ * banco, que já bastava pra pintar a tela inteira, ficava esperando junto.
+ */
+const TIMEOUT_MS = 4000;
+
+/**
+ * Rótulos que o servidor produz hoje (`ROTULO_SINAL` e os literais de prática em
+ * `modules/atencao.js` do repo do robô), mapeados pra a frase que o pai lê.
+ *
+ * A tabela faz DUAS coisas, e as duas são de tradução, nunca de invenção:
+ *
+ * 1. **Acento.** O repo do robô é escrito sem acentuação (convenção de lá) e o pai
+ *    não pode ler "ficou em duvida" no painel. A frase é idêntica, palavra por
+ *    palavra.
+ *
+ * 2. **Gênero (ago/2026).** Dois rótulos do robô vinham no feminino — "estava
+ *    embalada" e "resolveu sozinha" —, e `criancas` não tem campo de gênero: pra
+ *    metade das crianças o Mapa descrevia a aula na flexão errada, linha por linha,
+ *    numa tela feita justamente pra o pai reconhecer a filha (ou o filho) ali.
+ *    Trocar por "embalado(a)" seria o parêntese que o painel acabou de tirar do
+ *    onboarding. A saída é a mesma do resto do Companion: frase que não precisa de
+ *    flexão. "estava no embalo" e "resolveu sem ajuda" dizem exatamente o mesmo —
+ *    e a segunda até diz melhor, porque nomeia o fato ("sem ajuda") em vez de um
+ *    adjetivo sobre a criança.
+ *
+ * ⚠️ A divergência de texto mora AQUI de propósito: o `rotulo` cru continua sendo o
+ * do servidor (é o que está gravado no jsonb e o que o robô entende). Quem lê o
+ * banco por fora vê o rótulo original; quem lê a TELA vê a versão neutra.
+ *
+ * Rótulo que não estiver aqui passa como veio — não adivinhamos texto que não
+ * conhecemos.
  */
 const ROTULOS_ACENTUADOS = {
   "precisou de mais ajuda": "precisou de mais ajuda",
   "ficou em duvida": "ficou em dúvida",
-  "estava embalada": "estava embalada",
-  "resolveu sozinha": "resolveu sozinha",
+  "estava embalada": "estava no embalo",
+  "estava embalado": "estava no embalo",
+  "resolveu sozinha": "resolveu sem ajuda",
+  "resolveu sozinho": "resolveu sem ajuda",
   "tropecou no exercicio": "tropeçou no exercício",
   // Os dois rótulos do marco de compreensão (ago/2026) já nascem acentuados no
   // servidor — entram aqui só como rede: se um deles chegar sem acento (robô
@@ -355,7 +388,7 @@ async function buscarDoServidor(servidorUrl, criancaId) {
     const url =
       `${servidorUrl}/api/mapa-aula?criancaId=${encodeURIComponent(criancaId)}` +
       `&limite=${LIMITE_HISTORICO}`;
-    const resp = await fetch(url);
+    const resp = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!resp.ok) return null;
     return await resp.json();
   } catch (err) {
@@ -438,7 +471,7 @@ export async function carregarResumoDaAula(servidorUrl, criancaId) {
   if (!servidorUrl || !criancaId) return null;
   try {
     const url = `${servidorUrl}/api/mapa-aula/resumo?criancaId=${encodeURIComponent(criancaId)}`;
-    const resp = await fetch(url);
+    const resp = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!resp.ok) return null;
     const dados = await resp.json();
     return texto(dados && dados.texto);

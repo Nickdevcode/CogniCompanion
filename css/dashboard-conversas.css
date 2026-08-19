@@ -390,6 +390,11 @@
   padding: 0.6rem 0.9rem;
   border-radius: 16px;
   min-width: 0;
+  /* Teto de leitura. Sem ele o balão da Cogni acompanha o card: num monitor de
+     1920 isso dá ~730px de linha, e a partir de uns 75 caracteres o olho começa a
+     errar a volta pra linha seguinte. `ch` e não `px` porque o que importa aqui é
+     contar caractere, e a fonte do painel pode mudar. */
+  max-width: 68ch;
 }
 .cv-msg--crianca .cv-msg__bubble {
   background-color: var(--dash-surface-2);
@@ -414,17 +419,18 @@
   font-size: 0.78rem;
 }
 .cv-msg--crianca .cv-msg__name {
-  color: #5d78ff;
+  color: var(--dash-crianca-ink);
 }
+/* A tinta já troca sozinha por tema (dourado escuro no claro, dourado da marca no
+   escuro) — o override por `[data-theme]` daqui virou redundante e saiu. */
 .cv-msg--cogni .cv-msg__name {
-  color: var(--brand-gold-deep);
-}
-[data-theme="dark"] .cv-msg--cogni .cv-msg__name {
-  color: var(--brand-gold);
+  color: var(--dash-accent-ink);
 }
 .cv-msg__time {
   font-size: 0.7rem;
-  color: var(--dash-text-faint);
+  /* Os balões têm fundo tingido (azul da criança / dourado da Cogni) e o texto é
+     de 11px: `faint` fica abaixo do mínimo ali dentro. */
+  color: var(--dash-text-muted);
 }
 .cv-msg__text {
   font-family: var(--font-body);

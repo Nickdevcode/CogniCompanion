@@ -375,8 +375,10 @@ function criarFluxo({ ctx, aoSalvar }) {
       el("p", {
         class: "cap__intro",
         text:
-          "Escreva o que você quer que a Cogni trabalhe com ela. Se você tem um material " +
-          "— da escola ou não —, junte aqui também: ela lê e monta as tarefas; você " +
+          // Havia dois problemas na frase antiga ("…que a Cogni trabalhe com ela"):
+          // o "ela" tanto podia ser a Cogni quanto a criança, e assumia uma filha.
+          "Escreva o que quer que seja estudado. Se a escola mandou material — ou se " +
+          "você achou algum bom —, junte aqui: a Cogni lê, monta as tarefas e você " +
           "confere antes de valer.",
       }),
       campoDoPedido()
@@ -427,8 +429,12 @@ function criarFluxo({ ctx, aoSalvar }) {
     }
 
     if (materiais.length || lendoLink) palco.append(bandeja());
-    palco.append(acoesDoPalco());
 
+    // A nota de LGPD vem ANTES da barra de ações de propósito: no celular a barra
+    // fica grudada no rodapé da folha (ver `.cap__acoes` no CSS), e qualquer
+    // parágrafo depois dela nasceria escondido atrás do botão. Além disso ela lê
+    // melhor aqui — é a resposta à pergunta que o pai acabou de fazer ao anexar a
+    // foto do caderno da filha, e não uma letra miúda depois do "Montar o plano".
     palco.append(
       el("p", {
         class: "cap__lgpd",
@@ -437,6 +443,8 @@ function criarFluxo({ ctx, aoSalvar }) {
           "descartado.",
       })
     );
+
+    palco.append(acoesDoPalco());
 
     /**
      * Os `<input type="file">` ficam por ÚLTIMO no DOM de propósito: o foco inicial
@@ -558,7 +566,7 @@ function criarFluxo({ ctx, aoSalvar }) {
         inputmode: "url",
         autocomplete: "off",
         spellcheck: "false",
-        placeholder: "Cole um link do YouTube ou de um site",
+        placeholder: "Cole um link aqui",
       },
     });
     campo.value = textoDoLink;

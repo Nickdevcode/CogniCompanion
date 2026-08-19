@@ -11,7 +11,12 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: clamp(1rem, 2vw, 1.5rem);
-  align-items: start;
+  /* Sem `align-items: start`: "Aparência" tem uma linha e "Conta" tem três, e com
+     `start` o card curto parava na própria altura — sobrava um retângulo vazio de
+     ~130px entre ele e o "Vínculo com a Cogni" logo abaixo. Um vão desses no meio
+     de uma tela de configurações lê como card que não carregou. Esticando, os dois
+     terminam juntos: o espaço vira respiro DENTRO do card, que é o desenho normal
+     de qualquer painel de ajustes. */
 }
 /* Perfil e Vínculo com o robô ocupam a largura toda; Conta e Tema dividem a
    linha entre eles. Mantém o grid simétrico, sem espaços vazios. */
@@ -167,7 +172,7 @@
   padding: 0.15rem 0.6rem;
   border-radius: var(--radius-pill);
   background-color: var(--dash-accent-soft);
-  color: var(--brand-gold-deep);
+  color: var(--dash-accent-ink);
   font-family: var(--font-body);
   font-size: 0.72rem;
   font-weight: var(--fw-semibold);
@@ -344,6 +349,13 @@
   background-color: var(--st-ativo-soft);
 }
 .cfg-status-badge__dot {
+  /* `flex-shrink: 0` + `align-self: start`: em 360px a frase "Conectado ao perfil
+     de Pedro Carvalho" quebra em três linhas ao lado da foto de 96px, e o ponto
+     ficava centralizado na linha DO MEIO — parecia um bullet perdido. Agora ele
+     ancora na primeira linha, que é onde a leitura começa. */
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: 0.42rem;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -451,13 +463,23 @@
   width: 18px;
   height: 18px;
 }
-/* Botão desvincular: variante "perigo" do cfg-logout */
+/* Botão desvincular: variante "perigo" do cfg-logout.
+
+   O #d64545 era um literal único pros dois temas, e não passava em nenhum: 3,8:1
+   sobre o fundo claro e 2,9:1 sobre o escuro (o botão tem fundo avermelhado
+   próprio, que come contraste dos dois lados). Ação destrutiva é justamente onde
+   o texto não pode ficar ilegível — o pai precisa LER o que vai fazer antes de
+   tocar. Agora são duas cores, uma por tema. */
 .cfg-unlink {
-  color: #d64545;
+  --cfg-perigo: #c23134;
+  color: var(--cfg-perigo);
+}
+[data-theme="dark"] .cfg-unlink {
+  --cfg-perigo: #ff8a8a;
 }
 .cfg-unlink:hover {
-  background-color: color-mix(in srgb, #d64545 10%, transparent);
-  border-color: color-mix(in srgb, #d64545 35%, transparent);
+  background-color: color-mix(in srgb, var(--cfg-perigo) 10%, transparent);
+  border-color: color-mix(in srgb, var(--cfg-perigo) 35%, transparent);
 }
 
 /* Barra "última sincronização" + botão de atualizar */
@@ -684,6 +706,25 @@
 @media (max-width: 920px) {
   .cfg-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* No celular a foto do robô (96px) + a frase de status dividindo a mesma linha
+   deixam ~180px pro texto, e "Conectado ao perfil de Pedro Carvalho" vira três
+   linhas espremidas. Empilhado, a frase usa a largura inteira e a foto encolhe —
+   ela é ilustração, não informação. */
+@media (max-width: 480px) {
+  .cfg-status__top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+  .cfg-status__photo {
+    width: 72px;
+    height: 72px;
+  }
+  .cfg-status__info {
+    width: 100%;
   }
 }
 
