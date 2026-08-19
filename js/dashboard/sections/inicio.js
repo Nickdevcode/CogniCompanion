@@ -32,6 +32,7 @@ import {
   planosVigentes,
   sujeito,
   deQuem,
+  capitalizar,
 } from "../format.js";
 
 /* --------------------------------------------------------------------------
@@ -411,7 +412,9 @@ function conviteRosto(crianca, nome) {
             class: "dash-rosto-convite__titulo",
             // Sem artigo antes do nome: o perfil não guarda gênero, e "Deixa o Ana"
             // era o que a metade das famílias lia na primeira tela do painel.
-            text: nome + " pode desenhar o rosto da Cogni",
+            // `capitalizar` cobre o perfil sem nome, em que `sujeito()` devolve o
+            // fallback minúsculo ("a criança") e ele abre a frase.
+            text: capitalizar(nome) + " pode desenhar o rosto da Cogni",
           }),
           el("p", {
             class: "dash-rosto-convite__sub",

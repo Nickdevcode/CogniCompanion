@@ -91,14 +91,14 @@ function explicarCogni(evidencia) {
   if (e.motivo === "pratica") {
     const n = Number(e.acertos);
     return Number.isFinite(n) && n > 0
-      ? `acertou ${n} ${n === 1 ? "exercício" : "exercícios"} disso`
-      : "acertou os exercícios disso";
+      ? `Acertou ${n} ${n === 1 ? "exercício" : "exercícios"} disso`
+      : "Acertou os exercícios disso";
   }
-  if (e.motivo === "fala") return "ela disse que terminou";
-  if (e.motivo === "conversa") return "a Cogni trabalhou isso na conversa";
+  if (e.motivo === "fala") return "Ela disse que terminou";
+  if (e.motivo === "conversa") return "A Cogni trabalhou isso na conversa";
   // Motivo novo que o servidor passe a mandar: melhor uma frase honesta e vaga que
   // vazar a chave crua ('dispersa') pra tela do pai.
-  return "a Cogni acompanhou isso na conversa";
+  return "A Cogni acompanhou isso na conversa";
 }
 
 const toast = (msg, type) => {
@@ -860,7 +860,7 @@ export async function renderMesa(ctx) {
           children: [
             el("span", { class: "mesa-plano__selo-ico", svg: ICON.sparkle }),
             el("span", {
-              text: primeiro ? "a Cogni começa por aqui" : "a Cogni está seguindo",
+              text: primeiro ? "A Cogni começa por aqui" : "A Cogni está seguindo",
             }),
           ],
         })
@@ -886,7 +886,7 @@ export async function renderMesa(ctx) {
         children: [
           el("span", { class: "mesa-meta__ico", svg: ICON.calendar }),
           el("span", {
-            text: plano.duracao_dias ? `${plano.duracao_dias} dias` : "sem prazo",
+            text: plano.duracao_dias ? `${plano.duracao_dias} dias` : "Sem prazo",
           }),
         ],
       })
@@ -1194,7 +1194,7 @@ export async function renderMesa(ctx) {
           attrs: { title: "A Cogni não teve certeza do que leu nesta parte do material." },
           children: [
             el("span", { class: "mesa-chip__ico", svg: ICON.alert }),
-            el("span", { text: "confira" }),
+            el("span", { text: "Confira" }),
           ],
         })
       );

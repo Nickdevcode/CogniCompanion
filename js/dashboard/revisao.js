@@ -135,7 +135,7 @@ export function montarRevisao({ proposta, materiais, pedido = "", ctx, close, ao
       text: baixas
         ? `Confira antes de aprovar: ${baixas} ${
             baixas === 1 ? "tarefa está marcada" : "tarefas estão marcadas"
-          } com "confira", porque a Cogni não teve certeza do que leu.`
+          } com "Confira", porque a Cogni não teve certeza do que leu.`
         : materiais.length
           ? "Confira o que a Cogni entendeu. Dá pra editar tudo antes de salvar."
           : "Esta é a proposta da Cogni pro seu pedido. Dá pra editar tudo antes de salvar.",
@@ -373,7 +373,7 @@ export function montarRevisao({ proposta, materiais, pedido = "", ctx, close, ao
           class: "cap__confira",
           children: [
             el("span", { class: "cap__confira-ico", svg: ICON.alert }),
-            el("span", { text: "confira: a Cogni não teve certeza do que leu aqui" }),
+            el("span", { text: "Confira: a Cogni não teve certeza do que leu aqui" }),
           ],
         })
       );

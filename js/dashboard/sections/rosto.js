@@ -45,37 +45,37 @@ const PRESETS = [
 /**
  * Os quatro sliders, na linguagem da criança.
  *
- * `pontas` rotula os extremos ("fininho" ↔ "largo") porque é o que dá sentido ao
+ * `pontas` rotula os extremos ("Fininho" ↔ "Largo") porque é o que dá sentido ao
  * arrastar sem mostrar pixel nenhum. `descrever` alimenta o aria-valuetext: um
- * leitor de tela anunciando "36" não diria nada, "bem redondo" diz tudo.
+ * leitor de tela anunciando "36" não diria nada, "Bem redondo" diz tudo.
  */
 const CONTROLES = [
   {
     campo: "largura",
     rotulo: "Quão largo?",
-    pontas: ["fininho", "largo"],
-    descrever: (v) => (v <= 22 ? "fininho" : v >= 42 ? "bem largo" : "no meio"),
+    pontas: ["Fininho", "Largo"],
+    descrever: (v) => (v <= 22 ? "Fininho" : v >= 42 ? "Bem largo" : "No meio"),
   },
   {
     campo: "altura",
     rotulo: "Quão aberto?",
-    pontas: ["espremido", "arregalado"],
+    pontas: ["Espremido", "Arregalado"],
     descrever: (v) =>
-      v <= 18 ? "bem espremido" : v >= 44 ? "bem arregalado" : "no meio",
+      v <= 18 ? "Bem espremido" : v >= 44 ? "Bem arregalado" : "No meio",
   },
   {
     campo: "raio",
     rotulo: "Quão redondo?",
-    pontas: ["quadrado", "redondo"],
+    pontas: ["Quadrado", "Redondo"],
     descrever: (v) =>
-      v <= 3 ? "quadradão" : v >= 13 ? "bem redondo" : "meio redondo",
+      v <= 3 ? "Quadradão" : v >= 13 ? "Bem redondo" : "Meio redondo",
   },
   {
     campo: "espaco",
     rotulo: "Quão juntinhos?",
-    pontas: ["colados", "afastados"],
+    pontas: ["Colados", "Afastados"],
     descrever: (v) =>
-      v < 0 ? "cruzados, vesguinho" : v <= 8 ? "bem juntinhos" : v >= 26 ? "bem afastados" : "no meio",
+      v < 0 ? "Cruzados, vesguinho" : v <= 8 ? "Bem juntinhos" : v >= 26 ? "Bem afastados" : "No meio",
   },
 ];
 

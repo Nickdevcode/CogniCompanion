@@ -288,17 +288,17 @@ async function lerLink(url, signal) {
 function seloDoVideo(r) {
   if (r.grau !== "transcricao") {
     return {
-      texto: "sem legenda: li só o título e a descrição, o plano vai ficar mais genérico",
+      texto: "Sem legenda: li só o título e a descrição, o plano vai ficar mais genérico",
       tom: "atencao",
     };
   }
   if (r.legendaAutomatica) {
-    return { texto: "legenda automática, confira os números", tom: "atencao" };
+    return { texto: "Legenda automática, confira os números", tom: "atencao" };
   }
   if (r.idiomaLegenda && !/^pt/i.test(r.idiomaLegenda)) {
-    return { texto: `legenda em ${r.idiomaLegenda}, confira o que a Cogni entendeu`, tom: "atencao" };
+    return { texto: `Legenda em ${r.idiomaLegenda}, confira o que a Cogni entendeu`, tom: "atencao" };
   }
-  return { texto: "legenda do próprio canal", tom: "ok" };
+  return { texto: "Legenda do próprio canal", tom: "ok" };
 }
 
 /** Junta as partes de um rótulo, ignorando o que não veio. */
@@ -398,7 +398,7 @@ export async function prepararLink(bruto, orcamento, ctx = {}) {
       : rotulo(r.titulo || item.nome, r.dominio),
     miniatura: ehVideo ? r.miniatura || null : null,
     ehVideo,
-    selo: ehVideo ? seloDoVideo(r) : { texto: r.dominio || "página lida", tom: "ok" },
+    selo: ehVideo ? seloDoVideo(r) : { texto: r.dominio || "Página lida", tom: "ok" },
     // O aviso do servidor (conteúdo cortado) e o nosso corte local dizem a mesma coisa;
     // o do servidor é mais específico, então ele ganha.
     aviso:

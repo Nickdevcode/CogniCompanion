@@ -21,6 +21,7 @@ import {
   agruparConversasPorDia,
   primeiroNome,
   sujeito,
+  capitalizar,
 } from "../format.js";
 
 /* --------------------------------------------------------------------------
@@ -358,9 +359,8 @@ export async function renderConversas(ctx) {
     const grupos = agruparConversasPorDia(filtradas, ctx.now);
     const tl = el("div", { class: "cv-timeline" });
     grupos.forEach((g) => {
-      // capitaliza a inicial do rótulo de dia ("hoje" → "Hoje", "27 de maio")
-      const titulo = g.label.charAt(0).toUpperCase() + g.label.slice(1);
-      tl.appendChild(el("h2", { class: "cv-daygroup__title", text: titulo }));
+      // o rótulo de dia abre o grupo ("hoje" → "Hoje", "27 de maio" → "27 de maio")
+      tl.appendChild(el("h2", { class: "cv-daygroup__title", text: capitalizar(g.label) }));
       const lista = el("div", { class: "cv-daygroup__items" });
       g.itens.forEach((c) => lista.appendChild(entradaConversa(c, nome, ctx.now)));
       tl.appendChild(lista);

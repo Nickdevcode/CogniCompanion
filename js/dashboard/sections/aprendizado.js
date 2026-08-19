@@ -32,6 +32,7 @@ import {
   dayKey,
   primeiroNome,
   sujeito,
+  capitalizar,
 } from "../format.js";
 
 /* --------------------------------------------------------------------------
@@ -220,12 +221,6 @@ function trilhaAprendizado(crianca) {
   return { praticando, dominados, total: itens.length };
 }
 
-/** Primeira letra maiúscula — os conceitos vêm minúsculos da IA. */
-function capitalizar(texto) {
-  const t = String(texto || "");
-  return t.charAt(0).toUpperCase() + t.slice(1);
-}
-
 /* --------------------------------------------------------------------------
    Componentes de UI
    -------------------------------------------------------------------------- */
@@ -266,7 +261,7 @@ function chipTopico(topico) {
     attrs: { "data-materia": topico.materia },
     children: [
       el("span", { class: "ap-topic__ico", svg: materiaIcon(topico.materia) }),
-      el("span", { class: "ap-topic__name", text: topico.nome }),
+      el("span", { class: "ap-topic__name", text: capitalizar(topico.nome) }),
       el("span", { class: "ap-topic__check", svg: ICON.check }),
     ],
   });
@@ -282,8 +277,8 @@ function itemTrilha(item, { now, dominado }) {
   const selo = dominado
     ? null
     : item.status === STATUS_REFORCO
-    ? { texto: "precisa de reforço", tom: "reforco" }
-    : { texto: "quase lá", tom: "quase" };
+    ? { texto: "Precisa de reforço", tom: "reforco" }
+    : { texto: "Quase lá", tom: "quase" };
 
   // "Subiu de nível": a evidência mais direta de progresso conferido por código
   // (a criança está resolvendo exercícios mais duros do MESMO assunto), já que o
@@ -337,7 +332,7 @@ function itemTrilha(item, { now, dominado }) {
                 svg: ICON.arrowUp,
                 attrs: { "aria-hidden": "true" },
               }),
-              el("span", { text: "subiu de nível" }),
+              el("span", { text: "Subiu de nível" }),
             ],
           })
         : null,

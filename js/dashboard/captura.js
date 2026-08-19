@@ -709,7 +709,7 @@ function criarFluxo({ ctx, aoSalvar }) {
 
     preparando = true;
     const falhas = [];
-    etapaProgresso("preparando o material…", { cancelavel: false });
+    etapaProgresso("Preparando o material…", { cancelavel: false });
 
     for (const file of arquivos.slice(0, vagas)) {
       if (controle.signal.aborted) break;
@@ -846,7 +846,7 @@ function criarFluxo({ ctx, aoSalvar }) {
             el("span", {
               class: "cap__item-texto",
               children: [
-                el("span", { class: "cap__item-nome", text: "lendo o link…" }),
+                el("span", { class: "cap__item-nome", text: "Lendo o link…" }),
                 el("span", { class: "cap__item-aviso", text: encurtarUrl(lendoLink) }),
               ],
             }),
@@ -1035,7 +1035,7 @@ function criarFluxo({ ctx, aoSalvar }) {
       // A duração medida pelo cronômetro é mais confiável que a do cabeçalho: WebM
       // gravado por MediaRecorder costuma vir sem duração declarada.
       material.itens[0].duracao_s = Math.round(duracao_s);
-      material.rotulo = `gravação · ${formatarDuracao(duracao_s)}`;
+      material.rotulo = `Gravação · ${formatarDuracao(duracao_s)}`;
       if (mudo) {
         material.aviso =
           "Quase não ouvi som nessa gravação. Confira se o microfone estava aberto antes de mandar.";
@@ -1114,20 +1114,20 @@ function criarFluxo({ ctx, aoSalvar }) {
      * estruturar — e não a uma barra decorativa.
      */
     const temAudio = itens.some((i) => i.tipo === "audio");
-    etapaProgresso(itens.length ? "enviando o material…" : "mandando o pedido…");
+    etapaProgresso(itens.length ? "Enviando o material…" : "Mandando o pedido…");
     anunciar(itens.length ? "Enviando o material pra Cogni." : "Enviando o pedido pra Cogni.");
 
     const fases = !itens.length
-      ? [[3000, "montando as tarefas…"]]
+      ? [[3000, "Montando as tarefas…"]]
       : temAudio
         ? [
-            [5000, "transcrevendo o áudio…"],
-            [18000, "lendo o material…"],
-            [32000, "montando as tarefas…"],
+            [5000, "Transcrevendo o áudio…"],
+            [18000, "Lendo o material…"],
+            [32000, "Montando as tarefas…"],
           ]
         : [
-            [5000, "lendo o material…"],
-            [16000, "montando as tarefas…"],
+            [5000, "Lendo o material…"],
+            [16000, "Montando as tarefas…"],
           ];
     trocaDeFase = fases.map(([ms, texto]) =>
       window.setTimeout(() => etapaProgresso(texto), ms)

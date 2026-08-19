@@ -35,11 +35,26 @@ export function el(tag, opts = {}) {
   return node;
 }
 
+/**
+ * Nome de cada seção pro leitor de tela. A chave da rota ("mapa", "config") é
+ * identificador, não texto: anunciada como está, a landmark saía "região config".
+ * Aqui ela vira o mesmo rótulo que o pai lê na sidebar.
+ */
+const ROTULO_DA_SECAO = {
+  inicio: "Início",
+  conversas: "Conversas",
+  aprendizado: "Aprendizado",
+  mapa: "Mapa da aula",
+  mesa: "Mesa de Estudos",
+  rosto: "Rosto da Cogni",
+  config: "Configurações",
+};
+
 /** Wrapper raiz de uma seção (ganha a animação de entrada via .dash-section). */
 export function sectionRoot(name) {
   return el("section", {
     class: "dash-section dash-section--" + name,
-    attrs: { "aria-label": name },
+    attrs: { "aria-label": ROTULO_DA_SECAO[name] || name },
   });
 }
 

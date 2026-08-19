@@ -184,6 +184,24 @@ const DIA_LABELS = {
   sab: "Sáb",
 };
 
+/**
+ * Primeira letra maiúscula, o resto intacto.
+ *
+ * Texto que nasce fora do site chega minúsculo: o conceito que a IA gravou
+ * ("tabuada do 7"), o rótulo do momento que o robô mandou ("estava no embalo"),
+ * o tópico da conversa. Na tela cada um desses abre uma linha, um chip ou um
+ * selo — e começar em minúscula ali é erro de escrita, não estilo. Quem escreve
+ * a frase inteira NÃO passa por aqui: "visto ontem" no meio de uma linha de
+ * metadados continua minúsculo, como manda o português.
+ *
+ * @param {string} texto
+ * @returns {string}
+ */
+export function capitalizar(texto) {
+  const t = String(texto || "");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 /** @returns {string} rótulo legível da matéria (fallback: a própria chave). */
 export function materiaLabel(materia) {
   return MATERIA_LABELS[materia] || materia || "Outros";
@@ -191,7 +209,7 @@ export function materiaLabel(materia) {
 
 /** @returns {string} rótulo legível do status do plano. */
 export function statusLabel(status) {
-  return STATUS_LABELS[status] || status || "não definido";
+  return STATUS_LABELS[status] || status || "Não definido";
 }
 
 /**
@@ -207,20 +225,20 @@ export function statusLabel(status) {
  */
 export function origemLabel(origem) {
   const rotulos = {
-    foto: "criado a partir de uma foto",
-    arquivo: "criado a partir de um arquivo",
-    audio: "criado a partir de um áudio",
-    video: "criado a partir de um vídeo",
+    foto: "Criado a partir de uma foto",
+    arquivo: "Criado a partir de um arquivo",
+    audio: "Criado a partir de um áudio",
+    video: "Criado a partir de um vídeo",
     // ⭐ 16/ago/2026 — o plano que a Cogni montou do que o responsável pediu por
     // escrito, sem material nenhum da escola.
-    pedido: "criado a partir do seu pedido",
+    pedido: "Criado a partir do seu pedido",
     /**
      * ⭐ Rodada 3 — a videoaula ou a página que o responsável colou. O rótulo NÃO diz
      * "vídeo" nem "site": `origem` guarda um valor só, e os dois casos caem aqui. Qual
      * era fica no `extraido_texto` ("ver o que a Cogni entendeu"), que é onde o pai
      * olha quando a pergunta importa.
      */
-    link: "criado a partir de um link",
+    link: "Criado a partir de um link",
   };
   return rotulos[origem] || null;
 }
@@ -231,7 +249,7 @@ export function origemLabel(origem) {
  * @returns {string}
  */
 export function diasLabel(dias) {
-  if (!Array.isArray(dias) || !dias.length) return "não definido";
+  if (!Array.isArray(dias) || !dias.length) return "Não definido";
   return dias.map((d) => DIA_LABELS[d] || d).join(", ");
 }
 
@@ -451,18 +469,18 @@ export function formatPrazo(value, now = new Date()) {
   if (d < 0) {
     const atraso = -d;
     return {
-      texto: atraso === 1 ? "atrasado 1 dia" : `atrasado ${atraso} dias`,
+      texto: atraso === 1 ? "Atrasado 1 dia" : `Atrasado ${atraso} dias`,
       atrasado: true,
       perto: false,
     };
   }
-  if (d === 0) return { texto: "hoje", atrasado: false, perto: true };
-  if (d === 1) return { texto: "amanhã", atrasado: false, perto: true };
-  if (d < 7) return { texto: `em ${d} dias`, atrasado: false, perto: d <= 2 };
+  if (d === 0) return { texto: "Hoje", atrasado: false, perto: true };
+  if (d === 1) return { texto: "Amanhã", atrasado: false, perto: true };
+  if (d < 7) return { texto: `Em ${d} dias`, atrasado: false, perto: d <= 2 };
   // `diaLocal` de novo (e não `toDate(value)`): senão o rótulo longo mostraria o dia
   // anterior, com o prazo curto já corrigido logo acima — o pior tipo de bug, o que
   // se contradiz dentro da mesma tela.
-  return { texto: `até ${_dayFmt.format(diaLocal(chave))}`, atrasado: false, perto: false };
+  return { texto: `Até ${_dayFmt.format(diaLocal(chave))}`, atrasado: false, perto: false };
 }
 
 /* --------------------------------------------------------------------------

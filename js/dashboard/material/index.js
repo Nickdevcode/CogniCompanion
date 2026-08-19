@@ -246,14 +246,14 @@ export async function prepararMaterial(file, orcamento, ctx = {}) {
   let resultado;
 
   if (comecaCom(cabecalho, ASSIN_PDF)) {
-    ctx.onProgresso?.("preparando o PDF…");
+    ctx.onProgresso?.("Preparando o PDF…");
     resultado = await prepararPdf(file, orcamento);
   } else if (comecaCom(cabecalho, ASSIN_OLE2)) {
     throw new MaterialNaoSuportado(
       "Esse é um arquivo do Office antigo. Abra, use “Salvar como” e escolha PDF ou DOCX, aí eu leio."
     );
   } else if (comecaCom(cabecalho, ASSIN_ZIP)) {
-    ctx.onProgresso?.("abrindo o documento…");
+    ctx.onProgresso?.("Abrindo o documento…");
     // É ZIP — mas `.odt`, `.pages` e `.epub` também são. Quem decide é o conteúdo.
     const entradas = await abrirZip(file);
     if (ooxml.formatoOOXML(entradas)) {
@@ -265,15 +265,15 @@ export async function prepararMaterial(file, orcamento, ctx = {}) {
       throw new MaterialNaoSuportado(mensagem);
     }
   } else if (familia(file) === "imagem") {
-    ctx.onProgresso?.("preparando a foto…");
+    ctx.onProgresso?.("Preparando a foto…");
     resultado = await prepararFoto(file, orcamento);
   } else if (familia(file) === "video") {
     resultado = await prepararVideo(file, orcamento, ctx);
   } else if (familia(file) === "audio") {
-    ctx.onProgresso?.("preparando o áudio…");
+    ctx.onProgresso?.("Preparando o áudio…");
     resultado = await prepararAudio(file, orcamento);
   } else if (familia(file) === "texto") {
-    ctx.onProgresso?.("lendo o arquivo…");
+    ctx.onProgresso?.("Lendo o arquivo…");
     resultado = await prepararTextoPuro(file);
   } else {
     const mensagem =

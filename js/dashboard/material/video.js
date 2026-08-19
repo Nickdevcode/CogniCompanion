@@ -261,7 +261,7 @@ export async function deArquivo(file, orcamento, { onProgresso, signal } = {}) {
   let video = null;
 
   try {
-    onProgresso?.("abrindo o vídeo…");
+    onProgresso?.("Abrindo o vídeo…");
     video = await carregarMetadados(url);
     const duracao = Number.isFinite(video.duration) ? video.duration : 0;
     if (!duracao) throw new ErroDeVideo("Não consegui ler a duração desse vídeo.");
@@ -316,7 +316,7 @@ export async function deArquivo(file, orcamento, { onProgresso, signal } = {}) {
     let cortado = false;
 
     if (segundosAudio > 0 && !signal?.aborted) {
-      onProgresso?.("separando o áudio do vídeo…");
+      onProgresso?.("Separando o áudio do vídeo…");
       try {
         const buffer = await decodificarTrilha(file);
         const trilha = await deAudioBuffer(buffer, {

@@ -64,6 +64,7 @@ import {
   formatDiaRelativo,
   materiaLabel,
   primeiroNome,
+  capitalizar,
 } from "../format.js";
 
 /**
@@ -90,7 +91,7 @@ function seloAoVivo(compacto = false) {
     class: "mp-live" + (compacto ? " mp-live--mini" : ""),
     children: [
       el("span", { class: "mp-live__pulse", attrs: { "aria-hidden": "true" } }),
-      el("span", { text: compacto ? "ao vivo" : "acontecendo agora" }),
+      el("span", { text: compacto ? "Ao vivo" : "Acontecendo agora" }),
     ],
   });
 }
@@ -174,7 +175,7 @@ function chipsDeAssunto(sessao) {
             svg: materiaIcon(item.materia),
             attrs: { "aria-hidden": "true" },
           }),
-          el("span", { text: item.nome }),
+          el("span", { text: capitalizar(item.nome) }),
         ],
       })
     ),
@@ -479,15 +480,15 @@ function listaDeMomentos(sessao) {
           el("div", {
             class: "mp-momento__body",
             children: [
-              el("span", { class: "mp-momento__what", text: m.rotulo }),
+              el("span", { class: "mp-momento__what", text: capitalizar(m.rotulo) }),
               onde ? el("span", { class: "mp-momento__where", text: onde }) : null,
               m.superado
-                ? el("span", { class: "mp-momento__selo", text: "destravou depois" })
+                ? el("span", { class: "mp-momento__selo", text: "Destravou depois" })
                 : null,
               m.confianca === "baixa"
                 ? el("span", {
                     class: "mp-momento__ressalva",
-                    text: "só a câmera percebeu",
+                    text: "Só a câmera percebeu",
                   })
                 : null,
             ],
@@ -647,7 +648,9 @@ function blocoHistorico({ sessoes, chaveSelecionada, now, onEscolher }) {
                 ],
               }),
               el("span", { class: "mp-hist__meta", text: metaDaSessao(s) }),
-              el("span", { class: "mp-hist__resumo", text: resumoDoItem(s) }),
+              // O resumo pode ser um tópico da conversa ("dinossauros") ou um
+              // rótulo do robô — os dois chegam minúsculos, e aqui abrem a linha.
+              el("span", { class: "mp-hist__resumo", text: capitalizar(resumoDoItem(s)) }),
             ],
           });
           btn.addEventListener("click", () => onEscolher(s.chave));

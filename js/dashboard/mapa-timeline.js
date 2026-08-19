@@ -38,18 +38,20 @@
  */
 
 import { el } from "./sections/_shared.js";
-import { formatTempoNaAula, materiaLabel } from "./format.js";
+import { formatTempoNaAula, materiaLabel, capitalizar } from "./format.js";
 
 /**
  * Descrição de cada tom, usada só na legenda (o momento em si já traz o `rotulo`
  * pronto do servidor). Fala do que a Cogni PERCEBEU, nunca do que a criança "é".
  */
 const LEGENDA_TONS = [
-  { tom: "apoio", texto: "precisou de mais ajuda" },
-  { tom: "duvida", texto: "ficou em dúvida" },
+  { tom: "apoio", texto: "Precisou de mais ajuda" },
+  { tom: "duvida", texto: "Ficou em dúvida" },
   // Mesma frase neutra do `ROTULOS_ACENTUADOS` (mapa-api.js) — a legenda e os
   // marcadores precisam dizer a mesma coisa, senão a legenda deixa de explicá-los.
-  { tom: "bom", texto: "estava no embalo" },
+  // Só a inicial muda: aqui o texto abre o item da legenda, lá ele entra no meio
+  // da frase do `aria-label` ("Aos 2min40: estava no embalo.").
+  { tom: "bom", texto: "Estava no embalo" },
 ];
 
 /**
@@ -166,17 +168,17 @@ function marcador({ momento, duracaoMs, indice, novo, onSelecionar }) {
         attrs: { "aria-hidden": "true" },
         children: [
           el("span", { class: "mp-tl__tip-when", text: formatTempoNaAula(momento.emMs) }),
-          el("span", { class: "mp-tl__tip-what", text: momento.rotulo }),
+          el("span", { class: "mp-tl__tip-what", text: capitalizar(momento.rotulo) }),
           onde ? el("span", { class: "mp-tl__tip-where", text: onde }) : null,
           // A boa notícia vem antes da ressalva: se o balão for lido de relance,
           // que sobre "destravou depois".
           momento.superado
-            ? el("span", { class: "mp-tl__tip-nota", text: "destravou depois" })
+            ? el("span", { class: "mp-tl__tip-nota", text: "Destravou depois" })
             : null,
           momento.confianca === "baixa"
             ? el("span", {
                 class: "mp-tl__tip-ressalva",
-                text: "o que a câmera percebeu",
+                text: "O que a câmera percebeu",
               })
             : null,
         ],
@@ -200,7 +202,7 @@ function eixo(duracaoMs) {
       el("span", {
         class: "mp-tl__axis-label",
         attrs: { "data-mp-axis": String(i) },
-        text: i === 0 ? "início" : formatTempoNaAula(ms),
+        text: i === 0 ? "Início" : formatTempoNaAula(ms),
       })
     ),
   });
@@ -259,11 +261,11 @@ function legenda(momentos) {
   itens.push(
     el("li", {
       class: "mp-tl__key-item",
-      children: [amostra("bom", "pratica"), el("span", { text: "exercício conferido" })],
+      children: [amostra("bom", "pratica"), el("span", { text: "Exercício conferido" })],
     }),
     el("li", {
       class: "mp-tl__key-item",
-      children: [amostra("apoio", "compreensao"), el("span", { text: "lido na conversa" })],
+      children: [amostra("apoio", "compreensao"), el("span", { text: "Lido na conversa" })],
     })
   );
 
@@ -273,7 +275,7 @@ function legenda(momentos) {
         class: "mp-tl__key-item",
         children: [
           amostra("apoio", "afeto", { "data-superado": "true" }),
-          el("span", { text: "destravou depois" }),
+          el("span", { text: "Destravou depois" }),
         ],
       })
     );
@@ -287,7 +289,7 @@ function legenda(momentos) {
         class: "mp-tl__key-item",
         children: [
           amostra("apoio", "afeto", { "data-confianca": "baixa" }),
-          el("span", { text: "só a câmera percebeu" }),
+          el("span", { text: "Só a câmera percebeu" }),
         ],
       })
     );
