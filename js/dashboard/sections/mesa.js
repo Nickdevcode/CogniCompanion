@@ -187,7 +187,7 @@ export async function renderMesa(ctx) {
   raiz.appendChild(
     pageHead({
       title: "Mesa de Estudos",
-      subtitle: `O que ${primeiroNome} vai estudar — e como está indo.`,
+      subtitle: `O que ${primeiroNome} vai estudar, e como está indo.`,
       action: el("div", { class: "mesa-acoes", children: [btnCogni, btnNovo] }),
     })
   );
@@ -538,8 +538,8 @@ export async function renderMesa(ctx) {
    * informação que só existe pra parte das pessoas.
    */
   function rotuloDoChip(p, seguindo, primeiro) {
-    if (primeiro) return `${p.titulo} — a Cogni começa por aqui`;
-    if (seguindo) return `${p.titulo} — a Cogni está seguindo`;
+    if (primeiro) return `${p.titulo}: a Cogni começa por aqui`;
+    if (seguindo) return `${p.titulo}: a Cogni está seguindo`;
     return null;
   }
 
@@ -1072,7 +1072,7 @@ export async function renderMesa(ctx) {
     const textos = {
       a_fazer: "Nada esperando aqui. Adicione uma tarefa ou crie um plano com a Cogni.",
       fazendo: "Nada em andamento. A Cogni move um card pra cá quando trabalha o assunto.",
-      feito: "Ainda nada concluído — e tudo bem, o dia é longo.",
+      feito: "Ainda nada concluído, e tudo bem: o dia é longo.",
     };
     return el("p", { class: "mesa-col__vazio", text: textos[colunaId] });
   }
@@ -1108,7 +1108,7 @@ export async function renderMesa(ctx) {
         el("p", {
           class: "pl-empty__text",
           text:
-            "Diga o que você quer que ela estude — e, se a escola mandou foto, PDF, " +
+            "Diga o que você quer que ela estude. E, se a escola mandou foto, PDF, " +
             "slides ou o áudio da professora, junte também. A Cogni monta as tarefas, " +
             "você só confere.",
         }),
@@ -1508,7 +1508,7 @@ export async function renderMesa(ctx) {
             rows: "4",
             maxlength: "600",
             placeholder:
-              "Ex.: revisar frações — principalmente somar com denominadores diferentes.",
+              "Ex.: revisar frações, principalmente somar com denominadores diferentes.",
           },
         });
         if (editando) txt.value = plano.conteudo || "";

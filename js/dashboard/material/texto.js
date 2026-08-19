@@ -10,7 +10,7 @@
 
 import { MAX_TEXTO_ITEM } from "./orcamento.js";
 
-const MARCA = "\n\n…[o resto do material não coube — mande o que faltou separado]";
+const MARCA = "\n\n…[o resto do material não coube. Mande o que faltou separado]";
 
 /**
  * Corta em `max` caracteres, marcando o corte no próprio texto.

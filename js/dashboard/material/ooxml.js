@@ -189,7 +189,7 @@ async function lerPptx(file, entradas) {
     const notas = entradas.get(`ppt/notesSlides/notesSlide${numero}.xml`);
     const textoNotas = notas ? textoDeSlide(await lerTexto(file, notas)) : "";
 
-    const bloco = [`— Slide ${i + 1} —`, texto, textoNotas && `(anotações) ${textoNotas}`]
+    const bloco = [`[Slide ${i + 1}]`, texto, textoNotas && `(anotações) ${textoNotas}`]
       .filter(Boolean)
       .join("\n");
     partes.push(bloco);
@@ -377,7 +377,7 @@ async function lerXlsx(file, entradas) {
     const texto = textoDaAba(await lerTexto(file, entrada), strings, estilos, base1904);
     if (!texto) continue;
     // O nome da aba ("Cronograma", "Provas") é contexto de graça pro modelo.
-    partes.push(`— ${aba.nome} —\n${texto}`);
+    partes.push(`[${aba.nome}]\n${texto}`);
     if (partes.join("\n\n").length > MAX_TEXTO_ITEM) break;
   }
 
@@ -431,7 +431,7 @@ export async function deArquivo(file) {
   const { texto, cortado } = cortarTexto(bruto);
   if (!texto) {
     throw new ErroDeZip(
-      "Esse arquivo não tem texto que eu consiga ler — talvez seja só imagem. Tente mandar como foto."
+      "Esse arquivo não tem texto que eu consiga ler; talvez seja só imagem. Tente mandar como foto."
     );
   }
   return { formato, texto, cortado };

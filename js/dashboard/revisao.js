@@ -133,7 +133,7 @@ export function montarRevisao({ proposta, materiais, pedido = "", ctx, close, ao
     el("p", {
       class: "cap__intro",
       text: baixas
-        ? `Confira antes de aprovar — ${baixas} ${
+        ? `Confira antes de aprovar: ${baixas} ${
             baixas === 1 ? "tarefa está marcada" : "tarefas estão marcadas"
           } com "confira", porque a Cogni não teve certeza do que leu.`
         : materiais.length
@@ -170,7 +170,7 @@ export function montarRevisao({ proposta, materiais, pedido = "", ctx, close, ao
           el("span", { class: "cap__nota-ico", svg: ICON.alert }),
           el("span", {
             text:
-              "Esse material tem mais tarefas do que cabe num plano só. Peguei as 20 primeiras — " +
+              "Esse material tem mais tarefas do que cabe num plano só. Peguei as 20 primeiras; " +
               "mande o resto depois, num plano novo.",
           }),
         ],
@@ -373,7 +373,7 @@ export function montarRevisao({ proposta, materiais, pedido = "", ctx, close, ao
           class: "cap__confira",
           children: [
             el("span", { class: "cap__confira-ico", svg: ICON.alert }),
-            el("span", { text: "confira — a Cogni não teve certeza do que leu aqui" }),
+            el("span", { text: "confira: a Cogni não teve certeza do que leu aqui" }),
           ],
         })
       );

@@ -141,7 +141,7 @@ function propostaDeExemplo(materiais, pedido) {
   }
 
   const cabecalhos = materiais
-    .map((m) => `— ${m.nome} —\n(conteúdo lido deste material apareceria aqui)`)
+    .map((m) => `[${m.nome}]\n(conteúdo lido deste material apareceria aqui)`)
     .join("\n\n");
 
   return {
@@ -154,7 +154,7 @@ function propostaDeExemplo(materiais, pedido) {
     duracao_dias: 7,
     extraido_texto:
       `${cabecalhos}\n\n` +
-      "AGENDA — 26/05\nMat: exercícios pág. 42 e 43 (frações equivalentes)\n" +
+      "AGENDA 26/05\nMat: exercícios pág. 42 e 43 (frações equivalentes)\n" +
       "Port: ler cap. 3 do livro e responder as 5 perguntas\nEntregar sexta",
     truncado: false,
     aviso: null,
@@ -377,8 +377,8 @@ function criarFluxo({ ctx, aoSalvar }) {
         text:
           // Havia dois problemas na frase antiga ("…que a Cogni trabalhe com ela"):
           // o "ela" tanto podia ser a Cogni quanto a criança, e assumia uma filha.
-          "Escreva o que quer que seja estudado. Se a escola mandou material — ou se " +
-          "você achou algum bom —, junte aqui: a Cogni lê, monta as tarefas e você " +
+          "Escreva o que quer que seja estudado. Se a escola mandou material, ou se " +
+          "você achou algum bom, junte aqui: a Cogni lê, monta as tarefas e você " +
           "confere antes de valer.",
       }),
       campoDoPedido()
@@ -1038,7 +1038,7 @@ function criarFluxo({ ctx, aoSalvar }) {
       material.rotulo = `gravação · ${formatarDuracao(duracao_s)}`;
       if (mudo) {
         material.aviso =
-          "Quase não ouvi som nessa gravação — confira se o microfone estava aberto antes de mandar.";
+          "Quase não ouvi som nessa gravação. Confira se o microfone estava aberto antes de mandar.";
       }
       materiais.push(material);
       etapaEscolher();
@@ -1177,20 +1177,20 @@ function criarFluxo({ ctx, aoSalvar }) {
     // enviou um PDF é ruído, e ruído ensina o pai a ignorar as nossas mensagens.
     const origens = new Set(materiais.map((m) => m.origem));
     let dica =
-      "Confira se o arquivo tem mesmo o texto da lição — se for só imagem, tire uma foto bem enquadrada.";
+      "Confira se o arquivo tem mesmo o texto da lição. Se for só imagem, tire uma foto bem enquadrada.";
     if (!materiais.length) {
       dica =
-        "Diga o assunto e o que você quer que ela faça — por exemplo: “revisar frações, " +
+        "Diga o assunto e o que você quer que ela faça. Por exemplo: “revisar frações, " +
         "meia hora por dia até sexta”.";
     } else if (origens.has("link")) {
       dica =
-        "Tente uma videoaula ou uma página que expliquem o assunto — ou escreva no pedido o que você quer que ela treine.";
+        "Tente uma videoaula ou uma página que expliquem o assunto. Ou escreva no pedido o que você quer que ela treine.";
     } else if (origens.has("foto")) {
       dica =
-        "Tente de novo com a folha inteira no quadro, o celular parado e boa luz — sem sombra por cima do papel.";
+        "Tente de novo com a folha inteira no quadro, o celular parado e boa luz, sem sombra por cima do papel.";
     } else if (origens.has("audio") || origens.has("video")) {
       dica =
-        "Tente gravar mais perto de quem está falando, num lugar mais silencioso — ou escreva o plano você mesmo.";
+        "Tente gravar mais perto de quem está falando, num lugar mais silencioso. Ou escreva o plano você mesmo.";
     }
 
     palco.replaceChildren();

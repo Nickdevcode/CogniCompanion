@@ -78,7 +78,7 @@ function familia(file) {
 /** Mensagens que ensinam, por família de formato que a gente não lê. */
 function recusarPorExtensao(nome) {
   if (/\.(doc|xls|ppt)$/i.test(nome)) {
-    return "Esse é um arquivo do Office antigo. Abra, use “Salvar como” e escolha PDF ou DOCX — aí eu leio.";
+    return "Esse é um arquivo do Office antigo. Abra, use “Salvar como” e escolha PDF ou DOCX, aí eu leio.";
   }
   if (/\.(odt|ods|odp)$/i.test(nome)) {
     return "Esse arquivo é do LibreOffice. Use “Salvar como” e escolha PDF ou DOCX, e mande de novo.";
@@ -250,7 +250,7 @@ export async function prepararMaterial(file, orcamento, ctx = {}) {
     resultado = await prepararPdf(file, orcamento);
   } else if (comecaCom(cabecalho, ASSIN_OLE2)) {
     throw new MaterialNaoSuportado(
-      "Esse é um arquivo do Office antigo. Abra, use “Salvar como” e escolha PDF ou DOCX — aí eu leio."
+      "Esse é um arquivo do Office antigo. Abra, use “Salvar como” e escolha PDF ou DOCX, aí eu leio."
     );
   } else if (comecaCom(cabecalho, ASSIN_ZIP)) {
     ctx.onProgresso?.("abrindo o documento…");

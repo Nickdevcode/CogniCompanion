@@ -379,7 +379,7 @@ let planos = [
     ordem: 5000,
     origem: "foto",
     extraido_texto:
-      "AGENDA — 26/05\nMat: exercícios pág. 42 e 43 (frações equivalentes)\n" +
+      "AGENDA 26/05\nMat: exercícios pág. 42 e 43 (frações equivalentes)\n" +
       "Port: ler cap. 3 do livro e responder as 5 perguntas\nEntregar sexta",
     criado_em: "2026-05-26T20:10:00-03:00",
     atualizado_em: "2026-05-26T20:10:00-03:00",
@@ -625,7 +625,7 @@ const resumoSemanal = {
     "Que semana rica a do Pedro! Ele mergulhou em ciências (puxando bastante " +
     "papo sobre dinossauros e o sistema solar), praticou a tabuada do 7 e ainda " +
     "pediu ajuda com a redação da escola. Dá pra ver a curiosidade dele crescendo " +
-    "a cada conversa — continue incentivando essas perguntas!",
+    "a cada conversa. Continue incentivando essas perguntas!",
   materias: ["ciencias", "matematica", "portugues", "historia", "geografia"],
   topicos: [
     "dinossauros",

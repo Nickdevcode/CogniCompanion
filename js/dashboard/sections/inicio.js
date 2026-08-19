@@ -175,7 +175,7 @@ function cardProximoPlano(plano, onVerPlano) {
         class: "ini-empty",
         text:
           "Nenhum plano valendo agora. Na Mesa de Estudos dá pra criar um em um " +
-          "minuto — é o que a Cogni puxa nas conversas.",
+          "minuto. É o que a Cogni puxa nas conversas.",
       })
     );
     card.appendChild(body);
@@ -416,7 +416,7 @@ function conviteRosto(crianca, nome) {
           el("p", {
             class: "dash-rosto-convite__sub",
             text:
-              "Esta tela é a única do painel feita pra criança usar — passa o " +
+              "Esta tela é a única do painel feita pra criança usar. Passa o " +
               "aparelho e a Cogni muda de cara na hora.",
           }),
         ],

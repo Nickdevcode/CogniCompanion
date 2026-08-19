@@ -178,7 +178,7 @@ function telaBoasVindas(nome) {
         text:
           // Sem "jornada" (não diz nada) e sem "seu filho" (o painel serve pras duas
           // metades das famílias): a frase agora lista o que existe de verdade aqui.
-          "Aqui você acompanha de pertinho o que a Cogni ensinou hoje: as conversas, o que ficou fácil, o que travou — e os planos que ela vai seguir.",
+          "Aqui você acompanha de pertinho o que a Cogni ensinou hoje: as conversas, o que ficou fácil, o que travou e os planos que ela vai seguir.",
       }),
       el("button", {
         class: "dash-btn dash-btn--primary ob-cta",

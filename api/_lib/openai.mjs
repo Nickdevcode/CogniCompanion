@@ -277,7 +277,7 @@ async function disparar(chave, modelo, conteudoUsuario, hoje, crianca, formato, 
    */
   if (motivoDeParada === "length") {
     throw new FalhaSuave(
-      "Esse material é longo demais pra eu ler de uma vez. Mande uma parte por vez — uma folha, ou as páginas da lição."
+      "Esse material é longo demais pra eu ler de uma vez. Mande uma parte por vez: uma folha, ou as páginas da lição."
     );
   }
 

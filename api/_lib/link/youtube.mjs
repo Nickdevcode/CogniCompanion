@@ -301,7 +301,7 @@ function montarTexto(video) {
   } else {
     cabecalho.push(
       "SEM LEGENDA disponível: não consegui ouvir a aula. O que vem abaixo é só a " +
-        "descrição publicada pelo canal — use como pista do assunto, não como conteúdo."
+        "descrição publicada pelo canal, use como pista do assunto, não como conteúdo."
     );
     if (video.descricao) cabecalho.push("", video.descricao);
     if (video.palavrasChave?.length) {
@@ -336,7 +336,7 @@ export async function lerVideo(videoId) {
        */
       if (status === "ERROR" || status === "LOGIN_REQUIRED") {
         throw new LinkRuim(
-          "Não consegui abrir esse vídeo — ele pode estar privado, ter sido removido, ou pedir login."
+          "Não consegui abrir esse vídeo. Ele pode estar privado, ter sido removido, ou pedir login."
         );
       }
       detalhes = detalhes || j?.videoDetails || null;

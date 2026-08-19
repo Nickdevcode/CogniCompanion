@@ -95,7 +95,7 @@ async function acharEOCD(file) {
     return { totalEntradas, tamanhoCD, offsetCD };
   }
 
-  throw new ErroDeZip("Esse arquivo parece estar corrompido — não consegui abrir.");
+  throw new ErroDeZip("Esse arquivo parece estar corrompido, não consegui abrir.");
 }
 
 /**
@@ -184,7 +184,7 @@ export async function lerEntrada(file, entrada) {
     .arrayBuffer();
   const view = new DataView(cabecalho);
   if (view.getUint32(0, true) !== ASSIN_LOCAL) {
-    throw new ErroDeZip("Esse arquivo parece estar corrompido — não consegui abrir.");
+    throw new ErroDeZip("Esse arquivo parece estar corrompido, não consegui abrir.");
   }
   const tamNomeLocal = view.getUint16(26, true);
   const tamExtraLocal = view.getUint16(28, true);

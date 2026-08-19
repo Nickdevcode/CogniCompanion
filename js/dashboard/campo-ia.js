@@ -166,7 +166,7 @@ function exemploLocal({ campo, acao, texto, contexto, teto }) {
   if (acao === "encurtar") return cortarSemPartirPalavra(maiuscula(base), Math.ceil(teto / 2));
   if (acao === "detalhar") {
     return cortarSemPartirPalavra(
-      `${maiuscula(base)} — o que fazer, com que assunto e em que ordem (exemplo, sem rede)`,
+      `${maiuscula(base)}: o que fazer, com que assunto e em que ordem (exemplo, sem rede)`,
       teto
     );
   }
@@ -448,7 +448,7 @@ export function ligarCampoIA({ controle, campo, contexto }) {
       anterior = controle.value;
       controle.value = novo;
       pintar();
-      avisar("Texto atualizado — dá pra desfazer aqui do lado.", false);
+      avisar("Texto atualizado. Dá pra desfazer aqui do lado.", false);
       devolverFoco();
     } catch (err) {
       if (emCurso && emCurso.signal.aborted) return; // o modal fechou no meio

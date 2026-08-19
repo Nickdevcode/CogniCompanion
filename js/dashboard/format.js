@@ -191,7 +191,7 @@ export function materiaLabel(materia) {
 
 /** @returns {string} rótulo legível do status do plano. */
 export function statusLabel(status) {
-  return STATUS_LABELS[status] || status || "—";
+  return STATUS_LABELS[status] || status || "não definido";
 }
 
 /**
@@ -231,7 +231,7 @@ export function origemLabel(origem) {
  * @returns {string}
  */
 export function diasLabel(dias) {
-  if (!Array.isArray(dias) || !dias.length) return "—";
+  if (!Array.isArray(dias) || !dias.length) return "não definido";
   return dias.map((d) => DIA_LABELS[d] || d).join(", ");
 }
 

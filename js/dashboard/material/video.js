@@ -345,7 +345,7 @@ export async function deArquivo(file, orcamento, { onProgresso, signal } = {}) {
          */
         if (pareceTerAudio(video, { depoisDeTocar: true }) !== false) {
           aviso =
-            "Não consegui separar o áudio desse vídeo — montei o plano só com o que dá pra ver na imagem.";
+            "Não consegui separar o áudio desse vídeo; montei o plano só com o que dá pra ver na imagem.";
         }
       }
     } else if (grandeDemais) {

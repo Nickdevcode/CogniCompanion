@@ -73,7 +73,7 @@
     els.price.textContent = p.price;
     els.image.src = p.image;
     els.image.alt = p.alt || p.name;
-    document.title = p.name + " — Materiais — Cognify";
+    document.title = p.name + " · Materiais · Cognify";
 
     syncDots();
   }

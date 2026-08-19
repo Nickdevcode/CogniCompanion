@@ -197,8 +197,8 @@ function destaqueDoAtrito(sessao) {
     let texto;
     if (!assunto) {
       texto = ondeMomento
-        ? `Aos ${quando}, em ${ondeMomento} — ${momento.rotulo}.`
-        : `Aos ${quando} — ${momento.rotulo}.`;
+        ? `Aos ${quando}, em ${ondeMomento}: ${momento.rotulo}.`
+        : `Aos ${quando}: ${momento.rotulo}.`;
     } else if (mesmoAssunto) {
       texto = `A primeira vez foi aos ${quando}: ${momento.rotulo}.`;
     } else {
@@ -261,8 +261,8 @@ function faixaTranquila(sessao) {
           el("p", {
             class: "mp-tranquila__texto",
             text: assunto
-              ? `Nenhum momento de atrito nesta conversa sobre ${assunto} — a Cogni não precisou mudar de estratégia em nenhum minuto.`
-              : "Nenhum momento de atrito nesta conversa — a Cogni não precisou mudar de estratégia em nenhum minuto.",
+              ? `Nenhum momento de atrito nesta conversa sobre ${assunto}: a Cogni não precisou mudar de estratégia em nenhum minuto.`
+              : "Nenhum momento de atrito nesta conversa: a Cogni não precisou mudar de estratégia em nenhum minuto.",
           }),
         ],
       }),
@@ -500,7 +500,7 @@ function estadoSemAula(nome) {
       }),
       el("p", {
         class: "mp-vazio__dica",
-        text: "Com a câmera ligada, o mapa fica mais rico — é ela que percebe a hora de ajudar.",
+        text: "Com a câmera ligada, o mapa fica mais rico: é ela que percebe a hora de ajudar.",
       }),
     ],
   });

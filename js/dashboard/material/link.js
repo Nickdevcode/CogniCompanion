@@ -174,13 +174,13 @@ function respostaDeExemplo(url) {
       fonte: "youtube",
       formato: "youtube",
       chave: `yt:${id}`,
-      nome: "Comparação de frações — aula completa",
-      titulo: "Comparação de frações — aula completa",
+      nome: "Comparação de frações (aula completa)",
+      titulo: "Comparação de frações (aula completa)",
       canal: "Canal de exemplo",
       duracao_s: 772,
       miniatura: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
       texto:
-        "VIDEOAULA DO YOUTUBE: Comparação de frações — aula completa\n" +
+        "VIDEOAULA DO YOUTUBE: Comparação de frações (aula completa)\n" +
         "Canal: Canal de exemplo · Duração: 12min52\n" +
         (semLegenda
           ? "SEM LEGENDA disponível: (conteúdo lido do vídeo apareceria aqui)"
@@ -204,8 +204,8 @@ function respostaDeExemplo(url) {
     fonte: "pagina",
     formato: "web",
     chave: chaveDoLink(url),
-    nome: `Página de exemplo — ${dominio}`,
-    titulo: `Página de exemplo — ${dominio}`,
+    nome: `Página de exemplo · ${dominio}`,
+    titulo: `Página de exemplo · ${dominio}`,
     dominio,
     texto: `PÁGINA DA WEB: Página de exemplo\nEndereço: ${dominio}\n\n(o texto lido da página apareceria aqui)`,
     cortado: false,
@@ -293,10 +293,10 @@ function seloDoVideo(r) {
     };
   }
   if (r.legendaAutomatica) {
-    return { texto: "legenda automática — confira os números", tom: "atencao" };
+    return { texto: "legenda automática, confira os números", tom: "atencao" };
   }
   if (r.idiomaLegenda && !/^pt/i.test(r.idiomaLegenda)) {
-    return { texto: `legenda em ${r.idiomaLegenda} — confira o que a Cogni entendeu`, tom: "atencao" };
+    return { texto: `legenda em ${r.idiomaLegenda}, confira o que a Cogni entendeu`, tom: "atencao" };
   }
   return { texto: "legenda do próprio canal", tom: "ok" };
 }
@@ -333,7 +333,7 @@ export async function prepararLink(bruto, orcamento, ctx = {}) {
   // A chave da função enxerga o redirect (um encurtador e o link direto são o mesmo
   // material); a checagem local, não. Esta é a segunda peneira, e a definitiva.
   if (r.chave && jaNaBandeja.includes(r.chave)) {
-    throw new ErroDeLink("Esse link já está na lista — é o mesmo material.");
+    throw new ErroDeLink("Esse link já está na lista: é o mesmo material.");
   }
 
   const chave = r.chave || chaveDoLink(url);

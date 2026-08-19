@@ -245,7 +245,7 @@ function formularioPerfil(crianca, { onSubmit, close }) {
   /** `<select>` com a opção vazia no topo (o campo é nullable no contrato). */
   const mkSelect = (id) => {
     const sel = el("select", { class: "cfg-input cfg-select", attrs: { id } });
-    sel.appendChild(el("option", { attrs: { value: "" }, text: "— não definido —" }));
+    sel.appendChild(el("option", { attrs: { value: "" }, text: "não definido" }));
     return sel;
   };
 
@@ -487,7 +487,7 @@ function blocoConta(responsavel) {
       class: "cfg-data",
       children: [
         el("span", { class: "cfg-data__label", text: rotulo }),
-        el("span", { class: "cfg-data__value", text: valor || "—" }),
+        el("span", { class: "cfg-data__value", text: valor || "não informado" }),
       ],
     });
 
@@ -629,7 +629,7 @@ function blocoVinculo({ crianca, servidorUrl, user, onDesvinculado }) {
       }),
       el("p", {
         class: "cfg-vinculo__hint",
-        text: "O vínculo é permanente — só desfaz se você desvincular aqui.",
+        text: "O vínculo é permanente: só desfaz se você desvincular aqui.",
       }),
     ],
   });

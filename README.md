@@ -707,6 +707,7 @@ o próprio `-soft`, que são um degrau mais escuros que o branco puro. Na remedi
 | ✍️ **Dev-speak na tela** | *"Esse texto é injetado no que a Cogni sabe sobre o plano"* — "injetado" é palavra de quem escreveu o system prompt, não de quem tem uma filha com prova na sexta. Virou *"Ela lê isto antes de puxar o assunto com a criança"* |
 | 🗣️ **Frases de fábrica** | *"continue incentivando essa jornada"*, *"Gerencie o perfil, a conta e as preferências"*, *"Bem-vindo(a)"* — trocadas por frases que dizem algo que a tela não diz sozinha |
 | 🏷️ **Dois cards, um nome** | O Início tinha **dois** cards chamados "Resumo da semana" lado a lado. Viraram "A semana em números" e "O bilhete da semana". E "Próximo plano de estudo" mostrava o plano de **agora** — virou "O plano de agora" |
+| ➖ **Travessão fora** | Nenhum texto de interface usa travessão (`—`): a pontuação da casa é vírgula, dois-pontos e ponto, e `·` quando é separador (`Fase 1 · Tutorial`, `Painel · Cogni Companion`). A regra vale também pro que a **IA escreve**: os dois prompts (`prompt.mjs` e `melhorar.mjs`) proíbem em texto e **pararam de usar travessão nas próprias instruções** — modelo imita a pontuação do que lê, então pedir uma coisa e demonstrar outra é o jeito mais barato da regra ser ignorada |
 
 ---
 
