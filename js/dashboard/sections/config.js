@@ -19,6 +19,7 @@
  */
 
 import { el, sectionRoot, pageHead } from "./_shared.js";
+import { dicaInfo } from "../tooltip.js";
 import { ICON, materiaIcon } from "../icons.js";
 import { openModal } from "../modal.js";
 import { materiasAgrupadas, idadeLabel, serieLabel, SERIES } from "../format.js";
@@ -79,8 +80,16 @@ async function desvincularCrianca(servidorUrl, criancaId, responsavelId) {
    Componentes de UI
    -------------------------------------------------------------------------- */
 
-/** Cabeçalho de um card de configuração (ícone + título + subtítulo). */
-function blocoHead(iconSvg, titulo, subtitulo) {
+/**
+ * Cabeçalho de um card de configuração (ícone + título + subtítulo).
+ * @param {string} iconSvg
+ * @param {string} titulo
+ * @param {string} [subtitulo]
+ * @param {string} [dica] — o que muda de verdade quando o pai mexe neste bloco.
+ *   Vira o "?" no canto do cabeçalho. O subtítulo diz o QUE é; a dica diz a
+ *   consequência, que é a dúvida que sobra numa tela de ajustes.
+ */
+function blocoHead(iconSvg, titulo, subtitulo, dica) {
   return el("div", {
     class: "cfg-block__head",
     children: [
@@ -94,6 +103,7 @@ function blocoHead(iconSvg, titulo, subtitulo) {
             : null,
         ],
       }),
+      dica ? dicaInfo(dica, { rotulo: titulo, pos: "left" }) : null,
     ],
   });
 }
@@ -124,7 +134,12 @@ function toggle(checked, onChange, ariaLabel) {
 function blocoPerfil(crianca, onAbrirDetalhe) {
   const bloco = el("section", { class: "dash-card cfg-block cfg-block--perfil" });
   bloco.appendChild(
-    blocoHead(ICON.user, "Perfil da criança", "Quem conversa com a Cogni em casa.")
+    blocoHead(
+      ICON.user,
+      "Perfil da criança",
+      "Quem conversa com a Cogni em casa.",
+      "Idade e série já bastam pra Cogni parar de perguntar o básico e ajustar o nível das explicações. O resto ela aprende conversando."
+    )
   );
 
   const body = el("div", { class: "cfg-block__body" });
@@ -479,7 +494,12 @@ function formularioPerfil(crianca, { onSubmit, close }) {
 function blocoConta(responsavel) {
   const bloco = el("section", { class: "dash-card cfg-block cfg-block--conta" });
   bloco.appendChild(
-    blocoHead(ICON.user, "Conta", "Seus dados de responsável.")
+    blocoHead(
+      ICON.user,
+      "Conta",
+      "Seus dados de responsável.",
+      "Esta conta é sua. A criança não tem login: ela fala com a Cogni pelo robô."
+    )
   );
 
   const linha = (rotulo, valor) =>
@@ -528,12 +548,77 @@ function blocoConta(responsavel) {
 }
 
 /* --------------------------------------------------------------------------
+   Bloco: Ajuda (rever o tutorial guiado)
+
+   Todo produto que ensina na primeira visita precisa de um lugar pra ensinar de
+   novo: a primeira visita é justamente aquela em que o pai está com pressa pra
+   ver a tela. Fica em Configurações, no fim, porque é onde as pessoas procuram
+   ajuda quando ela não está na frente delas.
+   -------------------------------------------------------------------------- */
+function blocoAjuda(abrirTour) {
+  const bloco = el("section", { class: "dash-card cfg-block cfg-block--ajuda" });
+  bloco.appendChild(
+    blocoHead(
+      ICON.bulb,
+      "Ajuda",
+      "Uma volta guiada pelas telas do painel.",
+      "O tutorial troca de seção sozinho e explica cada tela. Dá pra sair no meio a qualquer momento."
+    )
+  );
+
+  const btn = el("button", {
+    class: "dash-btn dash-btn--ghost cfg-tutorial__btn",
+    attrs: {
+      type: "button",
+      "data-dica": "Abre o tutorial guiado desde a primeira parada.",
+    },
+    children: [
+      el("span", { class: "cfg-tutorial__ico", svg: ICON.sparkle, attrs: { "aria-hidden": "true" } }),
+      el("span", { text: "Rever o tutorial" }),
+    ],
+  });
+  btn.addEventListener("click", () => {
+    if (typeof abrirTour === "function") abrirTour({ rever: true });
+  });
+
+  bloco.appendChild(
+    el("div", {
+      class: "cfg-block__body",
+      children: [
+        el("div", {
+          class: "cfg-tutorial",
+          children: [
+            el("div", {
+              class: "cfg-notif__info",
+              children: [
+                el("span", { class: "cfg-notif__title", text: "Tutorial guiado" }),
+                el("span", {
+                  class: "cfg-notif__desc",
+                  text: "Dez paradas rápidas, uma por tela. Leva cerca de um minuto.",
+                }),
+              ],
+            }),
+            btn,
+          ],
+        }),
+      ],
+    })
+  );
+  return bloco;
+}
+
+/* --------------------------------------------------------------------------
    Bloco: Tema
    -------------------------------------------------------------------------- */
 function blocoTema() {
   const bloco = el("section", { class: "dash-card cfg-block cfg-block--tema" });
   bloco.appendChild(
-    blocoHead(ICON.bulb, "Aparência", "Vale só neste aparelho.")
+    blocoHead(
+      ICON.bulb,
+      "Aparência",
+      "Vale só neste aparelho.",
+      "A escolha fica salva neste navegador. Abrir o painel no celular não muda o tema do computador."
+    )
   );
 
   const isDark = () =>
@@ -598,7 +683,8 @@ function blocoVinculo({ crianca, servidorUrl, user, onDesvinculado }) {
     blocoHead(
       ICON.robot,
       "Vínculo com a Cogni",
-      "Qual perfil do robô este painel está lendo."
+      "Qual perfil do robô este painel está lendo.",
+      "O vínculo não expira: fica de pé até você desvincular aqui. Desvincular tira o acesso às conversas desta criança."
     )
   );
 
@@ -647,6 +733,7 @@ function blocoVinculo({ crianca, servidorUrl, user, onDesvinculado }) {
     attrs: {
       type: "button",
       "aria-label": "Copiar código de pareamento",
+      "data-dica": "Copia o código pra área de transferência.",
       disabled: "true",
     },
     svg: ICON_COPY,
@@ -684,7 +771,16 @@ function blocoVinculo({ crianca, servidorUrl, user, onDesvinculado }) {
       el("div", {
         class: "cfg-codigo__text",
         children: [
-          el("span", { class: "cfg-codigo__label", text: "Código de pareamento" }),
+          el("span", {
+            class: "cfg-codigo__label",
+            children: [
+              el("span", { text: "Código de pareamento" }),
+              dicaInfo(
+                "O mesmo código que liga outro aparelho a este perfil. Ele não muda, e só aparece com o robô ligado.",
+                { rotulo: "Código de pareamento" }
+              ),
+            ],
+          }),
           codigoValor,
         ],
       }),
@@ -818,7 +914,12 @@ export async function renderConfig(ctx) {
   let criancaAtual = crianca;
 
   // Host do bloco de perfil (re-renderizado ao salvar).
-  const perfilHost = el("div", { class: "cfg-perfil-host" });
+  // `data-tour`: âncora do tutorial guiado (ver js/dashboard/tour-passos.js). Vai
+  // no HOST porque o card de dentro é recriado a cada releitura do perfil.
+  const perfilHost = el("div", {
+    class: "cfg-perfil-host",
+    attrs: { "data-tour": "cfg-perfil" },
+  });
 
   // Com o modal aberto, ninguém repinta o card por baixo dele (ver `revalidar`).
   let modalAberto = false;
@@ -950,6 +1051,7 @@ export async function renderConfig(ctx) {
       blocoConta(responsavel),
       blocoTema(),
       blocoRobo,
+      blocoAjuda(ctx.abrirTour),
     ],
   });
   root.appendChild(grid);

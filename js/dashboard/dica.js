@@ -24,6 +24,7 @@
 
 import { el } from "./sections/_shared.js";
 import { ICON } from "./icons.js";
+import { dicaInfo } from "./tooltip.js";
 
 /** Texto amigável de quando NÃO há nenhuma dica salva ainda (tabela vazia). */
 const DICA_PADRAO =
@@ -108,6 +109,10 @@ export function cardDica({ servidorUrl, crianca, mock, onMais }) {
       children: [
         el("span", { class: "dash-card__head-ico", svg: ICON.bulb }),
         el("span", { class: "dash-card__head-title", text: "Dica da Cogni" }),
+        dicaInfo(
+          "Uma sugestão que a Cogni escreve pra você, a partir do que a criança andou perguntando. Muda quando há conversa nova.",
+          { rotulo: "Dica da Cogni", pos: "bottom" }
+        ),
       ],
     })
   );

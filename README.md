@@ -132,7 +132,9 @@ boot. Nada de erro na tela do pai por causa disso.
 
 ### 🧩 Onboarding & pareamento
 
-Quando o pai entra e **ainda não tem criança vinculada**, aparece um **onboarding em tela cheia**:
+Quando o pai entra e **ainda não tem criança vinculada**, aparece um **onboarding em tela cheia**. Ele é
+um **portão**: sem vínculo o painel não monta, então esta tela precisa dar conta sozinha de acolher,
+explicar e desbloquear.
 
 - **Primeira vez** (sem histórico no navegador): 3 telas — duas de apresentação com animação + a de
   pareamento (código de 6 caracteres).
@@ -141,6 +143,69 @@ Quando o pai entra e **ainda não tem criança vinculada**, aparece um **onboard
 O código é validado **pelo servidor** (que seta o vínculo com a `service_role`) — o site **nunca** escreve
 o `responsavel_id` direto. Em **Configurações** dá pra ver o código do perfil e **desvincular** (com
 confirmação). O vínculo é **permanente**: só some se você desvincular.
+
+#### O que a rodada de refinamento (ago/2026) trouxe
+
+| O que | Por quê |
+| --- | --- |
+| **"Passo 2 de 3"** + barra de progresso | Saber quanto falta é o que separa "deixa eu ver" de "isso vai tomar minha tarde?" |
+| **Sonda de rede** antes de digitar (`Procurando a Cogni…` → `Cogni encontrada` / `Não estou enxergando`) | Descobrir que o robô está desligado **depois** de digitar 6 caracteres vira "este site não funciona". A sonda **nunca bloqueia** o envio: navegadores tratam rede privada de formas diferentes, e um falso negativo não pode barrar um pareamento que funcionaria |
+| **"Onde encontro o código?"** embutido (`<details>` nativo) | Mandar quem está no meio de um formulário de 6 caixinhas pra outra página é perder metade das pessoas |
+| **Envio automático** ao completar o 6º caractere | Código completo na tela + botão ainda por apertar é um passo sem nenhuma decisão dentro |
+| **Tela de sucesso** com o nome da criança | É a única virada real do produto, e o painel demora ~1,4s pra recarregar. Um `<p>` verde não marcaria o momento |
+| **"Sair da conta"** no rodapé | Sem criança vinculada, a badge da conta (que tem o "Sair") **nem existe**. Sem esse rodapé, quem não consegue parear fica preso numa tela sem porta |
+| **Foco preso no overlay + slides inertes** | Com as 3 telas no DOM, o Tab passeava pelos campos da tela seguinte, invisíveis |
+| **A flag "já viu" grava ao CHEGAR no pareamento** | Quem fechava a aba no portão pra ir buscar o código no robô voltava e assistia a apresentação inteira de novo |
+
+### 🧭 Primeira visita: o tutorial guiado
+
+Na **primeira vez** que o painel abre com uma criança vinculada, entra um **tutorial guiado de 10
+paradas** que anda **pelo app de verdade**: ele troca de seção, rola até o elemento, recorta um foco
+dourado em volta dele e explica num balão. Não é vídeo nem carrossel de prints — a tela destacada é a
+tela do pai.
+
+- **Dá pra pular** a qualquer momento (botão "Pular tutorial", o ✕ do canto, ou `Esc`). Pular e concluir
+  gravam a mesma coisa: o pai já decidiu.
+- **Setas ← →** andam entre as paradas; o `Tab` fica preso no balão.
+- **Rever depois:** *Configurações → Ajuda → "Rever o tutorial"*.
+- A flag é **por usuário** (`cognify-tour-visto:<id>`): duas contas no mesmo computador têm cada uma o
+  seu primeiro acesso.
+- O pareamento termina em `location.reload()`, então o tour não pode começar ali (morreria com a página).
+  O onboarding deixa a marca `cognify-tour-pendente` e o boot seguinte a consome.
+
+**Três layouts, e a razão de serem três:**
+
+| Layout | Quando | Por quê |
+| --- | --- | --- |
+| **Flutuante** | Desktop | Ancora no alvo, com setinha, escolhendo o lado que cabe |
+| **Folha** (bottom sheet) | Celular em pé | Balão flutuante em 360px ou cobre o alvo ou fica com 6 palavras por linha |
+| **Painel lateral** | Celular **deitado** | Medido em 844×390: uma folha come 242px dos 390 e tapa exatamente o que explica. Encostado na direita, sobra a tela toda pro destaque |
+
+Detalhes que não são óbvios e estão no código: alvo que **não aparece** (conta nova sem conversa e sem
+plano) não trava nada — o balão vira **centrado**; a rolagem **não é travada** (o pai pode conferir o
+entorno) e por isso foco e balão se reposicionam a cada `scroll`/`resize`; e o passo da navegação aponta
+pra **sidebar** no desktop e pra **tab bar** no celular, porque abaixo de 900px a sidebar mora em
+`translateX(-105%)`.
+
+### 💬 Dicas contextuais (os "?" espalhados pelo painel)
+
+Um motor só (`tooltip.js`), delegado no documento, com **um balão reaproveitado** — o painel tem centenas
+de alvos possíveis e um nó por alvo encheria o DOM de coisa que quase nunca aparece. São **dois padrões**,
+e a escolha entre eles é de **acessibilidade**, não de gosto:
+
+| Padrão | Onde usar | Comportamento |
+| --- | --- | --- |
+| `data-dica="…"` | Em algo que **já é interativo** (botão, link, campo) | Abre no hover e no foco de teclado; vira `aria-describedby` enquanto está aberto |
+| `dicaInfo(texto, { rotulo })` | Pra explicar algo **não-interativo** (um número, um selo, um rótulo) | Devolve um `<button>` "?" de verdade: chega no `Tab`, abre no **toque**, e o leitor de tela anuncia "Ajuda: Tempo total" |
+
+> ⚠️ `data-dica` num `<span>` solto só enriquece o **hover** — teclado e toque nunca chegariam nele. Nesses
+> casos a mesma explicação precisa existir num `?` por perto. É exatamente o que foi feito com o selo
+> "Subiu de nível" da Trilha, que antes usava `title` nativo (invisível no celular).
+
+O balão é **escuro nos dois temas** de propósito: ele flutua sobre cards claros e escuros, e uma superfície
+que mudasse de cor junto com o tema sumiria sobre metade deles. Rolagem, `Esc` e resize fecham. O `?` tem
+**área de toque de 44px** sem inchar o layout (um `::after` invisível), o que resolve o alvo impossível de
+acertar no celular sem empurrar o rótulo do lado.
 
 ### 🎙️ O perfil tem duas pontas escrevendo nele (site **e** voz)
 
@@ -752,7 +817,10 @@ o próprio `-soft`, que são um degrau mais escuros que o branco puro. Na remedi
 | `js/dashboard/main.js` | Bootstrap: guard de auth, decide onboarding × painel, monta o contexto e o router |
 | `js/dashboard/mock-data.js` | **Fonte de dados** (roteia mock ↔ Supabase pela flag `USAR_SUPABASE`) |
 | `js/dashboard/supabase-data.js` | Implementação real das queries/escritas no Supabase |
-| `js/dashboard/onboarding.js` | Boas-vindas + pareamento por código (tela cheia, com motion) |
+| `js/dashboard/onboarding.js` | Boas-vindas + pareamento por código (tela cheia, com motion, sonda de rede e saída do portão) |
+| `js/dashboard/tour.js` | **Motor do tutorial guiado**: navega, espera o alvo, recorta o foco, posiciona o balão e prende o teclado |
+| `js/dashboard/tour-passos.js` | **O roteiro** do tutorial (só conteúdo: título, texto e âncora de cada uma das 10 paradas) |
+| `js/dashboard/tooltip.js` | **Motor das dicas**: o balão único, o `data-dica` e o helper `dicaInfo()` (o botão "?") |
 | `js/dashboard/resumo-semanal.js` | Card + modal do **"O bilhete da semana"** (resumo por IA) |
 | `js/dashboard/dica.js` | Card **"Dica da Cogni"** (Início + Aprendizado), gerada por IA no servidor local (`/api/dica`) |
 | `js/dashboard/router.js` | Roteamento por hash (SPA leve) |
@@ -773,6 +841,8 @@ o próprio `-soft`, que são um degrau mais escuros que o branco puro. Na remedi
 | `api/_lib/link/` | A leitura de link: `rede` (SSRF, redirect, tetos), `youtube` (InnerTube + legenda), `pagina` (charset, HTML→texto, anti-bot, PDF) |
 | `js/dashboard/sections/*.js` | As 7 seções: Início, Conversas, Aprendizado, **Mapa da aula**, **Mesa de Estudos**, **Rosto da Cogni**, Configurações |
 | `css/dashboard-onboarding.css` | Estilos do onboarding |
+| `css/dashboard-tour.css` | Estilos do tutorial guiado (véu, recorte e os três layouts do balão) |
+| `css/dashboard-tooltip.css` | Estilos das dicas: o balão, o `?` e as adaptações dele a cada cabeçalho que o hospeda |
 | `css/dashboard-rosto.css` | Estilos do editor de rosto (estética infantil, escopada em `.dash-rosto`) |
 | `css/dashboard-mapa.css` | Estilos do Mapa da aula (tons dos momentos, faixa do tempo, selo ao vivo) |
 | `css/dashboard-mesa.css` | Estilos da Mesa de Estudos (quadro, cards, arraste, captura) — o prefixo `.pl-` dos formulários fica, porque Configurações reusa |
@@ -880,6 +950,9 @@ Cogni Software/
 │   │   ├── mock-data.js    # Fonte de dados (flag USAR_SUPABASE: mock ↔ real)
 │   │   ├── supabase-data.js# Queries/escritas reais no Supabase
 │   │   ├── onboarding.js   # Boas-vindas + pareamento por código
+│   │   ├── tour.js         # Motor do tutorial guiado (foco, balão, navegação)
+│   │   ├── tour-passos.js  # O roteiro do tutorial (as 10 paradas)
+│   │   ├── tooltip.js      # Motor das dicas contextuais (balão + botão "?")
 │   │   ├── resumo-semanal.js # Bilhete da semana (IA, servidor local)
 │   │   ├── dica.js         # Dica da Cogni (IA, servidor local)
 │   │   ├── mapa-api.js     # Mapa da aula: ao vivo (servidor) + histórico (Supabase)

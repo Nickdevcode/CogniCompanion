@@ -7,9 +7,14 @@
  *
  * Dois modos, decididos pela flag `localStorage[FLAG_VISTO]`:
  *   - 1ª vez (flag ausente): jornada de 3 telas — duas de apresentação com
- *     motion + a terceira de pareamento. Ao concluir, grava a flag.
+ *     motion + a terceira de pareamento.
  *   - Já viu antes / despareou depois (flag presente): vai DIRETO pra tela de
  *     pareamento (sem repetir a apresentação). Combinado com o Nicolas.
+ *
+ * ⭐ A flag agora é gravada ao CHEGAR no pareamento (avançando ou pulando), e
+ * não só ao parear com sucesso. Quem fecha a aba no gate porque foi buscar o
+ * código no robô voltava e assistia a apresentação inteira de novo — a
+ * apresentação já cumpriu o papel dela no primeiro passe.
  *
  * Pareamento: o código (6 chars, sem ambíguos) é validado e o vínculo é setado
  * SÓ pelo servidor (service_role) — o site nunca escreve `responsavel_id`:
@@ -17,12 +22,33 @@
  *   → 200 {ok, jaPareado, criancaId, nome} · 404 inválido · 409 de outro pai
  *     · 400 faltando · 503 indisponível
  *
- * Acessível: foco gerenciado, Esc não fecha (é um gate), `aria-live` pros erros,
- * inputs do código com rótulos. Motion respeita `prefers-reduced-motion` (CSS).
+ * ────────────────────────────────────────────────────────────────────────────
+ * O QUE ESTE FLUXO FAZ DE PROPÓSITO (e por quê)
+ *
+ * • **É um portão, e portão precisa de saída.** Sem criança vinculada o painel
+ *   não monta, então a badge da conta (que tem o "Sair") nem existe. Um pai que
+ *   não consegue parear ficaria preso numa tela sem nenhuma porta. Daí o rodapé
+ *   com "Sair da conta" em todas as telas.
+ *
+ * • **A ajuda mora no passo, não num link pra fora.** "Onde encontro o código?"
+ *   abre ali mesmo, com os dois caminhos reais (tela do robô e pedir falando).
+ *   Mandar o pai pra outra página no meio de um formulário de 6 caixinhas é
+ *   perder metade deles.
+ *
+ * • **O painel avisa ANTES de o pai digitar** que não está enxergando a Cogni na
+ *   rede. Descobrir isso depois de digitar seis caracteres e apertar "Conectar"
+ *   é a diferença entre "ah, o robô está desligado" e "este site não funciona".
+ *   A sondagem nunca bloqueia o envio: ela só acrescenta um recado.
+ *
+ * • **Slide fora de vista é slide INERTE.** Um carrossel com as três telas no
+ *   DOM deixa o Tab passear pelos campos da tela seguinte, invisíveis. Aqui só a
+ *   tela ativa é focável, e o foco fica preso ao overlay.
+ * ────────────────────────────────────────────────────────────────────────────
  */
 
 import { el } from "./sections/_shared.js";
 import { ICON } from "./icons.js";
+import { marcarTourPendente } from "./tour.js";
 
 /** Chave que marca que a apresentação completa já foi vista neste navegador. */
 const FLAG_VISTO = "cognify-onboarding-visto";
@@ -30,6 +56,9 @@ const FLAG_VISTO = "cognify-onboarding-visto";
 /** Alfabeto do código (igual ao servidor): sem 0/O/1/I pra não confundir. */
 const ALFABETO_CODIGO = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const TAMANHO_CODIGO = 6;
+
+/** Teto da sondagem do servidor local. Curto: é um indicador, não uma etapa. */
+const TIMEOUT_SONDA_MS = 3500;
 
 /** Normaliza um caractere digitado: caixa alta e só aceita do alfabeto válido. */
 function normalizarChar(ch) {
@@ -64,37 +93,109 @@ export function iniciarOnboarding({ user, nomeResponsavel, servidorUrl, onParead
     telas.push(telaBoasVindas(nomeResponsavel));
     telas.push(telaComoFunciona());
   }
-  const pareamento = telaPareamento({ user, servidorUrl, onPareado });
+  const pareamento = telaPareamento({ user, servidorUrl });
   telas.push(pareamento.node);
 
   telas.forEach((t) => track.appendChild(t));
 
-  // Indicadores (bolinhas) — só fazem sentido com mais de uma tela.
+  const total = telas.length;
+  const temApresentacao = total > 1;
+
+  /* ---- Cromo: progresso, bolinhas, pular, rodapé ------------------------ */
+
+  // Rótulo "Passo 2 de 3". Saber quantas telas faltam é o que separa "deixa eu
+  // ver o que é isso" de "quanto tempo isso vai tomar?".
+  const progressoLabel = el("span", { class: "ob-progresso__txt" });
+  const progressoBarra = el("span", { class: "ob-progresso__barra" });
+  const progresso = temApresentacao
+    ? el("div", {
+        class: "ob-progresso",
+        children: [
+          el("div", { class: "ob-progresso__trilho", children: [progressoBarra] }),
+          progressoLabel,
+        ],
+      })
+    : null;
+
   const dots = telas.map((_, i) =>
     el("span", { class: "ob-dot" + (i === 0 ? " is-active" : "") })
   );
-  const dotsWrap =
-    telas.length > 1 ? el("div", { class: "ob-dots", children: dots }) : null;
+  const dotsWrap = temApresentacao
+    ? el("div", { class: "ob-dots", attrs: { "aria-hidden": "true" }, children: dots })
+    : null;
 
-  // Estado de navegação.
+  // Anúncio de troca de tela pro leitor de tela (o overlay não é recriado).
+  const anuncio = el("p", {
+    class: "sr-only",
+    attrs: { role: "status", "aria-live": "polite" },
+  });
+
+  /* ---- Navegação -------------------------------------------------------- */
+
   let idx = 0;
-  const total = telas.length;
+
+  /** Aplica `inert` (com plano B manual) numa tela fora de vista. */
+  function definirInerte(node, inerte) {
+    if ("inert" in HTMLElement.prototype) {
+      node.inert = inerte;
+      return;
+    }
+    // Plano B pra navegador sem `inert`: tira do Tab e da árvore acessível.
+    node.setAttribute("aria-hidden", inerte ? "true" : "false");
+    node.querySelectorAll("a, button, input, select, textarea, [tabindex]").forEach((f) => {
+      if (inerte) {
+        if (!f.hasAttribute("data-ob-tabindex")) {
+          f.setAttribute("data-ob-tabindex", f.getAttribute("tabindex") || "");
+        }
+        f.setAttribute("tabindex", "-1");
+      } else {
+        const antigo = f.getAttribute("data-ob-tabindex");
+        if (antigo) f.setAttribute("tabindex", antigo);
+        else f.removeAttribute("tabindex");
+        f.removeAttribute("data-ob-tabindex");
+      }
+    });
+  }
 
   function ir(novo) {
     idx = Math.max(0, Math.min(total - 1, novo));
     track.style.transform = `translateX(-${idx * 100}%)`;
     dots.forEach((d, i) => d.classList.toggle("is-active", i === idx));
-    // Foca a tela ativa (acessibilidade) sem rolar a página.
+
+    telas.forEach((t, i) => definirInerte(t, i !== idx));
+
+    if (progresso) {
+      progressoLabel.textContent = `Passo ${idx + 1} de ${total}`;
+      progressoBarra.style.transform = `scaleX(${(idx + 1) / total})`;
+    }
+    if (skip) skip.hidden = idx === total - 1;
+
+    // Foca a tela ativa (acessibilidade) sem rolar a página. O atraso acompanha
+    // a transição do trilho: focar no meio dela faz o navegador "puxar" o slide.
     const ativa = telas[idx];
-    const alvo = ativa.querySelector(
-      "input, button:not([disabled]), [tabindex]"
-    );
-    if (alvo) window.setTimeout(() => alvo.focus({ preventScroll: true }), 360);
-    // Quando chega na tela de pareamento, ativa o foco no 1º campo do código.
-    if (telas[idx] === pareamento.node) pareamento.focar();
+    window.setTimeout(() => {
+      if (ativa !== telas[idx]) return;
+      if (ativa === pareamento.node) {
+        pareamento.focar();
+        return;
+      }
+      const alvo = ativa.querySelector("button:not([disabled]), input, [tabindex]");
+      if (alvo) alvo.focus({ preventScroll: true });
+    }, 380);
+
+    // Chegou no pareamento: a apresentação cumpriu o papel dela.
+    if (telas[idx] === pareamento.node) {
+      gravarFlagVisto();
+      pareamento.aoEntrar();
+    }
+
+    const titulo = ativa.querySelector(".ob-title");
+    anuncio.textContent =
+      (total > 1 ? `Passo ${idx + 1} de ${total}. ` : "") +
+      (titulo ? titulo.textContent : "");
   }
 
-  // Liga os botões "avançar" das telas de apresentação.
+  // Liga os botões "avançar"/"voltar" das telas de apresentação.
   track.querySelectorAll("[data-ob-next]").forEach((btn) => {
     btn.addEventListener("click", () => ir(idx + 1));
   });
@@ -104,7 +205,7 @@ export function iniciarOnboarding({ user, nomeResponsavel, servidorUrl, onParead
 
   // Botão "pular apresentação" (vai direto ao pareamento) — só na 1ª vez.
   let skip = null;
-  if (!jaViu) {
+  if (temApresentacao) {
     skip = el("button", {
       class: "ob-skip",
       attrs: { type: "button" },
@@ -113,22 +214,98 @@ export function iniciarOnboarding({ user, nomeResponsavel, servidorUrl, onParead
     skip.addEventListener("click", () => ir(total - 1));
   }
 
-  // Quando o pareamento conclui, marca a flag (a apresentação não repete) e
-  // delega ao main pra recarregar o painel com a criança vinculada.
+  /* ---- Rodapé: a saída do portão ---------------------------------------- */
+
+  const sair = el("button", {
+    class: "ob-sair",
+    attrs: { type: "button" },
+    children: [
+      el("span", { class: "ob-sair__ico", svg: ICON_SAIR }),
+      el("span", { text: "Sair da conta" }),
+    ],
+  });
+  sair.addEventListener("click", async () => {
+    sair.disabled = true;
+    try {
+      if (window.cognifyAuth) await window.cognifyAuth.signOut();
+    } catch (e) {
+      console.error("[Companion] Falha ao sair da conta:", e);
+    }
+    window.location.replace("login.html");
+  });
+
+  const rodape = el("div", {
+    class: "ob-rodape",
+    children: [
+      el("p", {
+        class: "ob-rodape__txt",
+        text: "O painel só abre depois de ligado a um perfil do robô.",
+      }),
+      sair,
+    ],
+  });
+
+  /* ---- Conclusão -------------------------------------------------------- */
+
   pareamento.aoConcluir(() => {
     gravarFlagVisto();
+    // O pareamento termina em reload; o tutorial guiado não sobreviveria a ele.
+    // A marca faz o boot seguinte abrir o tour já com a criança na tela.
+    marcarTourPendente();
     if (typeof onPareado === "function") onPareado();
   });
 
-  // Monta o overlay.
+  /* ---- Montagem --------------------------------------------------------- */
+
   const inner = el("div", { class: "ob-inner" });
-  if (skip) inner.appendChild(skip);
+  const topo = el("div", { class: "ob-topo" });
+  if (progresso) topo.appendChild(progresso);
+  if (skip) topo.appendChild(skip);
+  if (progresso || skip) inner.appendChild(topo);
   inner.appendChild(viewport);
   if (dotsWrap) inner.appendChild(dotsWrap);
+  inner.appendChild(rodape);
+  inner.appendChild(anuncio);
   overlay.appendChild(inner);
 
   document.body.appendChild(overlay);
   document.body.style.overflow = "hidden";
+
+  /* ---- Teclado ---------------------------------------------------------- */
+
+  overlay.addEventListener("keydown", (e) => {
+    // Esc não fecha: é um portão, não um diálogo opcional.
+    if (e.key === "Escape") {
+      e.preventDefault();
+      return;
+    }
+    // Setas só navegam a apresentação; dentro do código elas andam entre as
+    // caixinhas (o handler de lá para a propagação).
+    if (e.key === "ArrowRight" && idx < total - 1) ir(idx + 1);
+    else if (e.key === "ArrowLeft" && idx > 0) ir(idx - 1);
+  });
+
+  // Foco preso no overlay: atrás dele o painel não montou, e sair com Tab
+  // levaria a lugar nenhum (ou pro histórico do navegador).
+  overlay.addEventListener("keydown", (e) => {
+    if (e.key !== "Tab") return;
+    const focaveis = Array.from(
+      overlay.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    ).filter((n) => n.offsetParent !== null && !n.closest("[inert]"));
+    if (!focaveis.length) return;
+    const primeiro = focaveis[0];
+    const ultimo = focaveis[focaveis.length - 1];
+    if (e.shiftKey && document.activeElement === primeiro) {
+      e.preventDefault();
+      ultimo.focus();
+    } else if (!e.shiftKey && document.activeElement === ultimo) {
+      e.preventDefault();
+      primeiro.focus();
+    }
+  });
+
   // Anima a entrada do overlay (2 frames pra a transição pegar).
   window.requestAnimationFrame(() =>
     window.requestAnimationFrame(() => overlay.classList.add("is-open"))
@@ -188,6 +365,9 @@ function telaBoasVindas(nome) {
           el("span", { class: "ob-cta__ico", svg: CHEVRON }),
         ],
       }),
+      // Expectativa de tempo logo abaixo do botão: é o que responde "isso vai
+      // me tomar a tarde?" antes de a pessoa decidir clicar.
+      el("p", { class: "ob-nota", text: "Leva menos de um minuto." }),
     ],
   });
 
@@ -278,11 +458,12 @@ function telaComoFunciona() {
 
 /**
  * Monta a tela de pareamento por código.
- * @returns {{ node:HTMLElement, focar:Function, aoConcluir:Function }}
+ * @returns {{ node:HTMLElement, focar:Function, aoEntrar:Function, aoConcluir:Function }}
  */
-function telaPareamento({ user, servidorUrl, onPareado }) {
+function telaPareamento({ user, servidorUrl }) {
   const tela = el("article", { class: "ob-screen ob-screen--pair" });
   let concluirCb = null;
+  let sondou = false;
 
   // Cabeçalho com robô compacto.
   const header = el("div", {
@@ -299,8 +480,7 @@ function telaPareamento({ user, servidorUrl, onPareado }) {
       el("h2", { class: "ob-title ob-title--sm", text: "Ligue este painel ao robô" }),
       el("p", {
         class: "ob-lead",
-        text:
-          "Digite o código de 6 caracteres que aparece no painel da Cogni (ou peça pra ela falar: “Cogni, qual é o código de pareamento?”).",
+        text: "Digite o código de 6 caracteres que aparece no painel da Cogni.",
       }),
     ],
   });
@@ -346,7 +526,89 @@ function telaPareamento({ user, servidorUrl, onPareado }) {
     children: [boxes, feedback, submitBtn],
   });
 
-  tela.append(header, form);
+  /* ---- Ajuda embutida: "onde encontro o código?" ------------------------ */
+
+  const ajuda = el("details", { class: "ob-ajuda" });
+  ajuda.appendChild(
+    el("summary", {
+      class: "ob-ajuda__resumo",
+      children: [
+        el("span", { class: "ob-ajuda__ico", svg: ICON.bulb }),
+        el("span", { text: "Onde encontro o código?" }),
+      ],
+    })
+  );
+  const PASSOS_AJUDA = [
+    "Ligue o robô e espere o rosto da Cogni aparecer.",
+    "No computador em que a Cogni está rodando, abra o painel dela: o código de 6 caracteres fica na tela de perfis.",
+    "Sem o computador à mão? Peça pra ela: “Cogni, qual é o código de pareamento?”.",
+  ];
+  ajuda.appendChild(
+    el("ol", {
+      class: "ob-ajuda__lista",
+      children: PASSOS_AJUDA.map((t) => el("li", { text: t })),
+    })
+  );
+  ajuda.appendChild(
+    el("p", {
+      class: "ob-ajuda__nota",
+      text:
+        "Este passo (e só ele) precisa que o painel alcance a Cogni pela rede. " +
+        "Use o mesmo computador ou a mesma casa do robô; depois de conectado, o " +
+        "painel funciona de qualquer lugar.",
+    })
+  );
+
+  /* ---- Sonda: a Cogni está ao alcance? ---------------------------------- */
+
+  const sondaTxt = el("span", { class: "ob-sonda__txt", text: "Procurando a Cogni na rede…" });
+  const sondaPonto = el("span", { class: "ob-sonda__ponto", attrs: { "aria-hidden": "true" } });
+  const sondaBtn = el("button", {
+    class: "ob-sonda__acao",
+    attrs: { type: "button", hidden: "hidden" },
+    text: "Verificar de novo",
+  });
+  const sonda = el("p", {
+    class: "ob-sonda",
+    attrs: { "data-estado": "procurando", role: "status", "aria-live": "polite" },
+    children: [sondaPonto, sondaTxt, sondaBtn],
+  });
+  sondaBtn.addEventListener("click", () => sondar());
+
+  /**
+   * Descobre se o servidor da Cogni responde, ANTES de o pai digitar.
+   *
+   * `mode: "no-cors"` de propósito: não queremos ler a resposta, só saber se
+   * houve uma. Assim a sonda não depende de o servidor liberar CORS numa rota
+   * de saúde que talvez nem exista. Resposta opaca = servidor vivo; rejeição =
+   * fora do ar, outra rede, ou bloqueado pelo navegador.
+   *
+   * O resultado NUNCA bloqueia o formulário: navegadores tratam requisição a
+   * rede privada de formas diferentes, e um falso negativo não pode impedir um
+   * pareamento que funcionaria.
+   */
+  async function sondar() {
+    sonda.setAttribute("data-estado", "procurando");
+    sondaTxt.textContent = "Procurando a Cogni na rede…";
+    sondaBtn.hidden = true;
+    try {
+      await fetch(servidorUrl + "/", {
+        mode: "no-cors",
+        cache: "no-store",
+        signal: AbortSignal.timeout(TIMEOUT_SONDA_MS),
+      });
+      sonda.setAttribute("data-estado", "ok");
+      sondaTxt.textContent = "Cogni encontrada. Pode digitar o código.";
+      sondaBtn.hidden = true;
+    } catch (e) {
+      sonda.setAttribute("data-estado", "off");
+      sondaTxt.textContent =
+        "Não estou enxergando a Cogni. Confira se o robô está ligado e na mesma rede.";
+      sondaBtn.hidden = false;
+    }
+  }
+
+  tela.append(header, form, ajuda, sonda);
 
   /* ---- Comportamento dos inputs do código (digitar, colar, navegar) ---- */
   function valorCodigo() {
@@ -364,6 +626,11 @@ function telaPareamento({ user, servidorUrl, onPareado }) {
       inp.value = c;
       limparErro();
       if (c && i < TAMANHO_CODIGO - 1) inputs[i + 1].focus();
+      // Seis preenchidos: envia sozinho. Um código completo na tela e um botão
+      // "Conectar" ainda por apertar é um passo a mais sem nenhuma decisão nele.
+      if (c && i === TAMANHO_CODIGO - 1 && valorCodigo().length === TAMANHO_CODIGO) {
+        form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event("submit"));
+      }
     });
     inp.addEventListener("keydown", (e) => {
       if (e.key === "Backspace" && !inp.value && i > 0) {
@@ -373,9 +640,15 @@ function telaPareamento({ user, servidorUrl, onPareado }) {
       } else if (e.key === "ArrowLeft" && i > 0) {
         inputs[i - 1].focus();
         e.preventDefault();
+        // Dentro do código, seta é navegação entre caixinhas — não pode virar
+        // "voltar um slide" lá no overlay.
+        e.stopPropagation();
       } else if (e.key === "ArrowRight" && i < TAMANHO_CODIGO - 1) {
         inputs[i + 1].focus();
         e.preventDefault();
+        e.stopPropagation();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.stopPropagation();
       }
     });
     // Colar o código inteiro em qualquer caixa distribui pelos campos.
@@ -394,12 +667,19 @@ function telaPareamento({ user, servidorUrl, onPareado }) {
       limparErro();
       const next = Math.min(chars.length, TAMANHO_CODIGO - 1);
       inputs[next].focus();
+      if (valorCodigo().length === TAMANHO_CODIGO) {
+        form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event("submit"));
+      }
     });
   });
 
-  /* ---- Submit: chama o servidor ---- */
+  /* ---- Submit: chama o servidor ---------------------------------------- */
+
+  let enviando = false;
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (enviando) return;
     const codigo = valorCodigo();
     if (codigo.length !== TAMANHO_CODIGO) {
       mostrarErro("Digite os 6 caracteres do código.");
@@ -408,6 +688,7 @@ function telaPareamento({ user, servidorUrl, onPareado }) {
       return;
     }
 
+    enviando = true;
     setLoading(true);
     try {
       const resp = await fetch(`${servidorUrl}/api/pareamento/vincular`, {
@@ -424,32 +705,33 @@ function telaPareamento({ user, servidorUrl, onPareado }) {
       }
 
       if (resp.ok && dados.ok) {
-        const nomeCrianca = dados.nome ? ` ${dados.nome}` : "";
-        mostrarOk(
-          dados.jaPareado
-            ? `Tudo certo! Você já estava conectado a${nomeCrianca}.`
-            : `Conectado a${nomeCrianca}! Levando você ao painel…`
-        );
-        // Pequena pausa pra a mensagem aparecer antes de recarregar.
+        mostrarSucesso(dados.nome, dados.jaPareado);
+        // Pequena pausa pra a comemoração aparecer antes de recarregar.
         window.setTimeout(() => {
           if (typeof concluirCb === "function") concluirCb();
-        }, 700);
+        }, 1400);
         return;
       }
 
       // Erros mapeados pelo servidor (mensagem já vem amigável em PT-BR).
       mostrarErro(dados.erro || erroPorStatus(resp.status));
+      enviando = false;
       setLoading(false);
       boxes.classList.add("is-error");
-      inputs[0].focus();
       inputs.forEach((i) => (i.value = ""));
+      inputs[0].focus();
     } catch (err) {
       // Falha de rede / servidor fora do ar / CORS.
       console.error("[Companion] Pareamento falhou:", err);
       mostrarErro(
-        "Não consegui falar com a Cogni. Confirme que o robô/servidor está ligado e tente de novo."
+        "Não consegui falar com a Cogni. Confirme que o robô está ligado e tente de novo."
       );
+      enviando = false;
       setLoading(false);
+      // O erro é de alcance, não de código: reabre a ajuda e refaz a sonda, que
+      // é onde está a explicação do que fazer.
+      ajuda.open = true;
+      sondar();
     }
   });
 
@@ -458,11 +740,38 @@ function telaPareamento({ user, servidorUrl, onPareado }) {
     feedback.classList.add("is-error");
     feedback.classList.remove("is-ok");
   }
-  function mostrarOk(msg) {
-    feedback.textContent = msg;
-    feedback.classList.add("is-ok");
-    feedback.classList.remove("is-error");
+
+  /**
+   * Estado de sucesso: troca a tela inteira por uma comemoração curta.
+   *
+   * Um `<p>` verde embaixo do formulário não marca a virada. Aqui o pai acabou
+   * de cruzar o único portão do produto, e a tela seguinte demora ~1,4s pra
+   * chegar (recarregamos o painel) — este é o lugar certo de dizer que deu
+   * certo, com o nome de quem ele acabou de conectar.
+   */
+  function mostrarSucesso(nomeCrianca, jaPareado) {
+    const quem = (nomeCrianca || "").trim();
+    const sucesso = el("div", {
+      class: "ob-sucesso",
+      attrs: { role: "status", "aria-live": "assertive" },
+      children: [
+        el("span", { class: "ob-sucesso__selo", svg: ICON.check, attrs: { "aria-hidden": "true" } }),
+        el("h2", {
+          class: "ob-title ob-title--sm",
+          text: jaPareado ? "Vocês já estavam conectados!" : "Conectado!",
+        }),
+        el("p", {
+          class: "ob-lead",
+          text: quem
+            ? `Este painel agora acompanha ${quem}. Abrindo…`
+            : "Este painel agora acompanha o perfil do robô. Abrindo…",
+        }),
+      ],
+    });
+    tela.replaceChildren(sucesso);
+    tela.classList.add("is-sucesso");
   }
+
   function setLoading(on) {
     submitBtn.disabled = on;
     submitBtn.classList.toggle("is-loading", on);
@@ -473,6 +782,12 @@ function telaPareamento({ user, servidorUrl, onPareado }) {
   return {
     node: tela,
     focar: () => inputs[0] && inputs[0].focus({ preventScroll: true }),
+    /** Chamado quando esta tela vira a ativa (só sonda uma vez por visita). */
+    aoEntrar: () => {
+      if (sondou) return;
+      sondou = true;
+      sondar();
+    },
     aoConcluir: (cb) => {
       concluirCb = cb;
     },
@@ -486,6 +801,10 @@ function telaPareamento({ user, servidorUrl, onPareado }) {
 /** Chevron de avanço (fallback se o ICON.arrowRight não existir). */
 const CHEVRON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+
+/** Porta com seta pra fora — o "sair" do rodapé do portão. */
+const ICON_SAIR =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 17v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v2"/><path d="M10 12h10M17 8.5l3.5 3.5L17 15.5"/></svg>';
 
 /** Mensagem genérica por status HTTP, caso o servidor não mande o corpo. */
 function erroPorStatus(status) {

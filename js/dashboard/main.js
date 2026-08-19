@@ -17,6 +17,16 @@ import * as mock from "./mock-data.js";
 import { idadeLabel, primeiroNome } from "./format.js";
 import { iniciarOnboarding } from "./onboarding.js";
 import { SERVIDOR_URL } from "./servidor.js";
+import { iniciarDicas } from "./tooltip.js";
+import {
+  iniciarTour,
+  tourJaVisto,
+  marcarTourVisto,
+  esquecerTour,
+  consumirTourPendente,
+  esperarElemento,
+} from "./tour.js";
+import { montarPassos } from "./tour-passos.js";
 
 import { renderInicio } from "./sections/inicio.js";
 import { renderConversas } from "./sections/conversas.js";
@@ -210,6 +220,28 @@ async function init() {
   setupShell();
   popularCardCrianca(crianca);
 
+  // Motor das dicas contextuais (os "?" e os balões de hover/foco). Um listener
+  // delegado no documento: ligar cedo cobre todas as seções, inclusive as que
+  // ainda nem renderizaram.
+  iniciarDicas();
+
+  /**
+   * Abre o tutorial guiado. Fica no contexto pra as Configurações poderem
+   * oferecer "Rever o tutorial" sem importar o motor (e sem duplicar a decisão
+   * de qual roteiro rodar).
+   * @param {object} [cfg]
+   * @param {boolean} [cfg.rever] — true quando é o pai pedindo pra rever
+   */
+  function abrirTour({ rever = false } = {}) {
+    if (rever) esquecerTour(user.id);
+    iniciarTour({
+      passos: montarPassos({ nomeCrianca: primeiroNome(crianca && crianca.nome) }),
+      // Concluir e pular gravam a mesma coisa: o pai já decidiu sobre o
+      // tutorial, e reabri-lo sozinho na visita seguinte seria ignorá-lo.
+      aoTerminar: () => marcarTourVisto(user.id),
+    });
+  }
+
   const context = {
     user,
     crianca,
@@ -217,6 +249,7 @@ async function init() {
     mock, // todas as seções leem/escrevem pelo mesmo módulo de dados
     servidorUrl: SERVIDOR_URL, // endpoints não-Supabase (Resumo, desvincular)
     now: mock.getNow(), // "agora" (data real no modo Supabase; MOCK_NOW no mock)
+    abrirTour, // usado pelo botão "Rever o tutorial" (Configurações)
   };
 
   const outlet = document.querySelector("[data-dash-outlet]");
@@ -236,6 +269,18 @@ async function init() {
   normalizarRota();
 
   router.start();
+
+  // Primeira visita → tutorial guiado. Duas portas levam aqui: a marca que o
+  // pareamento deixou (ele termina em reload, e o tour não sobreviveria a ele) e
+  // a regra do "nunca viu" — que também cobre quem já estava pareado antes de
+  // este tutorial existir.
+  const pendente = consumirTourPendente();
+  if (pendente || !tourJaVisto(user.id)) {
+    // Espera a PRIMEIRA seção pintar: aberto sobre o spinner, o tutorial
+    // descreveria uma tela que ainda não está lá. Se ela demorar (Supabase
+    // lento), o teto do `esperarElemento` solta e o tour abre assim mesmo.
+    esperarElemento("[data-dash-outlet] .dash-section").then(() => abrirTour());
+  }
 }
 
 if (document.readyState === "loading") {

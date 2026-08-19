@@ -1,0 +1,263 @@
+/* ==========================================================================
+   dashboard-tooltip.css — Dicas contextuais (o balão e o botãozinho "?").
+
+   Motor em js/dashboard/tooltip.js. São dois componentes:
+     .dash-dica        → o balão único, reaproveitado (position: fixed)
+     .dash-dica-info   → o "?" que abre a dica de algo não-interativo
+
+   Tema-aware pelos tokens do painel. O balão é ESCURO nos dois temas de
+   propósito: ele flutua sobre cards claros e escuros, e uma superfície que
+   muda de cor junto com o tema desapareceria sobre metade deles.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   O balão
+   -------------------------------------------------------------------------- */
+.dash-dica {
+  position: fixed;
+  /* Acima de modal (1000) e do drawer, abaixo do tour (2000): a dica precisa
+     aparecer sobre o formulário do modal, que é justamente onde há mais campo
+     pra explicar. */
+  z-index: 1400;
+  max-width: min(19rem, calc(100vw - 2rem));
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  background-color: var(--brand-navy);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  text-align: left;
+  /* A borda clara não é decoração: o balão é navy e ele encosta em cabeçalho de
+     card, que também é navy. Sem ela, o topo do balão desaparece no cabeçalho. */
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 12px 28px -12px rgba(8, 12, 56, 0.7);
+  pointer-events: none; /* nunca rouba o hover do que está embaixo */
+  opacity: 0;
+  transform: translateY(3px) scale(0.97);
+  transform-origin: center;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+.dash-dica.is-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+[data-theme="dark"] .dash-dica {
+  /* Navy puro somem no fundo #161618: um degrau acima, com borda. */
+  background-color: #33344a;
+  box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.8);
+}
+
+.dash-dica__txt {
+  display: block;
+}
+
+/* Setinha: um quadradinho girado, ancorado pelo JS no centro do alvo. */
+.dash-dica__seta {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background-color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  transform: rotate(45deg);
+  border-radius: 2px;
+}
+/* Posição + contorno de cada lado. Só as duas faces viradas pra FORA ficam com
+   borda; as de dentro virariam um risco atravessando o balão. */
+.dash-dica[data-lado="top"] .dash-dica__seta {
+  bottom: -4px;
+  margin-left: -5px;
+  border-top-color: transparent;
+  border-left-color: transparent;
+}
+.dash-dica[data-lado="bottom"] .dash-dica__seta {
+  top: -4px;
+  margin-left: -5px;
+  border-bottom-color: transparent;
+  border-right-color: transparent;
+}
+.dash-dica[data-lado="left"] .dash-dica__seta {
+  right: -4px;
+  margin-top: -5px;
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+}
+.dash-dica[data-lado="right"] .dash-dica__seta {
+  left: -4px;
+  margin-top: -5px;
+  border-right-color: transparent;
+  border-top-color: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   O botão "?"
+   -------------------------------------------------------------------------- */
+.dash-dica-info {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background-color: color-mix(in srgb, currentColor 14%, transparent);
+  color: inherit;
+  opacity: 0.62;
+  cursor: help;
+  vertical-align: middle;
+  transition: opacity 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+  /* Alvo de toque de 44px sem inchar o layout: a área invisível cresce, a
+     bolinha desenhada não. É o que resolve o "?" impossível de acertar no
+     celular sem empurrar o rótulo do lado. */
+  position: relative;
+}
+.dash-dica-info::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+.dash-dica-info svg {
+  width: 0.78rem;
+  height: 0.78rem;
+}
+.dash-dica-info:hover,
+.dash-dica-info.has-dica-aberta {
+  opacity: 1;
+  background-color: color-mix(in srgb, var(--dash-accent) 30%, transparent);
+  transform: scale(1.08);
+}
+.dash-dica-info:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--dash-accent);
+  outline-offset: 2px;
+}
+
+/* Wrapper "rótulo + ?" — mantém os dois na mesma linha de base. */
+.dash-com-dica {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+/* Quando o "?" acompanha um título de bloco, ele não deve herdar o peso nem o
+   tamanho da fonte do título (viraria uma bolota). */
+h1 .dash-dica-info,
+h2 .dash-dica-info,
+h3 .dash-dica-info {
+  font-size: 1rem;
+}
+
+/* --------------------------------------------------------------------------
+   Adaptações por hospedeiro
+
+   O "?" entra em cabeçalhos que já existiam e têm regras próprias de layout.
+   Todos os ajustes moram AQUI, e não espalhados pelos CSS de seção: assim dá pra
+   ler numa tela só o que o componente faz em cada casa que ele visita.
+   -------------------------------------------------------------------------- */
+
+/* Cabeçalho navy de card: o "?" herda o branco do cabeçalho e vai pro fim da
+   barra. Sem o `margin-left: auto` ele ficaria colado no título, competindo com
+   ele; encostado na direita vira um canto de ajuda previsível.
+   O seletor do ícone precisa vencer o `.dash-card__head svg { width: 20px }`,
+   que senão transforma o "?" numa bolota dourada. */
+.dash-card__head .dash-dica-info {
+  color: var(--dash-card-header-text);
+  margin-left: auto;
+  /* Sobre o navy do cabeçalho, 62% de branco fica no limite dos 3:1 exigidos
+     pra elemento gráfico. Um degrau acima resolve sem virar botão primário. */
+  opacity: 0.78;
+}
+.dash-card__head .dash-dica-info svg {
+  width: 0.78rem;
+  height: 0.78rem;
+  color: currentColor;
+}
+
+/* Cabeçalhos com `justify-content: space-between` (Aprendizado): sem o
+   `margin-right: auto` o "?" flutuaria no meio do vão, longe do título que ele
+   explica. O `margin-left` corrige o `gap` de cada um pra o mesmo respiro
+   visual: o de "Dicas" não tem gap nenhum, o do gráfico tem 1rem. */
+.ap-dicas__head .dash-dica-info {
+  margin-right: auto;
+  margin-left: 0.4rem;
+}
+.ap-chart__head .dash-dica-info {
+  margin-right: auto;
+  margin-left: -0.55rem;
+}
+
+/* Cabeçalho das colunas da Trilha: o "?" fecha a linha, à direita. */
+.ap-tcard__head .dash-dica-info {
+  margin-left: auto;
+}
+
+/* Selo "Tópico sensível" (Diário): pílula pequena, "?" proporcional a ela. */
+.cv-flag .dash-dica-info {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.cv-flag .dash-dica-info svg {
+  width: 0.65rem;
+  height: 0.65rem;
+}
+
+/* Subtítulo "Momento a momento" (Mapa): virou título + "?", então precisa ser
+   uma linha flex, e não um bloco de texto. */
+.mp-subtitulo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Selo "Acontecendo agora" (Mapa): o "?" acompanha a cor do selo. */
+.mp-live .dash-dica-info {
+  width: 1rem;
+  height: 1rem;
+}
+.mp-live .dash-dica-info svg {
+  width: 0.7rem;
+  height: 0.7rem;
+}
+
+/* Cabeçalho de card em Configurações: alinhado ao TOPO (o subtítulo empurra a
+   caixa pra baixo), então o "?" precisa descer um fio pra ficar na altura do
+   título em vez de na do ícone. */
+.cfg-block__head .dash-dica-info {
+  margin-left: auto;
+  margin-top: 0.2rem;
+}
+
+/* Rótulo "Código de pareamento": virou rótulo + "?", precisa ser linha flex. */
+.cfg-codigo__label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* --------------------------------------------------------------------------
+   Acessibilidade
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .dash-dica {
+    transition: none;
+  }
+  .dash-dica-info {
+    transition: none;
+  }
+  .dash-dica-info:hover,
+  .dash-dica-info.has-dica-aberta {
+    transform: none;
+  }
+}
+
+/* Contraste alto: o balão ganha borda pra não sumir na inversão de cores. */
+@media (forced-colors: active) {
+  .dash-dica {
+    border: 1px solid CanvasText;
+  }
+}

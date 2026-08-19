@@ -9,7 +9,11 @@
   inset: 0;
   z-index: 1000;
   display: grid;
-  place-items: center;
+  /* `safe center`: centraliza enquanto o conteúdo cabe e vira alinhamento ao
+     TOPO quando ele passa da altura da tela. Sem o `safe`, a tela de pareamento
+     (código + ajuda + sonda + rodapé) estoura pros dois lados e o começo dela
+     fica numa região que a rolagem não alcança. */
+  place-items: safe center;
   padding: clamp(1rem, 4vw, 2.5rem);
   overflow-y: auto;
   background:
@@ -31,12 +35,62 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.25rem;
+}
+
+/* --------------------------------------------------------------------------
+   Topo: progresso à esquerda, "pular" à direita
+   -------------------------------------------------------------------------- */
+.ob-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+}
+
+/* Barra + rótulo "Passo 2 de 3". Quantas telas faltam é o que separa "deixa eu
+   ver" de "quanto tempo isso vai tomar?". */
+.ob-progresso {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  flex: 1;
+  max-width: 16rem;
+}
+.ob-progresso__trilho {
+  flex: 1;
+  height: 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-primary) 14%, transparent);
+  overflow: hidden;
+}
+.ob-progresso__barra {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--brand-gold);
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.ob-progresso__txt {
+  flex: 0 0 auto;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text-primary) 60%, transparent);
+  white-space: nowrap;
 }
 
 /* Botão "pular apresentação" no canto superior. */
 .ob-skip {
-  align-self: flex-end;
+  flex: 0 0 auto;
+  margin-left: auto;
   border: none;
   background: transparent;
   color: color-mix(in srgb, var(--text-primary) 60%, transparent);
@@ -50,6 +104,9 @@
 .ob-skip:hover {
   color: var(--text-primary);
   background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+.ob-skip[hidden] {
+  display: none;
 }
 
 /* --------------------------------------------------------------------------
@@ -115,6 +172,13 @@
   line-height: 1.6;
   color: color-mix(in srgb, var(--text-primary) 78%, transparent);
   margin: 0;
+}
+/* Nota discreta sob o CTA (expectativa de tempo, ressalvas curtas). */
+.ob-nota {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: color-mix(in srgb, var(--text-primary) 55%, transparent);
 }
 
 /* CTA com chevron que desliza no hover */
@@ -341,6 +405,250 @@
 }
 
 /* --------------------------------------------------------------------------
+   Ajuda embutida: "Onde encontro o código?"
+
+   <details> nativo de propósito: abre sem JS, é acessível de fábrica e não tira
+   o pai da tela do formulário. Mandar quem está no meio de seis caixinhas pra
+   outra página é perder metade deles.
+   -------------------------------------------------------------------------- */
+.ob-ajuda {
+  width: 100%;
+  max-width: 34rem;
+  text-align: left;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
+  background: color-mix(in srgb, var(--brand-navy) 3%, var(--bg-page-2));
+  overflow: hidden;
+}
+.ob-ajuda__resumo {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.8rem 1rem;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.98rem;
+  color: var(--text-strong);
+  cursor: pointer;
+  list-style: none;
+  transition: background-color 0.18s ease;
+}
+.ob-ajuda__resumo::-webkit-details-marker {
+  display: none;
+}
+.ob-ajuda__resumo:hover {
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+.ob-ajuda__resumo:focus-visible {
+  outline: 2px solid var(--brand-gold);
+  outline-offset: -2px;
+}
+.ob-ajuda__ico {
+  display: inline-flex;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--brand-gold-deep);
+}
+.ob-ajuda__ico svg {
+  width: 100%;
+  height: 100%;
+}
+/* Chevron que gira ao abrir: o único sinal de que o bloco tem mais coisa. */
+.ob-ajuda__resumo::after {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-left: auto;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translate(-2px, -2px);
+  opacity: 0.55;
+  transition: transform 0.22s ease;
+}
+.ob-ajuda[open] .ob-ajuda__resumo::after {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+.ob-ajuda__lista {
+  margin: 0;
+  padding: 0 1rem 0 2.4rem;
+  font-family: var(--font-body);
+  font-size: 0.94rem;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--text-primary) 76%, transparent);
+}
+.ob-ajuda__lista li {
+  margin-bottom: 0.5rem;
+}
+.ob-ajuda__lista li::marker {
+  color: var(--brand-gold-deep);
+  font-weight: var(--fw-semibold);
+}
+.ob-ajuda__nota {
+  margin: 0;
+  padding: 0.15rem 1rem 1rem;
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--text-primary) 58%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Sonda: "a Cogni está ao alcance?"
+
+   Um pontinho de estado + uma frase. Descobrir que o robô está desligado ANTES
+   de digitar seis caracteres é a diferença entre "ah, é o robô" e "este site
+   não funciona".
+   -------------------------------------------------------------------------- */
+.ob-sonda {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  max-width: 34rem;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--text-primary) 62%, transparent);
+}
+.ob-sonda__ponto {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.ob-sonda[data-estado="procurando"] .ob-sonda__ponto {
+  animation: ob-pisca 1.3s ease-in-out infinite;
+}
+.ob-sonda[data-estado="ok"] {
+  color: #1f7a4a;
+}
+[data-theme="dark"] .ob-sonda[data-estado="ok"] {
+  color: #58c98d;
+}
+.ob-sonda[data-estado="off"] {
+  color: var(--brand-gold-deep);
+}
+.ob-sonda__acao {
+  border: none;
+  background: transparent;
+  padding: 0.15rem 0.3rem;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: var(--fw-semibold);
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ob-sonda__acao[hidden] {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   Sucesso: a única virada real do produto merece uma tela
+
+   Substitui o conteúdo da tela de pareamento por ~1,4s, enquanto o painel
+   recarrega. Um parágrafo verde embaixo do formulário não marcaria o momento.
+   -------------------------------------------------------------------------- */
+.ob-sucesso {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.5rem 0 0.5rem;
+  text-align: center;
+}
+.ob-sucesso__selo {
+  position: relative; /* âncora do anel que expande (::after) */
+  display: inline-grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, #1f9d57 16%, transparent);
+  color: #1f9d57;
+  /* Desaceleração exponencial, sem quicar: confirmação é firme, não fofa. */
+  animation: ob-selo-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ob-sucesso__selo svg {
+  width: 2.2rem;
+  height: 2.2rem;
+}
+/* O anel que expande uma vez, como o "toque" de confirmação do sistema. */
+.ob-sucesso__selo::after {
+  content: "";
+  position: absolute;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  border: 2px solid #1f9d57;
+  animation: ob-anel 0.9s ease-out 0.15s both;
+}
+.ob-screen.is-sucesso {
+  justify-content: center;
+  min-height: 20rem;
+}
+
+/* --------------------------------------------------------------------------
+   Rodapé: a saída do portão
+
+   Sem criança vinculada o painel não monta, então a badge da conta (que tem o
+   "Sair") nem existe. Sem este rodapé, quem não consegue parear fica preso numa
+   tela sem porta nenhuma.
+   -------------------------------------------------------------------------- */
+.ob-rodape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  width: 100%;
+  text-align: center;
+}
+.ob-rodape__txt {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  color: color-mix(in srgb, var(--text-primary) 52%, transparent);
+}
+.ob-sair {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.6rem;
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: var(--fw-semibold);
+  color: color-mix(in srgb, var(--text-primary) 70%, transparent);
+  cursor: pointer;
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+.ob-sair:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+.ob-sair:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.ob-sair__ico {
+  display: inline-flex;
+  width: 1rem;
+  height: 1rem;
+}
+.ob-sair__ico svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* --------------------------------------------------------------------------
    Indicadores de slide (bolinhas)
    -------------------------------------------------------------------------- */
 .ob-dots {
@@ -424,6 +732,38 @@
     transform: rotate(360deg);
   }
 }
+/* Pontinho da sonda enquanto procura a Cogni na rede. */
+@keyframes ob-pisca {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* Selo de sucesso: cresce e assenta. */
+@keyframes ob-selo-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* Anel que sai do selo uma vez só, como o "toque" de confirmação do sistema. */
+@keyframes ob-anel {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.65);
+  }
+}
 
 /* Acessibilidade: respeita quem pediu menos movimento. */
 @media (prefers-reduced-motion: reduce) {
@@ -431,7 +771,9 @@
   .ob-track,
   .ob-cta__ico,
   .ob-code__box,
-  .ob-dot {
+  .ob-dot,
+  .ob-progresso__barra,
+  .ob-ajuda__resumo::after {
     transition: none;
   }
   .ob-float,
@@ -439,10 +781,56 @@
   .ob-hero__robot.ob-float,
   .ob-hero__glow,
   .ob-feature,
-  .ob-cta.is-loading::after {
+  .ob-cta.is-loading::after,
+  .ob-sonda[data-estado="procurando"] .ob-sonda__ponto,
+  .ob-sucesso__selo,
+  .ob-sucesso__selo::after {
     animation: none;
   }
   .ob-feature {
     opacity: 1;
+  }
+  /* O anel só existe pela animação: parado, viraria um círculo solto em volta
+     do selo. */
+  .ob-sucesso__selo::after {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Telas estreitas e baixas
+
+   O overlay já rola (overflow-y: auto), mas com o rodapé e a ajuda embutida a
+   tela de pareamento ficou mais alta: no celular deitado ela precisa começar do
+   topo em vez de ficar centralizada (senão o cabeçalho sai pra cima).
+   -------------------------------------------------------------------------- */
+@media (max-width: 560px) {
+  .ob-inner {
+    gap: 1rem;
+  }
+  .ob-topo {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .ob-progresso {
+    max-width: none;
+  }
+  .ob-ajuda__lista {
+    padding-left: 2.1rem;
+  }
+  /* O robô da tela de pareamento é o primeiro a sair quando falta altura: a
+     informação dele (é do robô que estamos falando) já está no título. */
+  .ob-screen--pair .ob-pair__robot {
+    width: 64px;
+  }
+}
+
+/* Plano B pra quem não tem `safe` (Safari < 15.4): numa tela baixa, alinhar ao
+   topo é melhor do que centralizar e perder o cabeçalho. */
+@supports not (place-items: safe center) {
+  @media (max-height: 760px) {
+    .ob-overlay {
+      place-items: start center;
+    }
   }
 }

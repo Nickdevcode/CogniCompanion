@@ -169,7 +169,12 @@ export async function renderMesa(ctx) {
    */
   const btnCogni = el("button", {
     class: "dash-btn dash-btn--primary mesa-acao",
-    attrs: { type: "button" },
+    attrs: {
+      type: "button",
+      "data-dica":
+        "Aponte a câmera pro caderno, mande um PDF ou cole um link: a Cogni lê o material e monta o plano pra você revisar.",
+      "data-dica-pos": "bottom",
+    },
     children: [
       el("span", { class: "pl-btn__ico", svg: ICON.sparkle }),
       el("span", { text: "Criar com a Cogni" }),
@@ -177,7 +182,11 @@ export async function renderMesa(ctx) {
   });
   const btnNovo = el("button", {
     class: "dash-btn dash-btn--ghost mesa-acao",
-    attrs: { type: "button" },
+    attrs: {
+      type: "button",
+      "data-dica": "Cria um plano em branco pra você escrever o título, o foco e o conteúdo na mão.",
+      "data-dica-pos": "bottom",
+    },
     children: [
       el("span", { class: "pl-btn__ico", svg: ICON.plus }),
       el("span", { text: "Escrever eu mesmo" }),
@@ -188,17 +197,34 @@ export async function renderMesa(ctx) {
     pageHead({
       title: "Mesa de Estudos",
       subtitle: `O que ${primeiroNome} vai estudar, e como está indo.`,
-      action: el("div", { class: "mesa-acoes", children: [btnCogni, btnNovo] }),
+      // `data-tour`: âncora do tutorial guiado (ver js/dashboard/tour-passos.js).
+      action: el("div", {
+        class: "mesa-acoes",
+        attrs: { "data-tour": "mesa-acoes" },
+        children: [btnCogni, btnNovo],
+      }),
     })
   );
 
   /* ---- Abas -------------------------------------------------------------- */
 
   const ABAS = [
-    { id: "revisar", label: "Para revisar" },
-    { id: "ativos", label: "Ativos" },
-    { id: "todos", label: "Todos" },
-    { id: "concluidos", label: "Concluídos" },
+    {
+      id: "revisar",
+      label: "Para revisar",
+      dica: "Planos que a Cogni montou de um material e ainda esperam a sua aprovação. Ela não segue nenhum deles até você aprovar.",
+    },
+    {
+      id: "ativos",
+      label: "Ativos",
+      dica: "Os planos que a Cogni está seguindo agora. É nesta aba que a fila de prioridade pode ser arrastada.",
+    },
+    { id: "todos", label: "Todos", dica: "Todos os planos desta criança, em qualquer estado." },
+    {
+      id: "concluidos",
+      label: "Concluídos",
+      dica: "Planos que chegaram ao fim. Ficam guardados pra consulta.",
+    },
   ];
   const tabBtns = {};
   const tabsWrap = el("div", { class: "pl-tabs", attrs: { role: "tablist" } });
@@ -206,7 +232,13 @@ export async function renderMesa(ctx) {
     const contador = el("span", { class: "pl-tab__badge", attrs: { hidden: "hidden" } });
     const b = el("button", {
       class: "pl-tab",
-      attrs: { type: "button", role: "tab", "aria-selected": "false" },
+      attrs: {
+        type: "button",
+        role: "tab",
+        "aria-selected": "false",
+        "data-dica": a.dica,
+        "data-dica-pos": "bottom",
+      },
       children: [el("span", { text: a.label }), contador],
     });
     b.addEventListener("click", async () => {
@@ -233,7 +265,12 @@ export async function renderMesa(ctx) {
    */
   const btnSelecionar = el("button", {
     class: "dash-btn dash-btn--ghost mesa-selecionar",
-    attrs: { type: "button", "aria-pressed": "false" },
+    attrs: {
+      type: "button",
+      "aria-pressed": "false",
+      "data-dica": "Liga o modo de marcar vários planos de uma vez, pra excluir em lote.",
+      "data-dica-pos": "bottom",
+    },
     children: [
       el("span", { class: "pl-btn__ico", svg: ICON.check }),
       el("span", { class: "mesa-selecionar__texto", text: "Selecionar" }),

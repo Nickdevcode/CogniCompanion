@@ -26,6 +26,7 @@
 
 import { el } from "./sections/_shared.js";
 import { ICON } from "./icons.js";
+import { dicaInfo } from "./tooltip.js";
 import { openModal } from "./modal.js";
 import { materiaLabel } from "./format.js";
 
@@ -120,6 +121,10 @@ export function cardResumoSemanal({ servidorUrl, crianca, mock }) {
         // escreve — e "bilhete" é como o resto da tela já o chamava ("Ler o bilhete
         // completo", `ini-bilhete__*`, o próprio comentário do módulo).
         el("span", { class: "dash-card__head-title", text: "O bilhete da semana" }),
+        dicaInfo(
+          "Um texto que a Cogni escreve sobre os últimos 7 dias de conversa. Depende do robô estar ligado pra ser atualizado.",
+          { rotulo: "O bilhete da semana", pos: "bottom" }
+        ),
       ],
     })
   );

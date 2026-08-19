@@ -49,6 +49,7 @@
  */
 
 import { el, sectionRoot, pageHead } from "./_shared.js";
+import { dicaInfo } from "../tooltip.js";
 import { ICON, materiaIcon } from "../icons.js";
 import {
   buildTimeline,
@@ -92,6 +93,15 @@ function seloAoVivo(compacto = false) {
     children: [
       el("span", { class: "mp-live__pulse", attrs: { "aria-hidden": "true" } }),
       el("span", { text: compacto ? "Ao vivo" : "Acontecendo agora" }),
+      // Esta tela é a única do painel que anda sozinha, e o selo é o único aviso
+      // disso. Na versão compacta (cartão do histórico) o "?" fica de fora: ali
+      // ele repetiria a mesma explicação a cada linha da lista.
+      compacto
+        ? null
+        : dicaInfo(
+            "A criança está conversando com a Cogni neste momento. Esta tela se atualiza sozinha a cada poucos segundos.",
+            { rotulo: "Acontecendo agora" }
+          ),
     ],
   });
 }
@@ -501,7 +511,16 @@ function listaDeMomentos(sessao) {
   return el("div", {
     class: "mp-momentos-bloco",
     children: [
-      el("h3", { class: "mp-subtitulo", text: "Momento a momento" }),
+      el("h3", {
+        class: "mp-subtitulo",
+        children: [
+          el("span", { text: "Momento a momento" }),
+          dicaInfo(
+            "Cada linha é um instante em que a Cogni mudou de estratégia, conferiu um exercício ou percebeu algo na conversa. Toque num marcador da linha do tempo pra saltar até ele.",
+            { rotulo: "Momento a momento" }
+          ),
+        ],
+      }),
       lista,
     ],
   });
@@ -626,6 +645,10 @@ function blocoHistorico({ sessoes, chaveSelecionada, now, onEscolher }) {
         children: [
           el("span", { class: "mp-bloco__ico", svg: ICON.clock, attrs: { "aria-hidden": "true" } }),
           el("span", { text: "Aulas registradas" }),
+          dicaInfo(
+            "As aulas anteriores. Toque numa delas pra ver a linha do tempo daquele dia aqui em cima.",
+            { rotulo: "Aulas registradas" }
+          ),
         ],
       }),
       el("div", {
@@ -682,6 +705,10 @@ function cardResumo() {
         children: [
           el("span", { class: "dash-card__head-ico", svg: ICON.bulb }),
           el("span", { class: "dash-card__head-title", text: "O que rolou nesta aula" }),
+          dicaInfo(
+            "Duas ou três frases escritas pela Cogni sobre a aula em destaque. Depende do robô estar ligado.",
+            { rotulo: "O que rolou nesta aula", pos: "bottom" }
+          ),
         ],
       }),
       corpo,
@@ -755,7 +782,13 @@ export async function renderMapa(ctx) {
   });
 
   const resumoHost = el("div", { class: "mp-resumo-host" });
-  const sessaoHost = el("div", { class: "mp-sessao-host" });
+  // `data-tour`: âncora do tutorial guiado (ver js/dashboard/tour-passos.js). Vai
+  // no HOST, e não no card: o card é destruído e recriado a cada repintura do
+  // modo ao vivo, e o tutorial perderia o alvo no meio do passo.
+  const sessaoHost = el("div", {
+    class: "mp-sessao-host",
+    attrs: { "data-tour": "mp-sessao" },
+  });
   const historicoHost = el("div", { class: "mp-hist-host" });
   root.append(anuncio, resumoHost, sessaoHost, historicoHost);
 

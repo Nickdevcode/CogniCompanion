@@ -21,7 +21,8 @@
 /* Perfil e Vínculo com o robô ocupam a largura toda; Conta e Tema dividem a
    linha entre eles. Mantém o grid simétrico, sem espaços vazios. */
 .cfg-perfil-host,
-.cfg-block--status {
+.cfg-block--status,
+.cfg-block--ajuda {
   grid-column: 1 / -1;
 }
 /* Enquanto o perfil é relido do banco (antes de abrir o modal de edição). Só
@@ -229,6 +230,42 @@
   font-family: var(--font-body);
   font-size: 0.82rem;
   color: var(--dash-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Bloco: Ajuda (rever o tutorial guiado)
+
+   Mesma linha do "Modo escuro": texto explicativo à esquerda, controle à
+   direita. Reusa `.cfg-notif__*` de propósito, pra as duas linhas de ajuste da
+   tela terem exatamente a mesma tipografia.
+   -------------------------------------------------------------------------- */
+.cfg-tutorial {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 0 0;
+  flex-wrap: wrap;
+}
+.cfg-tutorial__btn {
+  flex: 0 0 auto;
+}
+.cfg-tutorial__ico {
+  display: inline-flex;
+  width: 1.05rem;
+  height: 1.05rem;
+  color: var(--dash-accent);
+}
+.cfg-tutorial__ico svg {
+  width: 100%;
+  height: 100%;
+}
+/* Na largura de celular o botão desce e ocupa a linha inteira: com ele ao lado
+   do texto sobrariam ~120px pro rótulo, e "Rever o tutorial" quebraria em duas
+   linhas dentro da pílula. */
+@media (max-width: 560px) {
+  .cfg-tutorial__btn {
+    width: 100%;
+  }
 }
 
 /* --------------------------------------------------------------------------

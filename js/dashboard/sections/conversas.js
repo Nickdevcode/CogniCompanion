@@ -13,6 +13,7 @@
 
 import { el, sectionRoot, pageHead } from "./_shared.js";
 import { ICON, materiaIcon, chevronDown } from "../icons.js";
+import { dicaInfo } from "../tooltip.js";
 import {
   materiasAgrupadas,
   materiaLabel,
@@ -116,6 +117,14 @@ function entradaConversa(conv, nomeCrianca, now) {
         children: [
           el("span", { class: "cv-flag__ico", svg: ICON.shield }),
           el("span", { text: "Tópico sensível" }),
+          // O selo mais opaco da tela: sem explicação, "sensível" tanto pode
+          // soar a alarme quanto a nada. Uma linha resolve, no lugar em que a
+          // dúvida aparece.
+          dicaInfo(
+            "A Cogni marcou esta conversa como um assunto delicado (medo, tristeza, corpo, bullying). " +
+              "Não é um alerta de problema: é um convite pra você ler com calma.",
+            { rotulo: "Tópico sensível" }
+          ),
         ],
       })
     );
@@ -178,7 +187,14 @@ function filtroMateria(state, onChange) {
   const label = el("span", { class: "cv-filter__label", text: "Matéria" });
   const btn = el("button", {
     class: "cv-filter__btn",
-    attrs: { type: "button", "aria-haspopup": "true", "aria-expanded": "false" },
+    attrs: {
+      type: "button",
+      "aria-haspopup": "true",
+      "aria-expanded": "false",
+      "data-dica":
+        "Mostra só as conversas de uma matéria. Quem classifica é a Cogni, pelo assunto da pergunta.",
+      "data-dica-pos": "bottom",
+    },
     children: [
       el("span", { class: "cv-filter__ico", svg: ICON.book }),
       label,
@@ -302,11 +318,18 @@ export async function renderConversas(ctx) {
       type: "search",
       placeholder: "Buscar conversa ou palavra-chave",
       "aria-label": "Buscar conversa ou palavra-chave",
+      "data-dica":
+        "Procura no que a criança perguntou, no que a Cogni respondeu e no nome da matéria.",
+      "data-dica-pos": "bottom",
     },
   });
   const clearBtn = el("button", {
     class: "cv-search__clear",
-    attrs: { type: "button", "aria-label": "Limpar busca" },
+    attrs: {
+      type: "button",
+      "aria-label": "Limpar busca",
+      "data-dica": "Apaga o termo buscado e volta a lista inteira.",
+    },
     svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   });
   clearBtn.hidden = true;
@@ -323,7 +346,13 @@ export async function renderConversas(ctx) {
   // Botão toggle "Tópicos sensíveis"
   const sensBtn = el("button", {
     class: "cv-filter__btn cv-filter__btn--toggle",
-    attrs: { type: "button", "aria-pressed": "false" },
+    attrs: {
+      type: "button",
+      "aria-pressed": "false",
+      "data-dica":
+        "Deixa na tela só o que a Cogni marcou como assunto delicado (medo, tristeza, corpo, bullying).",
+      "data-dica-pos": "bottom",
+    },
     children: [
       el("span", { class: "cv-filter__ico", svg: ICON.shield }),
       el("span", { text: "Tópicos sensíveis" }),
@@ -337,6 +366,8 @@ export async function renderConversas(ctx) {
 
   const toolbar = el("div", {
     class: "dash-card cv-toolbar",
+    // Âncora do tutorial guiado (ver js/dashboard/tour-passos.js).
+    attrs: { "data-tour": "cv-toolbar" },
     children: [searchRow, filtros],
   });
   root.appendChild(toolbar);

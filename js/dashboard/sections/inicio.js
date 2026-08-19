@@ -21,6 +21,7 @@ import {
 import { cardResumoSemanal } from "../resumo-semanal.js";
 import { cardDica } from "../dica.js";
 import { criarPreviewRosto, ROSTO_PADRAO } from "../rosto-preview.js";
+import { dicaInfo } from "../tooltip.js";
 import {
   formatHora,
   formatDiaRelativo,
@@ -39,13 +40,21 @@ import {
    Helpers de UI locais
    -------------------------------------------------------------------------- */
 
-/** Cabeçalho navy de um card do bento (ícone + título). */
-function cardHead(iconSvg, title) {
+/**
+ * Cabeçalho navy de um card do bento (ícone + título).
+ * @param {string} iconSvg
+ * @param {string} title
+ * @param {string} [dica] — explicação do card; vira o "?" no canto do cabeçalho.
+ *   Fica aqui, e não numa legenda embaixo, porque a pergunta que o pai faz
+ *   ("de onde saiu este número?") é sobre o card inteiro.
+ */
+function cardHead(iconSvg, title, dica) {
   return el("div", {
     class: "dash-card__head",
     children: [
       el("span", { class: "dash-card__head-ico", svg: iconSvg }),
       el("span", { class: "dash-card__head-title", text: title }),
+      dica ? dicaInfo(dica, { rotulo: title, pos: "bottom" }) : null,
     ],
   });
 }
@@ -101,7 +110,13 @@ function balao({ autor, nome, hora, texto }) {
 /** Card "Última conversa" — mostra os últimos turnos (até 3 mensagens). */
 function cardUltimaConversa(conversas, nomeCrianca, now, onVerTodas) {
   const card = el("article", { class: "dash-card ini-card ini-card--conversa" });
-  card.appendChild(cardHead(ICON.chat, "Última conversa"));
+  card.appendChild(
+    cardHead(
+      ICON.chat,
+      "Última conversa",
+      "Os últimos turnos da conversa mais recente. O histórico completo, com busca e filtros, fica em Conversas."
+    )
+  );
 
   const body = el("div", { class: "ini-card__body ini-conversa__body" });
 
@@ -166,7 +181,13 @@ function cardProximoPlano(plano, onVerPlano) {
   // "Próximo" era mentira: o card mostra o PRIMEIRO DA FILA, ou seja, o plano por
   // onde a Cogni começa hoje — não um que ainda vai começar. O pai lia "próximo" e
   // ia procurar na Mesa qual seria "o de agora".
-  card.appendChild(cardHead(ICON.calendar, "O plano de agora"));
+  card.appendChild(
+    cardHead(
+      ICON.calendar,
+      "O plano de agora",
+      "O primeiro da fila da Mesa de Estudos: é por ele que a Cogni começa quando a conversa não pede outro assunto."
+    )
+  );
 
   const body = el("div", { class: "ini-card__body ini-plano__body" });
 
@@ -242,7 +263,13 @@ function cardResumoSemana(conversas, now, onRelatorio) {
   const card = el("article", { class: "dash-card ini-card ini-card--resumo" });
   // Havia dois cards chamados "Resumo da semana" no mesmo Início (este e o bilhete
   // da IA logo abaixo). Este é o dos números; o outro é o texto.
-  card.appendChild(cardHead(ICON.chart, "A semana em números"));
+  card.appendChild(
+    cardHead(
+      ICON.chart,
+      "A semana em números",
+      "Conta só os últimos 7 dias. Tempo total é a soma da duração das conversas do período."
+    )
+  );
 
   // Janela dos últimos 7 dias a partir do "agora" de referência.
   const limite = new Date(now);
@@ -351,6 +378,8 @@ export async function renderInicio(ctx) {
 
   const grid = el("div", {
     class: "ini-grid",
+    // Âncora do tutorial guiado (ver js/dashboard/tour-passos.js).
+    attrs: { "data-tour": "ini-grid" },
     children: [
       cardUltimaConversa(conversas, nome, ctx.now, go("conversas")),
       cardProximoPlano(planoAtivo, go("mesa")),

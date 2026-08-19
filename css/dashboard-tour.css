@@ -1,0 +1,468 @@
+/* ==========================================================================
+   dashboard-tour.css — Tutorial guiado do painel.
+
+   Três peças, todas `position: fixed`, posicionadas pelo js/dashboard/tour.js:
+     .tour-veu    → escurece a tela e bloqueia clique
+     .tour-foco   → o recorte que ilumina o elemento da vez
+     .tour-balao  → o texto (flutuante no desktop, folha no celular)
+
+   O recorte é feito com `box-shadow` gigante em vez de máscara SVG ou de quatro
+   retângulos: uma sombra de 9999px cobre qualquer tela sem precisar recalcular
+   nada quando a página rola, e a borda arredondada sai de graça.
+   ========================================================================== */
+
+:root,
+[data-theme="light"] {
+  --tour-veu-cor: rgba(8, 12, 56, 0.62);
+  --tour-balao-bg: #ffffff;
+  --tour-balao-borda: rgba(8, 12, 56, 0.1);
+}
+[data-theme="dark"] {
+  --tour-veu-cor: rgba(0, 0, 0, 0.72);
+  --tour-balao-bg: #242426;
+  --tour-balao-borda: rgba(255, 255, 255, 0.12);
+}
+
+/* Raiz: só um contêiner lógico. Cada peça se posiciona sozinha. */
+.tour-raiz {
+  position: fixed;
+  inset: 0;
+  z-index: 2000; /* acima de modal (1000), header (110) e tab bar */
+  opacity: 0;
+  transition: opacity 0.28s ease;
+  pointer-events: none;
+}
+.tour-raiz.is-open {
+  opacity: 1;
+}
+
+/* Enquanto troca de seção e espera o alvo, tudo continua na tela (o véu não
+   pisca), mas o balão perde o clique pra ninguém adiantar dois passos. */
+.tour-raiz.is-carregando .tour-balao {
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Véu: escurece e engole os cliques
+   -------------------------------------------------------------------------- */
+.tour-veu {
+  position: fixed;
+  inset: 0;
+  background-color: var(--tour-veu-cor);
+  pointer-events: auto;
+  /* Sair do tutorial é decisão (dois botões), não um toque torto no fundo. */
+  cursor: default;
+}
+/* Com o recorte visível, o escuro quem faz é a sombra do `.tour-foco` (senão o
+   alvo ficaria escurecido duas vezes e o destaque não destacaria nada). */
+.tour-raiz:not(.is-centrado) .tour-veu {
+  background-color: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   Recorte: o "buraco" de luz sobre o elemento
+   -------------------------------------------------------------------------- */
+.tour-foco {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-radius: 20px;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow:
+    0 0 0 9999px var(--tour-veu-cor),
+    0 0 0 2px var(--dash-accent),
+    0 0 0 7px color-mix(in srgb, var(--dash-accent) 26%, transparent);
+  transition: left 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+    top 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+    width 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+    height 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 0.2s ease;
+}
+
+/* --------------------------------------------------------------------------
+   Balão (desktop): flutuante, ancorado no alvo
+   -------------------------------------------------------------------------- */
+.tour-balao {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: min(24rem, calc(100vw - 2rem));
+  box-sizing: border-box;
+  padding: 1.15rem 1.25rem 1.1rem;
+  border-radius: 20px;
+  background-color: var(--tour-balao-bg);
+  border: 1px solid var(--tour-balao-borda);
+  box-shadow: 0 24px 60px -24px rgba(8, 12, 56, 0.6);
+  color: var(--dash-text);
+  font-family: var(--font-body);
+  pointer-events: auto;
+  outline: none;
+  transition: left 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+    top 0.34s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+/* O balão é focado a cada passo (pra o leitor de tela ler título e texto);
+   um anel em volta da caixa inteira só poluiria. */
+.tour-balao:focus {
+  outline: none;
+}
+
+/* Setinha apontando pro alvo. Some no modo centrado e na folha. */
+.tour-balao__seta {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background-color: var(--tour-balao-bg);
+  border: 1px solid var(--tour-balao-borda);
+  transform: rotate(45deg);
+  border-radius: 3px;
+}
+.tour-balao[data-lado="bottom"] .tour-balao__seta {
+  top: -8px;
+  margin-left: -7px;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+}
+.tour-balao[data-lado="top"] .tour-balao__seta {
+  bottom: -8px;
+  margin-left: -7px;
+  border-left-color: transparent;
+  border-top-color: transparent;
+}
+.tour-balao[data-lado="right"] .tour-balao__seta {
+  left: -8px;
+  margin-top: -7px;
+  border-right-color: transparent;
+  border-top-color: transparent;
+}
+.tour-balao[data-lado="left"] .tour-balao__seta {
+  right: -8px;
+  margin-top: -7px;
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+}
+.tour-balao:not([data-lado]) .tour-balao__seta {
+  display: none;
+}
+
+/* Balão no centro. Dois casos, e a diferença é o VÉU:
+     .is-centrado         não há alvo (abertura, fecho, alvo que não existe
+                          nesta conta). O véu escurece a tela inteira.
+     .is-balao-centrado   há alvo, e ele toma quase a janela toda. O recorte
+                          continua aceso; só o balão vai pro meio, porque não
+                          sobra borda em que ele não cubra o que destaca. */
+.tour-raiz.is-centrado .tour-balao,
+.tour-raiz.is-balao-centrado .tour-balao {
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%);
+  width: min(30rem, calc(100vw - 2.5rem));
+}
+.tour-raiz.is-centrado .tour-balao__seta,
+.tour-raiz.is-balao-centrado .tour-balao__seta {
+  display: none;
+}
+
+/* --- Topo: contador + fechar --- */
+.tour-balao__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+.tour-balao__passo {
+  font-size: 0.78rem;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dash-accent-ink);
+}
+.tour-balao__fechar {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin: -0.35rem -0.35rem -0.35rem 0;
+  border: none;
+  border-radius: 50%;
+  background-color: transparent;
+  color: var(--dash-text-muted);
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.tour-balao__fechar:hover {
+  background-color: var(--dash-nav-hover-bg);
+  color: var(--dash-text);
+}
+.tour-balao__fechar svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* --- Texto --- */
+.tour-balao__titulo {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-size: 1.3rem;
+  line-height: 1.2;
+  color: var(--text-strong);
+}
+.tour-balao__texto p {
+  margin: 0 0 0.55rem;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--dash-text-muted);
+}
+.tour-balao__texto p:last-child {
+  margin-bottom: 0;
+}
+
+/* --- Progresso --- */
+.tour-progresso {
+  height: 4px;
+  margin: 0.95rem 0 0.85rem;
+  border-radius: 4px;
+  background-color: color-mix(in srgb, var(--dash-text) 12%, transparent);
+  overflow: hidden;
+}
+.tour-progresso__barra {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  background-color: var(--dash-accent);
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* --- Ações --- */
+.tour-balao__acoes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.tour-balao__acoes-dir {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+.tour-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.4rem;
+  padding: 0.5rem 1.1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 0.16s ease, filter 0.16s ease, background-color 0.16s ease;
+}
+.tour-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+.tour-btn:active {
+  transform: translateY(0);
+}
+/* `display: inline-flex` vence o `hidden` do HTML: sem isto, o "Voltar" do
+   primeiro passo e o "Pular" do último continuariam na tela. */
+.tour-btn[hidden] {
+  display: none;
+}
+.tour-btn--primary {
+  background-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+}
+.tour-btn--ghost {
+  background-color: transparent;
+  border-color: var(--dash-border-strong);
+  color: var(--dash-text);
+}
+.tour-btn--ghost:hover {
+  background-color: var(--dash-nav-hover-bg);
+}
+/* "Pular" é discreto de propósito: existe pra quem já sabe, não pra competir
+   com "Próximo". Discreto sem ser escondido (segue passando em contraste). */
+.tour-btn--pular {
+  padding-inline: 0.4rem;
+  background-color: transparent;
+  color: var(--dash-text-muted);
+  font-weight: var(--fw-medium);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tour-btn--pular:hover {
+  color: var(--dash-text);
+  transform: none;
+}
+
+/* --------------------------------------------------------------------------
+   CELULAR: o balão vira folha (bottom sheet)
+
+   Balão flutuante em 360px de largura ou cobre o alvo ou fica com seis palavras
+   por linha. A folha ocupa a largura inteira, sobe de onde o polegar está, e o
+   motor rola o alvo pra metade de cima da tela.
+   -------------------------------------------------------------------------- */
+@media (max-width: 700px) and (min-height: 561px) {
+  .tour-balao,
+  .tour-raiz.is-centrado .tour-balao,
+  .tour-raiz.is-balao-centrado .tour-balao {
+    left: 0 !important;
+    right: 0;
+    top: auto !important;
+    bottom: 0;
+    width: 100%;
+    max-height: 62vh;
+    overflow-y: auto;
+    transform: none;
+    border-radius: 22px 22px 0 0;
+    border-bottom: none;
+    /* Respiro pro gesto de home do iPhone e pra tab bar por trás. */
+    padding-bottom: max(1.1rem, env(safe-area-inset-bottom));
+    box-shadow: 0 -18px 50px -18px rgba(8, 12, 56, 0.55);
+    transition: bottom 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .tour-balao__seta {
+    display: none;
+  }
+  /* Numa tela estreita os três botões numa linha só ficam com 40px cada.
+     A ação principal ganha a linha inteira e "Pular" desce pro rodapé. */
+  .tour-balao__acoes {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .tour-balao__acoes-dir {
+    margin-left: 0;
+  }
+  .tour-balao__acoes-dir .tour-btn {
+    flex: 1;
+    min-height: 2.75rem;
+  }
+  .tour-btn--pular {
+    align-self: center;
+    min-height: 2.4rem;
+  }
+  .tour-balao__titulo {
+    font-size: 1.2rem;
+  }
+}
+
+/* Barra de endereço do celular some e volta: a folha acompanha sem saltar. */
+@supports (height: 100dvh) {
+  @media (max-width: 700px) and (min-height: 561px) {
+    .tour-balao {
+      max-height: 62dvh;
+    }
+  }
+}
+
+/* --------------------------------------------------------------------------
+   CELULAR DEITADO: o balão vira PAINEL LATERAL
+
+   Medido em 844×390: uma folha de 62vh come 242px dos 390 e cobre justamente o
+   que ela está explicando. Encostado na direita, o painel usa a altura inteira
+   (que é o que falta) e devolve a tela toda pro destaque. O motor sabe disto:
+   ele encolhe a largura útil do recorte pela largura deste painel, pra o anel
+   dourado nunca terminar embaixo do texto.
+   -------------------------------------------------------------------------- */
+@media (max-width: 950px) and (max-height: 560px) {
+  .tour-balao,
+  .tour-raiz.is-centrado .tour-balao,
+  .tour-raiz.is-balao-centrado .tour-balao {
+    left: auto !important;
+    right: 0;
+    top: 0 !important;
+    bottom: 0;
+    width: min(21rem, 42vw);
+    max-height: none;
+    height: 100%;
+    overflow-y: auto;
+    transform: none;
+    border-radius: 20px 0 0 20px;
+    border-right: none;
+    /* Centraliza o conteúdo na altura: o texto é curto e a coluna é alta. */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 1.1rem max(1.1rem, env(safe-area-inset-right)) 1.1rem 1.2rem;
+    box-shadow: -18px 0 50px -18px rgba(8, 12, 56, 0.55);
+  }
+  .tour-balao__seta {
+    display: none;
+  }
+  .tour-balao__titulo {
+    font-size: 1.15rem;
+  }
+  .tour-balao__texto p {
+    font-size: 0.92rem;
+  }
+  /* Altura é o recurso escasso aqui: as ações voltam pra uma linha só. */
+  .tour-balao__acoes {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .tour-balao__acoes-dir {
+    margin-left: auto;
+  }
+  .tour-btn {
+    min-height: 2.2rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.88rem;
+  }
+  .tour-progresso {
+    margin: 0.75rem 0 0.65rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Estado global enquanto o tutorial roda
+   -------------------------------------------------------------------------- */
+/* O painel inteiro fica inerte por trás do véu; a seleção de texto acidental no
+   arrasto do dedo atrapalharia a leitura. */
+body.tour-ativo {
+  -webkit-user-select: none;
+  user-select: none;
+}
+body.tour-ativo .tour-balao {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* --------------------------------------------------------------------------
+   Acessibilidade
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .tour-raiz,
+  .tour-foco,
+  .tour-balao,
+  .tour-progresso__barra,
+  .tour-btn {
+    transition: none;
+  }
+  .tour-btn:hover {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .tour-balao {
+    border: 1px solid CanvasText;
+  }
+  .tour-foco {
+    outline: 3px solid Highlight;
+  }
+}

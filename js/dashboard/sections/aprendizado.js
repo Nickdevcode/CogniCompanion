@@ -14,6 +14,7 @@
  */
 
 import { el, sectionRoot, pageHead } from "./_shared.js";
+import { dicaInfo } from "../tooltip.js";
 import { ICON, materiaIcon } from "../icons.js";
 import { buildLineChart } from "../linechart.js";
 import { resolverDicaAtual } from "../dica.js";
@@ -247,7 +248,16 @@ function cardMateria({ materia, ms }) {
               el("span", { text: formatDuracao(ms) }),
             ],
           }),
-          el("span", { class: "ap-mat__label", text: "Tempo dedicado" }),
+          el("span", {
+            class: "ap-mat__label",
+            text: "Tempo dedicado",
+            // Enriquecimento no hover; a mesma conta está explicada no "?" de
+            // "A semana em números", no Início.
+            attrs: {
+              "data-dica":
+                "Soma da duração das conversas desta matéria. O robô conta o tempo de cada troca com a Cogni.",
+            },
+          }),
         ],
       }),
     ],
@@ -324,7 +334,13 @@ function itemTrilha(item, { now, dominado }) {
               // Complementa sem ser essencial: quem só lê a pílula continua
               // entendendo a linha. Explica o que "nível" quer dizer aqui, que
               // pro pai não é óbvio.
-              title: `A Cogni já propõe exercícios mais difíceis de ${item.conceito}.`,
+              //
+              // `data-dica` no lugar do `title` nativo: o `title` não aparece no
+              // celular e o leitor de tela trata como opcional. Como a pílula não
+              // é focável, esta versão é ENRIQUECIMENTO no hover: a mesma
+              // explicação (sem o nome do conceito) mora no "?" do cabeçalho da
+              // coluna, que chega no Tab e abre no toque.
+              "data-dica": `A Cogni já propõe exercícios mais difíceis de ${item.conceito}.`,
             },
             children: [
               el("span", {
@@ -364,7 +380,17 @@ function itemTrilha(item, { now, dominado }) {
  * @param {{titulo:string, subtitulo:string, iconSvg:string, variante:string,
  *   itens:Array<object>, vazio:string, now:Date, dominado:boolean}} cfg
  */
-function cardTrilha({ titulo, subtitulo, iconSvg, variante, itens, vazio, now, dominado }) {
+function cardTrilha({
+  titulo,
+  subtitulo,
+  iconSvg,
+  variante,
+  itens,
+  vazio,
+  now,
+  dominado,
+  dica,
+}) {
   const lista = itens.length
     ? el("ul", {
         class: "ap-tlist",
@@ -388,6 +414,7 @@ function cardTrilha({ titulo, subtitulo, iconSvg, variante, itens, vazio, now, d
               el("p", { class: "ap-tcard__sub", text: subtitulo }),
             ],
           }),
+          dica ? dicaInfo(dica, { rotulo: titulo, pos: "left" }) : null,
         ],
       }),
       lista,
@@ -416,6 +443,10 @@ function blocoTrilha({ crianca, nome, now }) {
         children: [
           el("span", { class: "ap-section-head__ico", svg: ICON.sprout }),
           el("span", { text: "Trilha de aprendizado" }),
+          dicaInfo(
+            "Quem escreve esta trilha é o robô, conversando. Você não preenche nada aqui, e ela não vale como nota.",
+            { rotulo: "Trilha de aprendizado" }
+          ),
         ],
       }),
       el("p", {
@@ -437,6 +468,9 @@ function blocoTrilha({ crianca, nome, now }) {
           cardTrilha({
             titulo: "Praticando agora",
             subtitulo: "Assuntos que a Cogni vai reforçar",
+            dica:
+              "Assuntos em que a criança ainda pediu ajuda. A Cogni volta neles sozinha nos próximos dias. " +
+              "O selo Subiu de nível quer dizer que ela já está propondo exercícios mais difíceis do assunto.",
             iconSvg: ICON.sprout,
             variante: "praticando",
             itens: praticando,
@@ -449,6 +483,9 @@ function blocoTrilha({ crianca, nome, now }) {
           cardTrilha({
             titulo: "Já domina",
             subtitulo: "Acertou mais de uma vez sem ajuda",
+            dica:
+              "Assuntos que a criança acertou mais de uma vez sem precisar de ajuda. " +
+              "Não é nota de prova: é o que a Cogni deixou de precisar reforçar.",
             iconSvg: ICON.check,
             variante: "dominou",
             itens: dominados,
@@ -553,6 +590,10 @@ function cardDicasCogni({ servidorUrl, crianca, now, dicas, mock }) {
         class: "ap-dicas__head",
         children: [
           el("h2", { class: "ap-dicas__title", text: "Dicas da Cogni" }),
+          dicaInfo(
+            "Sugestões que a Cogni escreve pra você, a partir do que a criança andou perguntando. Mudam quando há conversa nova.",
+            { rotulo: "Dicas da Cogni" }
+          ),
           el("span", { class: "ap-dicas__ico", svg: ICON.bulb }),
         ],
       }),
@@ -625,14 +666,16 @@ export async function renderAprendizado(ctx) {
 
   /* ---- Cards de matéria ---- */
   const mats = topMaterias(conversas, 4);
-  root.appendChild(
-    mats.length
-      ? el("div", { class: "ap-mats", children: mats.map(cardMateria) })
-      : el("p", {
-          class: "ap-empty ap-empty--lead",
-          text: `O tempo por matéria aparece aqui assim que ${nome} conversar com a Cogni.`,
-        })
-  );
+  // Âncora do tutorial guiado. Vai nos DOIS ramos de propósito: um pai recém
+  // pareado cai no estado vazio, e é justamente ele quem está vendo o tutorial.
+  const matsNode = mats.length
+    ? el("div", { class: "ap-mats", children: mats.map(cardMateria) })
+    : el("p", {
+        class: "ap-empty ap-empty--lead",
+        text: `O tempo por matéria aparece aqui assim que ${nome} conversar com a Cogni.`,
+      });
+  matsNode.setAttribute("data-tour", "ap-materias");
+  root.appendChild(matsNode);
 
   /* ---- Trilha de aprendizado (criancas.progresso — read-only) ---- */
   root.appendChild(blocoTrilha({ crianca, nome, now: ctx.now }));
@@ -646,6 +689,10 @@ export async function renderAprendizado(ctx) {
         children: [
           el("span", { class: "ap-section-head__ico", svg: ICON.book }),
           el("span", { text: "Tópicos explorados" }),
+          dicaInfo(
+            "Os assuntos que apareceram nas conversas recentes. Quem nomeia cada um é a Cogni, pelo que foi perguntado.",
+            { rotulo: "Tópicos explorados" }
+          ),
         ],
       }),
     ],
@@ -734,12 +781,18 @@ export async function renderAprendizado(ctx) {
 
   const segWeek = el("button", {
     class: "ap-seg__btn is-active",
-    attrs: { type: "button" },
+    attrs: {
+      type: "button",
+      "data-dica": "Um ponto por dia, nos últimos 7 dias.",
+    },
     text: "Semanal",
   });
   const segMonth = el("button", {
     class: "ap-seg__btn",
-    attrs: { type: "button" },
+    attrs: {
+      type: "button",
+      "data-dica": "Um ponto por semana, no último mês.",
+    },
     text: "Mensal",
   });
   segWeek.addEventListener("click", () => {
@@ -760,6 +813,10 @@ export async function renderAprendizado(ctx) {
         class: "ap-chart__head",
         children: [
           el("h2", { class: "ap-chart__title", text: "Evolução" }),
+          dicaInfo(
+            "Quanto tempo de conversa por dia (Semanal) ou por semana (Mensal). Mede presença, não desempenho.",
+            { rotulo: "Evolução" }
+          ),
           el("div", {
             class: "ap-seg",
             children: [segWeek, segMonth],

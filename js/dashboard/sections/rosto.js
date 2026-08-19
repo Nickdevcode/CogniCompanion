@@ -17,6 +17,7 @@
  */
 
 import { el, sectionRoot, pageHead } from "./_shared.js";
+import { dicaInfo } from "../tooltip.js";
 import { ICON } from "../icons.js";
 import {
   criarPreviewRosto,
@@ -123,7 +124,17 @@ export async function renderRosto(ctx) {
     class: "dash-rosto__status",
     // polite: anuncia a mudança sem cortar o que o leitor de tela já estava lendo.
     attrs: { "aria-live": "polite", "data-estado": "salvo" },
-    children: [statusIcone, statusTexto],
+    children: [
+      statusIcone,
+      statusTexto,
+      // A única linha desta tela escrita pro PAI, e não pra criança: é ela que
+      // explica por que às vezes a mudança aparece na hora e às vezes só na
+      // próxima vez que o robô ligar.
+      dicaInfo(
+        "Com o robô ligado, o rosto muda nele na mesma hora. Desligado, a escolha fica guardada e entra na próxima vez que ele ligar.",
+        { rotulo: "Estado do rosto", pos: "bottom" }
+      ),
+    ],
   });
 
   function mostrarStatus(estado) {
@@ -140,6 +151,8 @@ export async function renderRosto(ctx) {
   raiz.appendChild(
     el("div", {
       class: "dash-rosto__palco",
+      // Âncora do tutorial guiado (ver js/dashboard/tour-passos.js).
+      attrs: { "data-tour": "rosto-palco" },
       children: [
         el("div", {
           class: "dash-rosto__moldura",
@@ -269,7 +282,10 @@ export async function renderRosto(ctx) {
 
   const botaoReset = el("button", {
     class: "dash-rosto__reset",
-    attrs: { type: "button" },
+    attrs: {
+      type: "button",
+      "data-dica": "Devolve a Cogni à carinha de fábrica, sem apagar mais nada.",
+    },
     children: [
       el("span", { class: "dash-rosto__reset-ico", svg: ICON.refresh, attrs: { "aria-hidden": "true" } }),
       el("span", { text: "Voltar ao rosto original" }),
