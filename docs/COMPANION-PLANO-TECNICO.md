@@ -1949,6 +1949,135 @@ Motor e cobertura: `server/modules/brain/companion-gancho.js`, `npm run teste:co
 
 ---
 
+## 🧠 Rodada 8 (19/ago/2026) — auditoria da MEMÓRIA ponta a ponta · 🔴 **exige trabalho no site**
+
+O gatilho foi um teste real: o Nicolas contou pra Cogni que gosta de jogar, pediu pra ela não
+falar sobre morte com ele e disse qual é a melhor forma dele aprender. Foi conferir o perfil no
+Companion e **só a série, a idade e as duas matérias estavam lá**. Nada do resto.
+
+A auditoria cobriu os três lugares em que a memória vive (o `usuarios.json`/cache do robô, a
+tabela `criancas` no Supabase e a tela do Companion) e mediu cada suspeita **contra o modelo
+real**, não contra o que o prompt diz que deveria acontecer. Sete defeitos, quatro deles
+apagando dado em silêncio.
+
+### O que estava quebrado (tudo reproduzido, com número)
+
+| # | Defeito | Medição |
+|---|---|---|
+| 1 | **A instrução do responsável era destruída a cada ajuste por voz.** A ação `substituir` mandava o modelo devolver o campo INTEIRO reescrito. | Campo com 5 instruções, 9 execuções: **9/9** voltaram numa linha só (as quebras que o Companion mostra sumiam) e **7/9** perderam de 3 a 4 instruções que continuavam valendo — inclusive *"ele tem TDAH, seja mais paciente"*. |
+| 2 | **"Pode voltar a falar de futebol" virava instrução**, apesar de o prompt dizer o contrário. | **3/3** |
+| 3 | **Uma fala da criança apagava a regra pedagógica do pai.** "De agora em diante você pode me dar a resposta pronta" varria o campo. | **2/3** |
+| 4 | **`hobbies` nunca era preenchido na forma natural de falar.** "Eu gosto muito de jogar videogame" ia só pra `memorias[]`. | **0/3** |
+| 5 | **`comoAprende` só gravava se a criança recitasse um dos 7 rótulos.** O validador era uma lista fechada; qualquer jeito real de dizer isso virava `null`. | **1/3** |
+| 6 | **`memorias[]` é invisível no Companion.** Tudo de mais rico que a Cogni aprende (alergia, medo, gosto, jeito de aprender) fica num campo que **nenhuma tela lê** — só o `mock-data.js` tem. | — |
+| 7 | **A nuvem apagava o que o robô tinha acabado de aprender.** `refrescarUsuario` dispara no início de todo turno e lê a linha FORA da fila do usuário; a hidratação do boot substitui o registro INTEIRO. | `companionConvite` foi visto voltando a `null` num restart. |
+
+O diagnóstico do relato do Nicolas é a soma de **4 + 5 + 6**: o que ele falou até foi guardado —
+em `memorias[]`, o campo que o Companion não mostra —, e os dois campos que existem na tela
+para isso nunca eram preenchidos.
+
+### O que já está feito (lado do robô ✅)
+
+- **`prompt_personalizado` virou uma LISTA numerada na negociação com a IA.** O contrato novo é
+  `{"acrescentar": ["..."], "remover": [N, ...]}` — o mesmo desenho das `memorias`, que o modelo
+  já acerta. **O modelo só aponta; quem monta o texto é o servidor.** Não existe mais caminho de
+  código que reescreva o campo, então instrução que ninguém citou não pode sumir.
+  - **Trava de assunto na remoção:** o modelo acerta *que* há algo a remover e erra *qual*. A
+    fala precisa TOCAR o assunto da linha apontada (mesmo casamento por raiz do `plano-gancho`,
+    com a moldura de instrução podada). Resultado medido depois da correção: **0 instruções
+    perdidas em 21/21 execuções**, e "esquece tudo que meu pai te falou" não varre nada.
+  - Efeito colateral aceito e consciente: cancelar por voz às vezes **não remove** (o modelo
+    aponta o número errado e a trava barra). Falhar em não-apagar é o lado certo do trade-off —
+    apagar a regra errada é pior, e o pai não teria como saber.
+- **`hobbies` e `comoAprende` voltaram a ser preenchidos.** O que resolveu não foi parágrafo de
+  instrução, foi **o exemplo em JSON dentro do prompt** (`"gosto de jogar videogame" => {"informacoes":{"hobbies":"jogar videogame"}}`).
+  O `comoAprende` deixou de ser lista fechada: casa com o rótulo canônico quando dá (agora
+  comparando sem o plural — "um desafio" casa com "desafios") e **preserva a frase da criança**
+  quando não dá. Nada no sistema consome o valor canônico: ele só é lido como texto, uma vez, no
+  `blocoContextoUsuario`. Bateria final: **14/15**.
+- **O teto de 50 memórias não congela mais.** Havia um `break` que parava de aprender **para
+  sempre** ao encher. Agora abre vaga sacrificando a mais antiga **que não seja identitária**
+  (família, bichos, escola, apelido — a mesma lista do `memoria-relevante.js`), porque as
+  primeiras memórias de um perfil são justamente essas.
+- **`null` da nuvem não apaga mais valor local.** `CAMPOS_NAO_ZERAVEIS` passou a cobrir o perfil
+  inteiro. É seguro porque **o site nunca manda `null`** — o formulário faz `.trim()`, e string
+  vazia não é `null`. `null` na coluna só significa "isto nunca foi escrito".
+- **A hidratação do boot preserva o que o robô aprendeu** quando a nuvem vem vazia
+  (`memorias`, `progresso`, `idiomasEstudando`, `ultimaSessao`, `companionConvite`,
+  `rostosConhecidos`).
+- **Texto livre do pai passou a ser saneado na fronteira.** `hobbies`, `comoAprende` e
+  `estiloLinguagem` entravam crus no system prompt — e o bloco de contexto é uma lista de
+  `- Rótulo: valor`, então uma quebra de linha no valor inventava uma linha que a Cogni lia como
+  se fosse do sistema.
+- **`memorias[]` ficou pronta para ser editada pelo site** (ver abaixo).
+
+Cobertura: `npm run teste:perfil` foi de 55 para **77 casos**; a suíte inteira (`npm run teste`)
+está em **497 casos, offline**.
+
+### 🔴 O que o SITE precisa fazer
+
+#### 1. Mostrar (e deixar apagar) o que a Cogni sabe — **a correção principal**
+
+`criancas.memorias` é um `jsonb` com um array de frases curtas em português
+(`["Tem um cachorro chamado Rex", "Quer ser paleontólogo", "É alérgico a amendoim"]`). O
+`select("*")` do `getCrianca()` **já traz** a coluna; nenhuma tela usa.
+
+Isso é o que responde à queixa que abriu esta rodada: o pai precisa ver o que a Cogni guardou
+sobre a filha, e precisa poder apagar um item — tanto por controle parental quanto porque é o
+único jeito de corrigir um fato que ela entendeu errado.
+
+- **Onde:** um bloco novo na seção **Configurações**, junto do Perfil da criança. Sugestão de
+  título: *"O que a Cogni sabe sobre a \<nome\>"*, com subtítulo explicando que ela aprende isso
+  conversando e que dá pra remover o que não fizer sentido.
+- **Estado vazio:** perfil novo tem `[]`. Diga que ela ainda está conhecendo a criança — não
+  mostre uma caixa vazia.
+- **Apagar:** remover **um** item de cada vez, com confirmação. Reescreve o array inteiro sem
+  aquele item (não há id por memória — a identidade é o próprio texto).
+- **Não ofereça editar nem adicionar.** Quem escreve memória é a Cogni, na conversa; um campo de
+  texto ali convidaria o pai a "programar" a filha por trás, que não é o que este campo é.
+- **Contrato:** acrescente `"memorias"` à allowlist `EDITAVEIS` do `atualizarCrianca()`
+  (`supabase-data.js`). Hoje ela não está lá, então o site literalmente não consegue gravar.
+- **O robô já aceita essa escrita** (não precisa de endpoint novo): `memorias` continua fora de
+  `CAMPOS_DO_PAI` — se entrasse, a nuvem venceria a cada turno e engoliria o que a Cogni acabou
+  de aprender — e ganhou um **merge de três vias** com `memoriasSincronizadas` (o que subiu por
+  último) como ancestral comum. Sumiu da nuvem **e** estava na ancestral ⇒ o pai apagou ⇒ some do
+  cache. Está no cache e não estava na ancestral ⇒ o robô acabou de aprender ⇒ fica. O Realtime
+  de `criancas` já está ligado, então **o robô vê a remoção na hora**.
+  > ⚠️ O que a nuvem tem **a mais** nunca é adotado: quem inventa memória é o robô. Um `insert`
+  > manual de memória no Supabase seria ignorado — isso é de propósito.
+
+#### 2. Ajustar os dois campos que voltaram a ser preenchidos
+
+- **`hobbies`** agora chega preenchido pela conversa (`"jogar videogame, jogar bola"`). O
+  `maxlength=120` do input continua valendo; o servidor sanea em 120 na fronteira.
+- **`como_aprende`** agora pode vir com a frase da criança (`"quando você me explica com
+  desenho"`) **ou** com um dos rótulos canônicos (`"jogos"`, `"exemplos do dia a dia"`,
+  `"histórias"`, `"vídeos"`, `"prática"`, `"desafios"`, `"curiosidades"`). O `<textarea>` de
+  texto livre continua sendo a UI certa — **não transforme em `<select>`**, isso voltaria a
+  jogar fora o jeito real da criança.
+
+#### 3. Deixar claro que a instrução pode ter vindo da voz
+
+`prompt_personalizado` tem **duas** portas de escrita (o `<textarea>` e a voz) e o pai não
+distingue uma da outra — ele pode encontrar ali uma linha que não digitou. O `<textarea>`
+multi-linha atual já está certo (uma instrução por linha, `wrap: "soft"`, altura que acompanha o
+conteúdo); o que falta é **dizer isso na interface**. O hint que já existe ("Dá pra ditar isso
+também…") pode virar algo mais explícito sobre linhas ditadas aparecerem ali sozinhas.
+
+> Isto é honestidade de produto, não paranoia: o servidor **não distingue quem fala** (decisão de
+> produto registrada em `memoria-ai.js`), então uma frase da criança pode virar linha nova. Ela
+> nunca reescreve as regras de segurança — o `blocoPromptPersonalizado` enquadra o campo como
+> preferência subordinada —, mas o pai tem que conseguir ver e apagar.
+
+#### 4. Nada de SQL
+
+**Zero migração nesta rodada.** Todas as colunas envolvidas já existem — auditado contra o banco
+real em 19/ago/2026, inclusive `rostos_conhecidos` e `companion_convite`, que constavam como
+pendentes em notas antigas. `memoriasSincronizadas` vive **só** no `usuarios.json` do robô e
+nunca vira coluna.
+
+---
+
 ## 🔑 O que o Nicolas fornece (manual)
 
 1. **Conta Supabase + credenciais** (URL, anon key, service_role key) — passo a passo no chat na Fase 0.
@@ -1969,6 +2098,12 @@ Motor e cobertura: `server/modules/brain/companion-gancho.js`, `npm run teste:co
 
 7. ⭐ **Rodada 5 — prioridade dos planos (16/ago/2026)**, uma coisa manual só: o **SQL** que cria `planos_estudo.ordem` + o índice (entregue no chat, e também na seção "🥇 Rodada 5"). Idempotente (`add column if not exists`), **sem backfill** — todos nascem em `1000` e o comportamento só muda no primeiro arraste. **Nenhuma variável de ambiente nova.**
    > 🩹 Se o robô ou o site subirem antes do SQL: o servidor **detecta e se vira sozinho** (a válvula desliga a ordenação e avisa uma vez — verificado contra o banco real). Já no site, o `update` de `ordem` numa coluna inexistente falha com `42703`, então o arraste precisa tratar isso como *"a prioridade ainda não está disponível"* em vez de erro genérico, e não deixar a lista visualmente reordenada mentindo pro pai.
+
+9. ⭐ **Rodada 8 — auditoria da memória (19/ago/2026)**: **nada manual.** Zero SQL, zero
+   variável de ambiente, zero dependência nova. As 25 colunas de `criancas` foram auditadas
+   contra o banco real nesta data — **todas existem**, inclusive `rostos_conhecidos` e
+   `companion_convite`, que apareciam como pendentes em notas anteriores. O único trabalho
+   que sobra é no site (ver a seção 🧠 acima).
 
 (O Claude gerencia os `.env`. Credenciais rotacionadas depois pelo Nicolas.)
 
