@@ -534,6 +534,15 @@
   color: var(--dash-text);
   margin-bottom: 1.25rem;
 }
+/* Segunda linha da confirmação: o que acontece DEPOIS de confirmar. Fica abaixo
+   do que vai sumir, e mais discreta, pra não competir com ele. */
+.pl-confirm__hint {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--dash-text-muted);
+  margin: -0.9rem 0 1.25rem;
+}
 .pl-confirm__actions {
   display: flex;
   justify-content: flex-end;

@@ -2076,6 +2076,35 @@ real em 19/ago/2026, inclusive `rostos_conhecidos` e `companion_convite`, que co
 pendentes em notas antigas. `memoriasSincronizadas` vive **só** no `usuarios.json` do robô e
 nunca vira coluna.
 
+### ✅ Feito no site (19/ago/2026)
+
+As três frentes acima estão na tela. O que saiu diferente do sugerido aqui, e por quê:
+
+- **O card "O que a Cogni sabe" existe**, em Configurações, logo abaixo do perfil. Só remove: um item
+  por vez, com uma confirmação que **cita** a memória em vez de embuti-la na frase (*"a Cogni vai
+  esquecer que Tem um cachorro chamado Thor"* sai torto em quase todo item, porque a memória já vem
+  como frase inteira, com maiúscula e ponto).
+- **`memorias` entrou na allowlist `EDITAVEIS`** do `atualizarCrianca()` (`supabase-data.js`) — a
+  mesma allowlist que impede o site de escrever em `progresso`.
+- 🔴 **A remoção relê o perfil FRESCO antes de gravar.** Isto não estava no plano, e é o que segura a
+  correção de pé: sem id por memória, apagar é regravar o array inteiro — e regravar o array *que
+  está na tela* apaga tudo que a Cogni aprendeu enquanto o pai olhava a página. Seria o defeito nº 1
+  desta mesma auditoria (reescrever o campo inteiro e perder o que ninguém citou), na direção
+  contrária. Então a lista sai do banco, o item sai dela pelo texto, e some **uma** ocorrência só.
+- **O título usa `deQuem(nome)`**, e não "sobre a \<nome\>" como a sugestão: `criancas` não tem campo
+  de gênero, e desde 18/ago o painel escreve frases que não precisam de flexão. Fica "O que a Cogni
+  sabe de Pedro" (ou "da criança", num perfil sem nome).
+- **`hobbies` e `como_aprende` não pediram mudança nenhuma** — `maxlength=120` continua valendo, e o
+  `como_aprende` continua `<textarea>` livre.
+- **O aviso do `prompt_personalizado`** passou a dizer que a Cogni não distingue quem falou, e que
+  uma linha que o pai não digitou pode ter vindo daí.
+
+Coberto por Playwright no painel real (modo de exemplo): a lista, a remoção com gravação de verdade,
+o estado vazio, jsonb torto (`null`, número, objeto, string vazia), `memorias: null`, o foco do
+teclado depois de remover (vai pro item que assumiu a posição; cancelar volta pro botão original),
+área de toque de 44px no celular, contraste nos dois temas, e o **cenário de corrida**: o robô
+aprende algo durante a visita e a memória nova sobrevive à remoção.
+
 ---
 
 ## 🔑 O que o Nicolas fornece (manual)

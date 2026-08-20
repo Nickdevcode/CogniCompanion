@@ -22,7 +22,16 @@ import { el, sectionRoot, pageHead } from "./_shared.js";
 import { dicaInfo } from "../tooltip.js";
 import { ICON, materiaIcon } from "../icons.js";
 import { openModal } from "../modal.js";
-import { materiasAgrupadas, idadeLabel, serieLabel, SERIES } from "../format.js";
+import {
+  materiasAgrupadas,
+  idadeLabel,
+  serieLabel,
+  SERIES,
+  primeiroNome,
+  sujeito,
+  deQuem,
+  capitalizar,
+} from "../format.js";
 
 /**
  * Busca o código de pareamento do perfil no servidor local (não-Supabase).
@@ -413,7 +422,9 @@ function formularioPerfil(crianca, { onSubmit, close }) {
           el("span", {
             text:
               "Dá pra ditar isso também: fale com o robô (“não fale sobre morte com ele”) " +
-              "e a Cogni acrescenta a instrução aqui, uma por linha.",
+              "e a Cogni acrescenta a instrução aqui, uma por linha. Ela não distingue " +
+              "quem falou, então uma linha que você não digitou pode ter vindo daí: " +
+              "vale conferir de vez em quando.",
           }),
         ],
       }),
@@ -486,6 +497,232 @@ function formularioPerfil(crianca, { onSubmit, close }) {
   });
 
   return form;
+}
+
+/* --------------------------------------------------------------------------
+   Bloco: o que a Cogni já sabe (`criancas.memorias`) ⭐ 19/ago/2026
+
+   O gatilho foi um teste real: o pai contou coisas pra Cogni (o hobby, o jeito
+   de aprender, um assunto proibido) e não achou NADA disso no painel. Parte
+   tinha sido guardada mesmo — em `criancas.memorias`, o campo mais rico do
+   perfil e o único que nenhuma tela lia. O `select("*")` do `getCrianca()` já
+   trazia a coluna: faltava mostrar.
+
+   Três decisões definem o bloco:
+
+   1. Só REMOVER. Não existe "adicionar" nem "editar" aqui, e a ausência é a
+      feature: quem escreve memória é a Cogni, na conversa. Um campo de texto
+      neste lugar convidaria o pai a programar a filha por trás, que não é o que
+      este campo é. Remover existe por dois motivos legítimos — controle do
+      responsável, e corrigir o que ela entendeu errado (sem id por memória,
+      corrigir é apagar e deixar ela reaprender).
+   2. Um por vez, com confirmação. Pelo site a remoção não tem volta: a Cogni só
+      reaprende aquilo se o assunto reaparecer numa conversa.
+   3. A remoção parte de uma leitura FRESCA do banco (ver `removerMemoria`).
+   -------------------------------------------------------------------------- */
+
+/**
+ * As memórias em forma de lista limpa.
+ *
+ * `memorias` é jsonb livre escrito pelo robô: pode vir `null` (perfil que nunca
+ * conversou), com item vazio, ou com algo que não é string. Item torto some da
+ * lista em vez de derrubar a seção — mesma prática do saneamento da trilha.
+ * @param {object|null} crianca
+ * @returns {string[]}
+ */
+function memoriasDe(crianca) {
+  const bruto = crianca && crianca.memorias;
+  if (!Array.isArray(bruto)) return [];
+  return bruto
+    .map((m) => (typeof m === "string" ? m.trim() : ""))
+    .filter(Boolean);
+}
+
+/**
+ * Remove UMA memória, relendo o perfil antes de gravar.
+ *
+ * 🔴 Por que a releitura é obrigatória. Não há id por memória: apagar é regravar
+ * o array inteiro sem aquele item. Se o array regravado for o que estava NA TELA,
+ * tudo que a Cogni aprendeu enquanto o pai olhava a página é apagado junto — que
+ * é exatamente o defeito que esta rodada acabou de matar do outro lado (o modelo
+ * reescrevendo o campo inteiro e perdendo instrução). Então a lista que vai pro
+ * banco nasce do banco, e o item sai dela pelo TEXTO.
+ *
+ * Some só a primeira ocorrência: duas memórias idênticas são duas linhas na tela,
+ * e apagar as duas de um clique surpreenderia quem clicou em uma.
+ *
+ * @param {object} ctx — o contexto do painel (a camada de dados)
+ * @param {string} texto — a memória a esquecer, como está no banco
+ * @returns {Promise<object>} a criança atualizada (ou a atual, se nada mudou)
+ */
+async function removerMemoria(ctx, texto) {
+  const fresca = await ctx.mock.getCrianca({ fresco: true });
+  const atuais = memoriasDe(fresca);
+  const i = atuais.indexOf(texto);
+  // Já não está lá: o robô pode ter reescrito a lista no meio do caminho. Isso é
+  // sucesso, não erro — o pai pediu que sumisse, e sumiu.
+  if (i === -1) return fresca;
+  const restantes = atuais.slice(0, i).concat(atuais.slice(i + 1));
+  return ctx.mock.atualizarCrianca({ memorias: restantes });
+}
+
+/**
+ * Confirmação antes de esquecer (a Cogni só reaprende se o assunto voltar).
+ *
+ * `aoRemover` roda depois que o modal fecha, e SÓ quando algo foi removido: o
+ * `openModal` devolve o foco a quem o abriu, e quem o abriu foi um botão que
+ * acabou de sair do DOM — sem este gancho, o teclado cai fora da lista no meio
+ * da tarefa. No cancelar não roda, porque aí o botão original continua lá e a
+ * devolução normal do modal é a certa.
+ */
+function confirmarEsquecer({ texto, onConfirmado, aoRemover }) {
+  let removeu = false;
+  openModal({
+    title: "Esquecer isto",
+    size: "sm",
+    onClose: () => {
+      if (removeu && typeof aoRemover === "function") aoRemover();
+    },
+    content: ({ close }) => {
+      const wrap = el("div", { class: "pl-confirm" });
+      // A memória vai CITADA, e não embutida numa frase ("a Cogni vai esquecer
+      // que Tem um cachorro chamado Thor"): ela é uma frase inteira, com
+      // maiúscula e ponto, escrita pelo robô. Encaixá-la no meio da nossa frase
+      // produz uma capitalização torta em quase todo item.
+      wrap.appendChild(
+        el("p", { class: "pl-confirm__text", text: "A Cogni vai esquecer isto:" })
+      );
+      wrap.appendChild(
+        el("p", { class: "cfg-mem__quote", text: capitalizar(texto) })
+      );
+      wrap.appendChild(
+        el("p", {
+          class: "pl-confirm__hint",
+          text: "Ela pode aprender de novo se o assunto voltar numa conversa.",
+        })
+      );
+      const feedback = el("p", {
+        class: "ob-feedback",
+        attrs: { role: "status", "aria-live": "polite" },
+      });
+
+      const cancel = el("button", {
+        class: "dash-btn dash-btn--ghost",
+        attrs: { type: "button" },
+        text: "Cancelar",
+      });
+      cancel.addEventListener("click", close);
+
+      const confirm = el("button", {
+        class: "pl-btn pl-btn--danger",
+        attrs: { type: "button" },
+        children: [
+          el("span", { class: "pl-btn__ico", svg: ICON.trash }),
+          el("span", { text: "Esquecer" }),
+        ],
+      });
+      confirm.addEventListener("click", async () => {
+        confirm.disabled = true;
+        cancel.disabled = true;
+        feedback.textContent = "Esquecendo…";
+        feedback.classList.remove("is-error");
+        try {
+          await onConfirmado();
+          removeu = true;
+          close();
+          if (window.cognifyToast)
+            window.cognifyToast.show("A Cogni esqueceu.", { type: "info" });
+        } catch (e) {
+          console.error("[Companion] Não consegui apagar a memória:", e);
+          confirm.disabled = false;
+          cancel.disabled = false;
+          feedback.textContent =
+            "Não consegui apagar agora. Verifique sua conexão e tente de novo.";
+          feedback.classList.add("is-error");
+        }
+      });
+
+      wrap.appendChild(
+        el("div", { class: "pl-confirm__actions", children: [cancel, confirm] })
+      );
+      wrap.appendChild(feedback);
+      return wrap;
+    },
+  });
+}
+
+/**
+ * O card "O que a Cogni sabe de <nome>".
+ * @param {{crianca: object|null, onEsquecer: (texto:string)=>void}} cfg
+ */
+function blocoMemorias({ crianca, onEsquecer }) {
+  const primeiro = primeiroNome(crianca && crianca.nome);
+  const bloco = el("section", { class: "dash-card cfg-block cfg-block--memoria" });
+  bloco.appendChild(
+    blocoHead(
+      ICON.heart,
+      // `deQuem()` em vez de "sobre a <nome>": o contrato de `criancas` não tem
+      // gênero, e o título do card não pode ser a frase que erra sobre a filha
+      // de metade das famílias.
+      `O que a Cogni sabe ${deQuem(primeiro)}`,
+      "Coisas que ela guardou das conversas.",
+      "Ela anota sozinha o que aparece na conversa e usa depois pra puxar assunto. Some daqui o que não fizer sentido, ou o que ela tiver entendido errado."
+    )
+  );
+
+  const body = el("div", { class: "cfg-block__body" });
+  const itens = memoriasDe(crianca);
+
+  if (!itens.length) {
+    body.appendChild(
+      el("p", {
+        class: "cfg-mem__vazio",
+        text: `A Cogni ainda está conhecendo ${sujeito(
+          primeiro
+        )}. O que ela aprender nas conversas aparece aqui.`,
+      })
+    );
+    bloco.appendChild(body);
+    return bloco;
+  }
+
+  const lista = el("ul", { class: "cfg-mem" });
+  itens.forEach((texto, indice) => {
+    // O texto vem do robô e chega em minúscula com frequência; aqui ele ABRE a
+    // linha, então passa por `capitalizar()`. O valor no banco continua o dele —
+    // a remoção casa pelo texto cru, não pelo que está na tela.
+    const rotulo = capitalizar(texto);
+    const del = el("button", {
+      class: "cfg-mem__del",
+      attrs: {
+        type: "button",
+        "aria-label": `Esquecer: ${rotulo}`,
+        "data-dica": "A Cogni esquece isto.",
+      },
+      svg: ICON.trash,
+    });
+    del.addEventListener("click", () => onEsquecer(texto, indice));
+
+    lista.appendChild(
+      el("li", {
+        class: "cfg-mem__item",
+        children: [el("span", { class: "cfg-mem__text", text: rotulo }), del],
+      })
+    );
+  });
+  body.appendChild(lista);
+
+  // Sem esta linha, a primeira pergunta do card é "e como eu acrescento?". Ela
+  // responde a ausência do botão em vez de deixar o pai procurando por ele.
+  body.appendChild(
+    el("p", {
+      class: "cfg-mem__nota",
+      text: "Quem escreve aqui é a Cogni, conversando. Dá pra remover o que não fizer sentido, mas não dá pra editar nem acrescentar.",
+    })
+  );
+
+  bloco.appendChild(body);
+  return bloco;
 }
 
 /* --------------------------------------------------------------------------
@@ -948,6 +1185,7 @@ export async function renderConfig(ctx) {
       if (nova) {
         criancaAtual = nova;
         renderPerfil();
+        renderMemorias();
         sincronizarCardSidebar();
       }
     } catch (e) {
@@ -1012,6 +1250,59 @@ export async function renderConfig(ctx) {
   }
   renderPerfil();
 
+  // Host do bloco "O que a Cogni sabe" (repintado a cada releitura do perfil e
+  // a cada remoção). A lista é o campo que mais muda sozinho no painel: o robô
+  // escreve nele a cada conversa.
+  // `tabindex="-1"`: fora da ordem do Tab, mas focável por código — é pra onde o
+  // foco vai quando o pai apaga a última memória e o botão que ele usou deixa de
+  // existir. Focar o card faz o leitor de tela anunciar o estado vazio.
+  const memoriasHost = el("div", {
+    class: "cfg-memorias-host",
+    attrs: { tabindex: "-1" },
+  });
+
+  /**
+   * Devolve o teclado pra lista depois de uma remoção. Vai pro botão que assumiu
+   * a posição do apagado (ou pro último, se o apagado era o último) — que é onde
+   * a mão do usuário já estava. Lista vazia: o próprio card, pro leitor de tela
+   * anunciar que não sobrou nada.
+   * @param {number} indice — a posição do item removido
+   */
+  function focarDepoisDeRemover(indice) {
+    const botoes = memoriasHost.querySelectorAll(".cfg-mem__del");
+    const alvo = botoes.length
+      ? botoes[Math.min(indice, botoes.length - 1)]
+      : memoriasHost;
+    alvo.focus({ preventScroll: true });
+  }
+
+  function renderMemorias() {
+    // Repintado também pela releitura do perfil (voltar pra aba): se o foco
+    // estava aqui dentro, ele volta pra cá em vez de cair no body.
+    const tinhaFoco = memoriasHost.contains(document.activeElement);
+    memoriasHost.replaceChildren(
+      blocoMemorias({
+        crianca: criancaAtual,
+        onEsquecer: (texto, indice) =>
+          confirmarEsquecer({
+            texto,
+            onConfirmado: async () => {
+              criancaAtual = await removerMemoria(ctx, texto);
+              renderPerfil();
+              renderMemorias();
+              sincronizarCardSidebar();
+            },
+            aoRemover: () => focarDepoisDeRemover(indice),
+          }),
+      })
+    );
+    if (tinhaFoco) {
+      const alvo = memoriasHost.querySelector(".cfg-mem__del") || memoriasHost;
+      alvo.focus({ preventScroll: true });
+    }
+  }
+  renderMemorias();
+
   /**
    * Terceiro gancho de releitura: voltar pra aba. O caso real é o pai deixar o
    * Companion aberto, ir falar com o robô e voltar — sem isto, a tela seguiria
@@ -1048,6 +1339,9 @@ export async function renderConfig(ctx) {
     class: "cfg-grid",
     children: [
       perfilHost,
+      // Logo abaixo do perfil, porque é a continuação dele: o formulário é o que
+      // o pai contou, e este card é o que ela descobriu sozinha.
+      memoriasHost,
       blocoConta(responsavel),
       blocoTema(),
       blocoRobo,

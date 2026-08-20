@@ -555,6 +555,19 @@ export async function atualizarCrianca(patch) {
     // Rosto do robô (jsonb). Quem escreve aqui é o editor da CRIANÇA, não o pai —
     // é o mesmo caminho de escrita porque é a mesma linha e a mesma RLS.
     "rosto_robo",
+    // O que a Cogni aprendeu conversando (jsonb, array de frases). ⭐ 19/ago/2026
+    //
+    // ⚠️ Entra na allowlist só pra REMOÇÃO. Quem escreve memória é o robô, na
+    // conversa; a tela de Configurações apaga um item e regrava o array sem ele.
+    // O robô resolve isso com um merge de três vias (`memoriasSincronizadas` como
+    // ancestral): sumiu da nuvem E estava na ancestral ⇒ o pai apagou ⇒ some do
+    // cache dele também. O que a nuvem tem A MAIS nunca é adotado — memória
+    // inserida à mão no banco é ignorada de propósito.
+    //
+    // Por isso a tela relê fresco antes de gravar (ver `removerMemoria` em
+    // sections/config.js): mandar de volta a lista que estava na tela apagaria o
+    // que a Cogni aprendeu enquanto o pai olhava a página.
+    "memorias",
   ];
   const campos = {};
   for (const k of EDITAVEIS) if (k in patch) campos[k] = patch[k];

@@ -30,6 +30,7 @@ Mais do que um robô, o Cogni é a união de **hardware + IA** numa experiência
 - [Primeira visita: o tutorial guiado](#-primeira-visita-o-tutorial-guiado)
 - [Dicas contextuais (os "?" espalhados pelo painel)](#-dicas-contextuais-os--espalhados-pelo-painel)
 - [O perfil tem duas pontas escrevendo nele (site e voz)](#️-o-perfil-tem-duas-pontas-escrevendo-nele-site-e-voz)
+- [O que a Cogni sabe (e o que o pai pode apagar dali)](#-o-que-a-cogni-sabe-e-o-que-o-pai-pode-apagar-dali)
 - [As 14 matérias (e por que quem decide é o servidor)](#-as-14-matérias-e-por-que-quem-decide-é-o-servidor)
 - [Trilha de aprendizado (no Painel de Aprendizado)](#-trilha-de-aprendizado-no-painel-de-aprendizado)
 - [Mapa da aula — em que minuto ela parou de entender](#️-mapa-da-aula--em-que-minuto-ela-parou-de-entender)
@@ -271,6 +272,47 @@ nada na tela revelava que essa porta existia.
 > ⚠️ **Honestidade sobre o limite:** a releitura fecha a janela comum, não todas. Se o pai ficar com o modal
 > aberto e a criança ditar algo nesse meio-tempo, o "Salvar perfil" ainda grava por cima. Fechar isso de vez
 > pede um patch diferencial (mandar só os campos que o pai realmente mexeu) — decisão pendente.
+
+### 🧠 O que a Cogni sabe (e o que o pai pode apagar dali)
+
+O gatilho foi um teste: contar várias coisas pra Cogni (o hobby, o jeito de aprender, um assunto
+proibido) e depois ir conferir no painel. **Só a série, a idade e as duas matérias estavam lá.** Uma
+auditoria do lado do robô achou sete defeitos, e o diagnóstico da queixa era a soma de três: dois
+campos que a conversa nunca preenchia, e `criancas.memorias` — um `jsonb` com frases curtas em
+português (*"Tem um cachorro chamado Thor"*, *"É alérgico a amendoim"*), o campo mais rico do perfil
+e **o único que nenhuma tela lia**. O `select("*")` do `getCrianca()` já trazia a coluna.
+
+Agora ele tem um card próprio em **Configurações**, logo abaixo do perfil. O desenho dele é quase
+todo feito do que ele **não** faz:
+
+| | Por quê |
+| --- | --- |
+| 🚫 **Não dá pra acrescentar** | Quem escreve memória é a Cogni, conversando. Um campo de texto ali convidaria o pai a programar a filha por trás, que não é o que este campo é |
+| 🚫 **Nem editar** | Não há id por memória: a identidade é o próprio texto. Corrigir o que ela entendeu errado é apagar e deixar ela reaprender |
+| ✅ **Remover, um por vez, com confirmação** | Pelo site não tem volta: ela só reaprende aquilo se o assunto reaparecer numa conversa. A confirmação cita a memória em vez de embutir na frase, senão *"a Cogni vai esquecer que Tem um cachorro"* sai torto em quase todo item |
+
+> 🔄 **A remoção relê o perfil antes de gravar.** Apagar é regravar o array inteiro sem aquele item —
+> e se o array regravado fosse o que está **na tela**, tudo que a Cogni aprendeu enquanto o pai olhava
+> a página iria junto. É o mesmo defeito que a auditoria acabou de matar do outro lado (o modelo
+> reescrevendo o campo inteiro e perdendo instrução do pai), só que na direção contrária. Então a
+> lista sai do banco, o item sai dela pelo texto, e o que ela aprendeu no meio do caminho sobrevive.
+
+> 🤝 **Do lado do robô não precisou de endpoint novo.** `memorias` continua fora de `CAMPOS_DO_PAI`
+> (se entrasse, a nuvem venceria a cada turno e engoliria o que ela acabou de aprender) e ganhou um
+> **merge de três vias**: sumiu da nuvem **e** estava na ancestral ⇒ o pai apagou ⇒ some do cache
+> dele. O que a nuvem tem **a mais** nunca é adotado, então memória inserida à mão no banco é
+> ignorada de propósito. Do lado do site, a allowlist `EDITAVEIS` ganhou `memorias` — a mesma
+> allowlist que protege a trilha de aprendizado.
+
+E o aviso do `prompt_personalizado` ficou mais honesto: a Cogni **não distingue quem falou**, então
+uma linha que o pai não digitou pode ter vindo de uma fala da criança. Saber disso é o que dá sentido
+ao campo ser visível e editável ali.
+
+> 🧪 Os outros dois campos que a auditoria destravou (`hobbies` e `como_aprende`, que voltaram a ser
+> preenchidos pela conversa) **não pediram mudança nenhuma na tela** — e um deles quase pediu a
+> errada: `como_aprende` agora pode chegar com a frase da própria criança (*"quando você me explica
+> com desenho"*) em vez de um dos sete rótulos canônicos. Transformar aquilo num `<select>` jogaria
+> fora exatamente o que a correção do robô passou a preservar.
 
 ### 📚 As 14 matérias (e por que quem decide é o servidor)
 

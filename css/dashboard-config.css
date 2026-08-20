@@ -21,6 +21,7 @@
 /* Perfil e Vínculo com o robô ocupam a largura toda; Conta e Tema dividem a
    linha entre eles. Mantém o grid simétrico, sem espaços vazios. */
 .cfg-perfil-host,
+.cfg-memorias-host,
 .cfg-block--status,
 .cfg-block--ajuda {
   grid-column: 1 / -1;
@@ -202,6 +203,117 @@
   font-family: var(--font-body);
   color: var(--dash-text-muted);
   padding: 0.5rem 0;
+}
+
+/* --------------------------------------------------------------------------
+   Bloco: o que a Cogni sabe (`criancas.memorias`) ⭐ 19/ago/2026
+   -------------------------------------------------------------------------- */
+/* Focável por código (o foco cai aqui quando a última memória some), mas nunca
+   pelo Tab — sem `outline: none`, que apagaria a única pista de onde o foco foi
+   parar justo em quem navega por teclado. */
+.cfg-memorias-host:focus {
+  outline: none;
+}
+
+/* Os itens se acomodam ao próprio texto, e não a uma coluna fixa.
+   Memória é frase curta e de comprimento imprevisível ("Tem um cachorro chamado
+   Thor" ao lado de "Prefere estudar depois do jantar, nunca antes"): numa grade
+   de colunas iguais, a frase curta vira um retângulo com um palmo de vazio até a
+   lixeira, e num card de largura inteira isso se repete linha após linha. Aqui
+   cada item ocupa o que precisa, quebra pra próxima linha quando não cabe, e o
+   conjunto lê como o que é: um punhado de coisas que ela sabe. */
+.cfg-mem {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.cfg-mem__item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  /* Teto pra memória longa não virar uma faixa de 1400px de uma linha só. */
+  max-width: min(100%, 46ch);
+  padding: 0.55rem 0.55rem 0.55rem 0.9rem;
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  background-color: var(--dash-surface-2);
+}
+.cfg-mem__text {
+  min-width: 0;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--dash-text);
+  /* Memória é frase curta, mas o robô não promete tamanho: sem isto, um item
+     comprido empurraria a lixeira pra fora do card. */
+  overflow-wrap: anywhere;
+}
+.cfg-mem__del {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  color: var(--dash-text-faint);
+  cursor: pointer;
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+.cfg-mem__del svg {
+  width: 17px;
+  height: 17px;
+}
+/* A cor de perigo só aparece na intenção (hover/foco). Trinta lixeiras vermelhas
+   em repouso transformariam um card de leitura num campo minado. */
+.cfg-mem__del:hover,
+.cfg-mem__del:focus-visible {
+  color: var(--menu-danger, #c0392b);
+  background-color: var(--menu-danger-hover, rgba(192, 57, 43, 0.1));
+}
+[data-theme="dark"] .cfg-mem__del:hover,
+[data-theme="dark"] .cfg-mem__del:focus-visible {
+  color: var(--menu-danger, #ff8a80);
+}
+/* A memória citada dentro da confirmação de "esquecer". Repete o desenho do
+   item da lista de propósito: o pai reconhece no modal exatamente o cartãozinho
+   em que acabou de clicar, sem precisar reler pra ter certeza de qual era. */
+.cfg-mem__quote {
+  margin: -0.85rem 0 1rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  background-color: var(--dash-surface-2);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--dash-text);
+  overflow-wrap: anywhere;
+}
+.cfg-mem__vazio {
+  font-family: var(--font-body);
+  line-height: 1.5;
+  color: var(--dash-text-muted);
+  padding: 0.5rem 0;
+}
+.cfg-mem__nota {
+  margin-top: 0.9rem;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--dash-text-faint);
+}
+
+/* Numa coluna estreita cabe um item por linha de qualquer jeito — e aí a largura
+   colada ao texto vira uma escadinha de bordas desalinhadas, que lê como layout
+   quebrado. Largura cheia e lixeira na direita: vira lista, que é o que é. */
+@media (max-width: 620px) {
+  .cfg-mem__item {
+    width: 100%;
+    max-width: none;
+  }
+  .cfg-mem__text {
+    flex: 1;
+  }
 }
 
 /* --------------------------------------------------------------------------

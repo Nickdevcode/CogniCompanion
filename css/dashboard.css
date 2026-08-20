@@ -1027,6 +1027,7 @@
   .cv-search__clear,
   .cfg-codigo__copy,
   .cfg-switch,
+  .cfg-mem__del,
   .ap-seg__btn,
   .dash-modal__close {
     position: relative;
@@ -1034,6 +1035,7 @@
   .cv-search__clear::after,
   .cfg-codigo__copy::after,
   .cfg-switch::after,
+  .cfg-mem__del::after,
   .ap-seg__btn::after,
   .dash-modal__close::after {
     content: "";
