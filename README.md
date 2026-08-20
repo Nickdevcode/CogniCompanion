@@ -6,11 +6,49 @@ Mais do que um robô, o Cogni é a união de **hardware + IA** numa experiência
 
 ---
 
+## 📑 Índice
+
+|  | Seção | O que tem lá |
+| --- | --- | --- |
+| 🌐 | [Sobre o projeto](#-sobre-o-projeto) | o que é o Cogni e o que este repositório contém |
+| 📄 | [Páginas](#-páginas) | as 7 telas do site, arquivo por arquivo |
+| ✨ | [Destaques técnicos](#-destaques-técnicos) | design system, tema claro/escuro, acessibilidade, zero build |
+| 🔐 | [Autenticação](#-autenticação-login-cadastro-e-sessão) | Supabase Auth, sessão persistente e o gate de download do jogo |
+| 📊 | [**Painel Companion**](#-painel-companion-dashboard-dos-pais) | o app dos pais, e a maior parte deste README |
+| 🎨 | [Rosto da Cogni](#-rosto-da-cogni--a-tela-da-criança) | a única tela feita pra criança, e a contribuição científica do TCC |
+| 🗂️ | [Estrutura de pastas](#️-estrutura-de-pastas) | onde cada coisa mora |
+| 🚀 | [Como rodar](#-como-rodar-localmente) | subir na sua máquina, e como o site vai ao ar |
+| 👥 | [Equipe](#-equipe) · [Tecnologias](#️-tecnologias) | quem fez, e com o quê |
+
+<details>
+<summary><b>📊 Dentro do Painel Companion</b> — as features, uma a uma</summary>
+
+- [De onde vêm os dados](#-de-onde-vêm-os-dados)
+- [A chave que liga tudo: `USAR_SUPABASE`](#️-a-chave-que-liga-tudo-usar_supabase)
+- [Servidor local (`SERVIDOR_URL`)](#-servidor-local-servidor_url)
+- [Onboarding & pareamento](#-onboarding--pareamento)
+- [Primeira visita: o tutorial guiado](#-primeira-visita-o-tutorial-guiado)
+- [Dicas contextuais (os "?" espalhados pelo painel)](#-dicas-contextuais-os--espalhados-pelo-painel)
+- [O perfil tem duas pontas escrevendo nele (site e voz)](#️-o-perfil-tem-duas-pontas-escrevendo-nele-site-e-voz)
+- [As 14 matérias (e por que quem decide é o servidor)](#-as-14-matérias-e-por-que-quem-decide-é-o-servidor)
+- [Trilha de aprendizado (no Painel de Aprendizado)](#-trilha-de-aprendizado-no-painel-de-aprendizado)
+- [Mapa da aula — em que minuto ela parou de entender](#️-mapa-da-aula--em-que-minuto-ela-parou-de-entender)
+- [Mesa de Estudos — o plano vira um quadro que anda sozinho](#️-mesa-de-estudos--o-plano-vira-um-quadro-que-anda-sozinho)
+- [A revisão de design do painel (18/ago/2026)](#-a-revisão-de-design-do-painel-18ago2026)
+- [Arquivos do painel](#️-arquivos-do-painel)
+
+</details>
+
+---
+
 ## 🌐 Sobre o projeto
 
-Este repositório contém o **site de apresentação** do Cogni: um site estático, responsivo e com tema claro/escuro, feito para mostrar a proposta, os materiais, o jogo e o artigo científico que documentam o desenvolvimento do projeto.
+Este repositório tem **duas metades**, e vale saber disso antes de ler o resto:
 
-O site foi construído **do zero em HTML, CSS e JavaScript puro** (sem frameworks), com foco em performance, acessibilidade e uma identidade visual própria, reproduzindo fielmente o design feito no Figma.
+- 🌐 **O site de apresentação** — estático, responsivo e com tema claro/escuro. Mostra a proposta, os materiais, o jogo e o artigo científico que documentam o desenvolvimento do projeto.
+- 📊 **O Cogni Companion** (`dashboard.html`) — o app onde o responsável acompanha a criança: o que ela estudou, em que minuto travou, e os planos de estudo que a Cogni segue na conversa. É a maior parte do código daqui, e a maior parte deste README.
+
+Os dois foram construídos **do zero em HTML, CSS e JavaScript puro** (sem frameworks e sem etapa de build), com foco em performance, acessibilidade e uma identidade visual própria, reproduzindo fielmente o design feito no Figma.
 
 ---
 
@@ -24,6 +62,7 @@ O site foi construído **do zero em HTML, CSS e JavaScript puro** (sem framework
 | 📘 **Instruções** | `instrucoes.html` | Como usar / saber mais sobre o Cogni |
 | 🔐 **Login** | `login.html` | Tela de acesso |
 | 📝 **Cadastro** | `cadastro.html` | Tela de cadastro |
+| 📊 **Painel Companion** | `dashboard.html` | O app dos pais: uma SPA com 7 seções ([tem seção só dele](#-painel-companion-dashboard-dos-pais)) |
 
 ---
 
@@ -34,7 +73,7 @@ O site foi construído **do zero em HTML, CSS e JavaScript puro** (sem framework
 - 📱 **Totalmente responsivo** — layouts adaptados para desktop e mobile, com textos e imagens otimizados por tamanho de tela.
 - 🎬 **Animações ao rolar** — efeitos de *reveal* e micro-interações suaves, com fallback para quem desativa o `js`.
 - ♿ **Acessibilidade** — uso de `aria-*`, textos alternativos nas imagens e HTML semântico.
-- ⚡ **Zero dependências de build** — é só abrir e rodar; nada de instalar pacotes.
+- ⚡ **Zero dependências de build** — nada de instalar pacote nem compilar: é servir a pasta e pronto.
 
 ---
 
@@ -114,7 +153,7 @@ trocar a flag não muda nenhuma tela).
 ### 🌐 Servidor local (`SERVIDOR_URL`)
 
 Tudo que depende de IA ou de falar com o robô passa pelo servidor que roda junto dele. A URL fica no topo
-de `js/dashboard/main.js`:
+de `js/dashboard/servidor.js` (o `main.js` só a reexporta, pra não quebrar quem já importava de lá):
 
 ```js
 export const SERVIDOR_URL = "http://127.0.0.1:3000";
@@ -807,6 +846,7 @@ o próprio `-soft`, que são um degrau mais escuros que o branco puro. Na remedi
 | 🗣️ **Frases de fábrica** | *"continue incentivando essa jornada"*, *"Gerencie o perfil, a conta e as preferências"*, *"Bem-vindo(a)"* — trocadas por frases que dizem algo que a tela não diz sozinha |
 | 🏷️ **Dois cards, um nome** | O Início tinha **dois** cards chamados "Resumo da semana" lado a lado. Viraram "A semana em números" e "O bilhete da semana". E "Próximo plano de estudo" mostrava o plano de **agora** — virou "O plano de agora" |
 | ➖ **Travessão fora** | Nenhum texto de interface usa travessão (`—`): a pontuação da casa é vírgula, dois-pontos e ponto, e `·` quando é separador (`Fase 1 · Tutorial`, `Painel · Cogni Companion`). A regra vale também pro que a **IA escreve**: os dois prompts (`prompt.mjs` e `melhorar.mjs`) proíbem em texto e **pararam de usar travessão nas próprias instruções** — modelo imita a pontuação do que lê, então pedir uma coisa e demonstrar outra é o jeito mais barato da regra ser ignorada |
+| 🔠 **Maiúscula no começo** (19/ago) | Um professor viu na apresentação: o painel escrevia *"carregando"*. Texto que nasce **fora** do site chega minúsculo (o conceito que a IA gravou, o rótulo que o robô mandou, o tópico da conversa) e não dá pra consertar na origem. Onde ele **abre** uma linha, um chip ou um selo, passa por `capitalizar()` (`format.js`) — no meio da frase nada muda: *"visto ontem"* continua minúsculo, como o português manda |
 
 ---
 
@@ -815,6 +855,7 @@ o próprio `-soft`, que são um degrau mais escuros que o branco puro. Na remedi
 | Arquivo | Função |
 | --- | --- |
 | `js/dashboard/main.js` | Bootstrap: guard de auth, decide onboarding × painel, monta o contexto e o router |
+| `js/dashboard/servidor.js` | `SERVIDOR_URL` e os pings no robô. Mora fora do `main.js` pra camada de dados poder importar sem fazer ciclo |
 | `js/dashboard/mock-data.js` | **Fonte de dados** (roteia mock ↔ Supabase pela flag `USAR_SUPABASE`) |
 | `js/dashboard/supabase-data.js` | Implementação real das queries/escritas no Supabase |
 | `js/dashboard/onboarding.js` | Boas-vindas + pareamento por código (tela cheia, com motion, sonda de rede e saída do portão) |
@@ -824,6 +865,8 @@ o próprio `-soft`, que são um degrau mais escuros que o branco puro. Na remedi
 | `js/dashboard/resumo-semanal.js` | Card + modal do **"O bilhete da semana"** (resumo por IA) |
 | `js/dashboard/dica.js` | Card **"Dica da Cogni"** (Início + Aprendizado), gerada por IA no servidor local (`/api/dica`) |
 | `js/dashboard/router.js` | Roteamento por hash (SPA leve) |
+| `js/dashboard/format.js` | As 14 matérias (rótulos e grupos), datas, durações e os helpers de texto: `sujeito()`, `deQuem()`, `capitalizar()` |
+| `js/dashboard/modal.js`, `icons.js`, `linechart.js` | As peças de UI: o diálogo acessível, os ícones SVG e o gráfico de linha (tudo à mão, sem lib) |
 | `js/dashboard/rosto-preview.js` | Desenho do rosto do robô em SVG (módulo puro, sem rede) |
 | `js/dashboard/rosto-api.js` | Leitura/gravação do rosto: PUT ao vivo no robô + persistência no Supabase |
 | `js/dashboard/mapa-api.js` | Dados do Mapa da aula: endpoint (ao vivo) + tabela (histórico) e o saneamento dos momentos |
@@ -923,11 +966,12 @@ Cogni Software/
 ├── cadastro.html           # Cadastro
 ├── dashboard.html          # Painel Companion (app dos pais)
 │
-├── api/                    # Vercel Functions (site estático + 2 funções)
+├── api/                    # Vercel Functions (site estático + 3 funções)
 │   ├── plano-de-material.mjs # Pedido do pai e/ou material da escola → plano, por IA
 │   ├── ler-link.mjs        # Videoaula do YouTube ou página da web → material
+│   ├── melhorar-texto.mjs  # O ✨ dos campos: uma frase entra, uma frase sai
 │   └── _lib/               # Peças delas (o "_" impede virar rota): auth, itens,
-│                           #   openai, prompt, sanear, http
+│                           #   openai, prompt, melhorar, sanear, http
 │                           #   link/ → rede (SSRF), youtube, pagina
 │
 ├── css/                    # Estilos (tokens → base → componentes)
@@ -947,8 +991,10 @@ Cogni Software/
 │   ├── toast.js            # Notificações (toasts)
 │   ├── dashboard/          # Painel Companion (SPA)
 │   │   ├── main.js         # Bootstrap (auth, onboarding × painel, router)
+│   │   ├── servidor.js     # Endereço do servidor local + os pings no robô
 │   │   ├── mock-data.js    # Fonte de dados (flag USAR_SUPABASE: mock ↔ real)
 │   │   ├── supabase-data.js# Queries/escritas reais no Supabase
+│   │   ├── format.js       # Matérias, datas, durações e os helpers de texto
 │   │   ├── onboarding.js   # Boas-vindas + pareamento por código
 │   │   ├── tour.js         # Motor do tutorial guiado (foco, balão, navegação)
 │   │   ├── tour-passos.js  # O roteiro do tutorial (as 10 paradas)
@@ -961,12 +1007,20 @@ Cogni Software/
 │   │   ├── mesa-realtime.js# O quadro ao vivo (canal do Supabase + fila)
 │   │   ├── captura.js      # Pedido/material/link → plano (entradas, bandeja, orçamento)
 │   │   ├── revisao.js      # A revisão do plano (o pai confere e edita)
+│   │   ├── campo-ia.js     # O ✨ dentro do campo (com desfazer)
+│   │   ├── rosto-preview.js# O rosto do robô em SVG (a matemática do firmware)
+│   │   ├── rosto-api.js    # Rosto: PUT ao vivo no robô + gravação no Supabase
 │   │   ├── material/       # Cada formato virando item, sem biblioteca:
 │   │   │                   #   index, orcamento, imagem, zip, ooxml, texto,
 │   │   │                   #   audio, gravador, video, wav, bytes, link
 │   │   ├── router.js       # Roteamento por hash
+│   │   ├── modal.js        # Diálogo acessível e reutilizável
+│   │   ├── icons.js        # Os ícones SVG do painel
+│   │   ├── linechart.js    # Gráfico de linha em SVG puro
 │   │   └── sections/       # Início, Conversas, Aprendizado, Mapa, Mesa, Rosto, Config
-│   └── ...
+│   │                       #   (+ _shared.js, as peças que todas usam)
+│   └── ...                 # e o que é de página: ui.js, particles.js,
+│                           #   product.js, game-page.js
 │
 └── assets/                 # Mídia
     ├── icons/              # Ícones e favicon
@@ -978,11 +1032,8 @@ Cogni Software/
 
 ## 🚀 Como rodar localmente
 
-Como é um site **100% estático**, você tem duas opções:
-
-**Opção 1 — Abrir direto:** basta abrir o arquivo `index.html` no navegador. 👍
-
-**Opção 2 — Servidor local (recomendado):** evita pequenos problemas com caminhos de arquivo. Escolha um:
+O site é **100% estático**: não tem build, não tem `npm install`, não tem o que instalar. Suba
+qualquer servidor dentro da pasta do projeto:
 
 ```bash
 # Com Python (já vem instalado em muitos sistemas)
@@ -995,6 +1046,24 @@ npx serve
 Depois é só acessar o endereço que aparecer no terminal (ex.: `http://localhost:5500`).
 
 > 💡 No VS Code, a extensão **Live Server** também funciona super bem: clique com o botão direito no `index.html` → *Open with Live Server*.
+
+> ⚠️ **Abrir o `index.html` com dois cliques quase funciona — e é justamente aí que engana.** As
+> páginas do site aparecem, mas em `file://` o navegador recusa módulos ES (e o `dashboard.html`
+> carrega `js/dashboard/main.js` com `type="module"`) e o login com Google não tem pra onde voltar.
+> Ou seja: o **painel não abre** e a **autenticação não fecha o ciclo**, os dois em silêncio. Servidor
+> local resolve os dois.
+
+### ☁️ E como ele vai ao ar
+
+O site vive na **Vercel**, ligada ao repositório: `git push` na `main` publica. De tudo que está
+aqui, só as três funções de `api/` rodam em servidor — o resto é arquivo entregue como está. As
+variáveis delas (`OPENAI_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`) ficam em *Settings →
+Environment Variables* do projeto, e faltando qualquer uma a função responde **503** com mensagem
+clara, em vez de quebrar a tela do pai.
+
+> 🗄️ Num deploy que mexa em plano de estudo, os SQLs manuais vêm **primeiro** (os `CHECK` de
+> `origem` e a coluna `planos_estudo.ordem`): a ordem é **SQL → função → site**, e o porquê está em
+> [O que o Nicolas precisa configurar](#️-o-que-o-nicolas-precisa-configurar).
 
 ---
 
@@ -1015,8 +1084,16 @@ Projeto desenvolvido como TCC no **UNASP** por:
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat&logo=html5&logoColor=white)
 ![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat&logo=css3&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)
+![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=flat&logo=supabase&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat&logo=vercel&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=flat&logo=openai&logoColor=white)
 
-HTML5 · CSS3 · JavaScript (vanilla) — sem frameworks, sem build.
+**No navegador:** HTML5 · CSS3 · JavaScript puro, com módulos ES no painel. Sem framework, sem etapa
+de build e **sem uma dependência npm** — o leitor de ZIP, o parser de OOXML, o encoder de WAV, o drag
+and drop e os gráficos são todos escritos à mão sobre API nativa.
+
+**Fora dele:** Supabase (Auth, Postgres com RLS e Realtime) · três Vercel Functions em Node que falam
+com a OpenAI · e o servidor local que roda junto do robô.
 
 ---
 
