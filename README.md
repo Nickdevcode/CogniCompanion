@@ -33,7 +33,7 @@ Mais do que um robô, o Cogni é a união de **hardware + IA** numa experiência
 - [O que a Cogni sabe (e o que o pai pode apagar dali)](#-o-que-a-cogni-sabe-e-o-que-o-pai-pode-apagar-dali)
 - [As 14 matérias (e por que quem decide é o servidor)](#-as-14-matérias-e-por-que-quem-decide-é-o-servidor)
 - [Trilha de aprendizado (no Painel de Aprendizado)](#-trilha-de-aprendizado-no-painel-de-aprendizado)
-- [Mapa da aula — em que minuto ela parou de entender](#️-mapa-da-aula--em-que-minuto-ela-parou-de-entender)
+- [~~Mapa da aula~~ — removido do produto (21/ago/2026)](#️-mapa-da-aula--removido-do-produto-21ago2026)
 - [Mesa de Estudos — o plano vira um quadro que anda sozinho](#️-mesa-de-estudos--o-plano-vira-um-quadro-que-anda-sozinho)
 - [A revisão de design do painel (18/ago/2026)](#-a-revisão-de-design-do-painel-18ago2026)
 - [Arquivos do painel](#️-arquivos-do-painel)
@@ -47,7 +47,7 @@ Mais do que um robô, o Cogni é a união de **hardware + IA** numa experiência
 Este repositório tem **duas metades**, e vale saber disso antes de ler o resto:
 
 - 🌐 **O site de apresentação** — estático, responsivo e com tema claro/escuro. Mostra a proposta, os materiais, o jogo e o artigo científico que documentam o desenvolvimento do projeto.
-- 📊 **O Cogni Companion** (`dashboard.html`) — o app onde o responsável acompanha a criança: o que ela estudou, em que minuto travou, e os planos de estudo que a Cogni segue na conversa. É a maior parte do código daqui, e a maior parte deste README.
+- 📊 **O Cogni Companion** (`dashboard.html`) — o app onde o responsável acompanha a criança: o que ela estudou, o que já ficou firme, e os planos de estudo que a Cogni segue na conversa. É a maior parte do código daqui, e a maior parte deste README.
 
 Os dois foram construídos **do zero em HTML, CSS e JavaScript puro** (sem frameworks e sem etapa de build), com foco em performance, acessibilidade e uma identidade visual própria, reproduzindo fielmente o design feito no Figma.
 
@@ -133,8 +133,8 @@ O painel lê de **duas fontes**, e ambas já estão integradas:
 
 | Fonte | O quê | Como |
 | --- | --- | --- |
-| 🗄️ **Supabase** | Criança, conversas (Diário), planos de estudo, perfil, **trilha de aprendizado**, **aulas do Mapa** | `@supabase/supabase-js` (anon key + RLS). Conversas, trilha e aulas são **só leitura** pelo site; planos têm CRUD |
-| 🖥️ **Servidor local da Cogni** | Resumo Semanal (IA), Dica da Cogni (IA), **Mapa da aula ao vivo + seu resumo** (IA), rosto do robô, pareamento/despareamento | `fetch` nos endpoints `/api/...` (precisa do robô/servidor ligado) |
+| 🗄️ **Supabase** | Criança, conversas (Diário), planos de estudo, perfil, **trilha de aprendizado** | `@supabase/supabase-js` (anon key + RLS). Conversas e trilha são **só leitura** pelo site; planos têm CRUD |
+| 🖥️ **Servidor local da Cogni** | Resumo Semanal (IA), Dica da Cogni (IA), rosto do robô, pareamento/despareamento | `fetch` nos endpoints `/api/...` (precisa do robô/servidor ligado) |
 
 ### 🎛️ A chave que liga tudo: `USAR_SUPABASE`
 
@@ -381,86 +381,31 @@ Três regras que valem a pena não esquecer:
 - 🛡️ **Dado torto não derruba a tela.** Como é jsonb livre, cada item passa por um saneamento (conceito
   vazio, status desconhecido, matéria inventada ou data inválida são descartados/normalizados).
 
-### 🗺️ Mapa da aula — em que minuto ela parou de entender
+### 🗺️ ~~Mapa da aula~~ — removido do produto (21/ago/2026)
 
-A Trilha responde *"o que ela está aprendendo"*; o **Mapa da aula** responde a pergunta que nenhum sistema
-escolar responde: **em que minuto** ela travou, e **sobre o quê**. É a resposta do TCC ao concorrente (um
-CRM de professor cuja feature mais elogiada é a chamada automática — que mede quem estava na sala, o dado
-mais fácil de coletar e o que menos diz sobre aprendizado). A frase que resume a tela inteira:
+> ❌ **Esta tela não existe mais**, nas duas pontas. A decisão foi do Nicolas: a função **perdeu
+> viabilidade técnica**. Fica registrada aqui pra ninguém reconstruir por engano — e porque a saída faz
+> parte da história do projeto tanto quanto a entrada.
 
-> *"aos 4min12, quando entrou 'frações equivalentes', ela travou por 40s."*
+**O que era:** a tela respondia *"em que minuto ela parou de entender, e sobre o quê"*. O robô cruzava,
+durante a conversa, o assunto de cada turno com os sinais que a câmera lia e os vereditos dos exercícios,
+e entregava ao painel uma linha do tempo da aula (`GET /api/mapa-aula`) mais um resumo de 2–3 frases
+escrito por IA (`GET /api/mapa-aula/resumo`). A aula fechada virava uma linha em `sessoes_atencao`.
 
-O servidor cruza, durante a conversa, **o assunto de cada turno** com **os sinais que a câmera leu** e **os
-vereditos dos exercícios**, e grava a aula fechada em `sessoes_atencao`. O site só desenha:
-
-| Parte | O que é |
+| O que saiu do site | |
 | --- | --- |
-| 💬 **O resumo em texto** | 2–3 frases por IA (`/api/mapa-aula/resumo`) — é o que o pai lê primeiro |
-| 📍 **O que vale rever** | O destaque da tela, e ele responde **duas** perguntas: *o quê* (`assuntoMaisDificil` — o tópico que somou mais atrito na aula inteira) e *quando* (`pontoDeAtrito` — o minuto em que começou). Quando os dois apontam pro mesmo assunto, a segunda linha vira só a hora; quando não, aparece o *"o primeiro tropeço veio antes, aos 4min12, em frações"* |
-| 📊 **A linha do tempo** | Faixa de 0 até a duração, um marcador por momento. **Forma** = origem (● câmera · ◆ exercício conferido · ○ lido na conversa), **cor** = tom. Abaixo, a mesma linha em lista de texto |
-| 🔴 **Modo ao vivo** | Com o robô conversando, a aula **se desenha na tela**: poll de 10s e selo "acontecendo agora" pulsando. Dá pra abrir no celular e acompanhar |
-| 🕘 **Aulas registradas** | O histórico; clicar troca a aula em destaque |
+| 🗂️ **Arquivos apagados** | `js/dashboard/sections/mapa.js`, `js/dashboard/mapa-api.js`, `js/dashboard/mapa-timeline.js`, `css/dashboard-mapa.css` |
+| 🧭 **Navegação** | O item "Mapa da aula" saiu da sidebar e da tab bar (que voltou a **6 abas**), e a parada dele saiu do tutorial guiado (10 → **9 paradas**) |
+| 🔌 **Dados** | As chamadas aos dois endpoints e a leitura de `sessoes_atencao` (`getSessoesAtencao()` no mock e no Supabase) |
+| 🔗 **Link velho** | `#/mapa` **redireciona pra `#/aprendizado`** (mesmo mecanismo de `#/planos` → `#/mesa`, o `ALIAS_ROTA` do `main.js`). O pai que tinha a rota no histórico do navegador não vê 404 nem tela branca |
 
-> 🧩 **As três origens não valem o mesmo, e a forma diz isso.** Exercício conferido é **fato** (◆), câmera é
-> **impressão** (●), e o que a Cogni leu da própria conversa é **leitura** (○ — anel vazado, de propósito o
-> mais discreto). Esse terceiro tipo é o mais frequente da linha: antes dele, uma aula inteira de explicação
-> e dúvida produzia **zero momentos**, e o mapa dizia "correu tranquila" em quase toda sessão.
+> 🧠 **O que NÃO saiu junto** — é fácil confundir. A **percepção afetiva pela câmera** continua viva no
+> robô: ela muda a explicação da Cogni no mesmo instante. O que acabou foi o *registro* daquilo numa linha
+> do tempo. A **Trilha de aprendizado**, o **Diário**, a **Dica**, o **Resumo Semanal** e a **Mesa de
+> Estudos** nunca foram o Mapa e seguem de pé.
 
-Quatro cuidados que sustentam a tela:
-
-- 🗣️ **`travada`/`travou` nunca aparecem.** O que vai pra tela é o `rotulo` que o servidor manda pronto
-  ("precisou de mais ajuda", "estava no embalo"). E se um rótulo vier **igual** ao sinal — o que acontece
-  quando o robô ganha um sinal novo e esquece de nomeá-lo —, o site troca por um neutro em vez de vazar.
-  Desde ago/2026 a tabela do `mapa-api.js` também **tira o gênero** de dois rótulos que o robô manda no
-  feminino: `estava embalada` → *"estava no embalo"* e `resolveu sozinha` → *"resolveu sem ajuda"*
-  (ver "A revisão de design do painel"). O `rotulo` cru no banco continua o do servidor.
-- 🚫 **Não é placar.** Os `contadores` chegam no payload e **de propósito não viram números**: "2 acertos ×
-  1 tropeço" é boletim com outro nome. O cabeçalho mostra só duração e trocas de conversa. Pelo mesmo
-  motivo, o `peso` do assunto mais difícil é descartado (é ranking interno) e as `ocorrencias` viram frase
-  — *"esse ponto voltou algumas vezes"* —, nunca contagem.
-- 😌 **Aula sem nada a rever é boa notícia**, não tela vazia. Desde ago/2026 esse é o caso **comum**, e
-  ele tem três textos conforme o que a linha do tempo mostra logo abaixo (ver "Quando o mapa aprendeu a
-  não concluir").
-- ♿ **Não depende de cor nem de posição.** Cada marcador é um `<button>` com o momento inteiro no
-  `aria-label`, a lista repete tudo em texto, e tocar um marcador destaca a linha correspondente (no
-  celular não existe hover).
-
-> 🔌 O histórico é lido **direto do Supabase**, e não só do endpoint, por um motivo específico: quando há
-> aula ao vivo, `/api/mapa-aula` devolve `historico: []` (ele prioriza a sessão que está em RAM). Sem a
-> tabela, as aulas anteriores sumiriam da tela **exatamente durante a demonstração ao vivo** — e o
-> histórico também continua valendo com o robô desligado.
-
-#### 🩺 Quando o mapa aprendeu a não concluir (ago/2026)
-
-> *"Sinto que o mapa da aula não é confiável. Às vezes ele dá uma mentida, às vezes ele inventa."*
-
-O relato estava certo. Uma auditoria do motor no robô achou **seis** defeitos independentes, todos
-silenciosos, todos com o mesmo padrão: **o mapa afirmava com confiança algo que os dados não sustentavam.**
-Uma careta de 2s ganhava de um exercício conferido errado; um assunto grudava no momento sem prazo de
-validade e virava *"travou em frações"* 44 min depois de frações sair da mesa; a webcam ligada segurava a
-sessão viva e transformava uma aula de 6 min em *"aula de 47 minutos"*.
-
-Tudo isso foi corrigido **no servidor**. Nenhum campo antigo sumiu nem mudou de tipo, então a tela não
-quebrou — mas ela ficou desalinhada, e o realinhamento inteiro cabe numa frase: **a tela passou a concluir
-menos, e cada estado a menos precisou parecer intencional.**
-
-| O que mudou no site | Por quê |
-| --- | --- |
-| 🔴 **O recálculo local do `pontoDeAtrito` foi DELETADO** | O critério do servidor inverteu (era câmera → exercício → conversa, virou exercício → conversa → **câmera só se corroborada**) e passou a depender de agrupar tópico com a mesma chave de conceito da trilha do robô. Replicar isso no front seria recriar a normalização inteira; replicar pela metade seria divergir em silêncio — o defeito que a reforma acabou de remover |
-| 🤝 **Marcador tracejado** | Leitura de câmera que nenhuma outra fonte confirmou (`confianca: 'baixa'`). Vazado e tracejado: a linha existe, mas não fecha. A palavra "confiança" **nunca** aparece pro pai — na tela isso vira *"só a câmera percebeu"* |
-| 🌱 **Halo verde + selo "destravou depois"** | `superado: true` = ela emperrou e destravou **sozinha**, na mesma aula. É a melhor notícia que a tela tem pra dar, e sem tratamento próprio ficava visualmente igual a um atrito pendente |
-| ⏱️ **"14 min de estudo"** | `tempoEfetivoMs` é a duração **sem** os silêncios longos. Vem nomeado de propósito: ele é menor que o fim da régua da linha do tempo, e sem a palavra "estudo" o cabeçalho pareceria contradizer o desenho |
-| 🤔 **"Parece que…" em vez de "o ponto do dia foi…"** | Numa aula sustentada só pela câmera, ou num assunto que só ela apontou, a frase pondera exatamente onde o dado pondera |
-| 🤐 **Histórico sem derivado não ganha cabeçalho** | O histórico lido direto de `sessoes_atencao` (o contorno de quando o endpoint devolve `historico: []`) não traz `pontoDeAtrito`. Aí a tela mostra a linha do tempo e **cala** — inclusive nos cartõezinhos, que antes diriam *"correu tranquila"* pra toda aula do histórico |
-
-> ⚠️ **`topico: null` num momento é ESPERADO, não é bug.** O assunto de um momento agora vence em 4 min sem
-> ser mencionado; passada a janela, o servidor se recusa a chutar. A tela deixa o complemento de fora — e
-> **nunca** cai no primeiro item de `topicos[]` pra preencher, que é literalmente o defeito nº 1 da lista.
-
-> 🚫 **Nada de derivado pode ser cacheado.** `pontoDeAtrito`, `assuntoMaisDificil` e `qualidade` são
-> recalculados pelo servidor **a cada leitura** — é assim que uma aula gravada antes da reforma para de
-> repetir a leitura errada de ontem. O mesmo `id` de sessão pode devolver derivados diferentes depois de uma
-> mudança de critério no robô. Cachear `momentos` seria seguro; cachear derivado, não.
+> 🗄️ **A tabela `sessoes_atencao` fica no Supabase, dormindo** — decisão explícita: nada de `DROP TABLE`,
+> nada de SQL. Ninguém escreve, ninguém lê; as linhas antigas continuam intactas.
 
 ### 🗒️ Mesa de Estudos — o plano vira um quadro que anda sozinho
 
@@ -807,8 +752,9 @@ valendo, palavra por palavra.
 `criancas` **não tem campo de gênero** — e sete frases da interface escreviam o artigo na mão:
 *"Como tá indo **o** Ana?"*, *"Deixa **o** Ana desenhar o rosto da Cogni"*, *"veja como **ele** está
 aprendendo"*. Para metade das famílias, a **primeira frase da primeira tela** estava errada sobre a
-filha delas. E o Mapa da aula piorava: dois rótulos vinham do robô no feminino (*"estava embalada"*,
-*"resolveu sozinha"*), então pra outra metade a aula era descrita na flexão errada, linha por linha.
+filha delas. E o Mapa da aula (removido depois, em 21/ago/2026) piorava: dois rótulos vinham do robô no
+feminino (*"estava embalada"*, *"resolveu sozinha"*), então pra outra metade a aula era descrita na
+flexão errada, linha por linha.
 
 A saída não é adivinhar nem pedir mais um campo no cadastro — é escrever frases que **não precisam de
 flexão**. O português dá duas construções neutras de graça, e o `format.js` agora as encapsula:
@@ -818,9 +764,9 @@ flexão**. O português dá duas construções neutras de graça, e o `format.js
 | `sujeito(nome)` | `"Pedro"` · `"a criança"` | *"Conforme **Pedro** estuda…"* |
 | `deQuem(nome)` | `"de Pedro"` · `"da criança"` | *"O dia **de Pedro**"* (o coloquial "do/da" é que tem gênero) |
 
-E os rótulos do Mapa viraram fato em vez de adjetivo: **"estava no embalo"** e **"resolveu sem ajuda"**.
-A troca mora no `ROTULOS_ACENTUADOS` do `mapa-api.js`, junto com a dos acentos — o `rotulo` cru continua
-sendo o do servidor no banco; quem muda é a **tela**.
+Na época, os rótulos do Mapa também viraram fato em vez de adjetivo (**"estava no embalo"**, **"resolveu
+sem ajuda"**), numa tabela do próprio site — a regra era que o `rotulo` cru continuava sendo o do servidor
+no banco e quem mudava era a **tela**. Esse pedaço morreu com o Mapa; os dois helpers acima ficaram.
 
 > 🤖 De quebra, a própria Cogni tinha dois gêneros no painel: 155 *"a Cogni"* contra 15 *"o Cogni"* —
 > e o card do Início dizia *"Dica **do** Cogni"* no título com *"**A** Cogni está pensando…"* no corpo.
@@ -880,7 +826,7 @@ o próprio `-soft`, que são um degrau mais escuros que o branco puro. Na remedi
 | --- | --- |
 | 📊 **Gráfico de evolução** | Num card de 280px os rótulos chegavam com **4,6px** de altura. Ganhou um viewBox compacto (360×260) que entra abaixo de 620px, e o `matchMedia` fica vivo pra girar o aparelho não deixar o gráfico ilegível |
 | 🕳️ **Buracos no grid** | O Início parava cada card na própria altura e abria dois vazios no meio do bento; o card do gráfico esticava até a altura do vizinho e deixava ~200px de nada entre a curva e a faixa de resumo; em Configurações sobrava um retângulo vazio ao lado de "Aparência" |
-| ⏱️ **Mapa da aula sem teto** | As duas únicas chamadas do painel sem `AbortSignal.timeout` — e o Mapa **bloqueia o render**, então o pai olhava "Carregando…" até o navegador desistir sozinho |
+| ⏱️ **Mapa da aula sem teto** *(a tela saiu do produto depois, em 21/ago/2026)* | Eram as duas únicas chamadas do painel sem `AbortSignal.timeout` — e o Mapa **bloqueava o render**, então o pai olhava "Carregando…" até o navegador desistir sozinho |
 | 📏 **Telas largas** | Em 1920 as linhas do Diário passavam de 150 caracteres; teto de 1500px no conteúdo e de 68ch no balão |
 | 🎚️ **Sliders do rosto** | Herdavam a largura da seção (~900px): a faixa inteira do olho tem 34px de variação espalhados nisso, e os rótulos das pontas ficavam longe demais pra explicar o controle |
 | 📐 **Tab bar** | A altura era um `72px` solto no respiro do conteúdo, e a barra tinha a altura que desse; virou um token lido nos dois lugares |
@@ -911,8 +857,6 @@ o próprio `-soft`, que são um degrau mais escuros que o branco puro. Na remedi
 | `js/dashboard/modal.js`, `icons.js`, `linechart.js` | As peças de UI: o diálogo acessível, os ícones SVG e o gráfico de linha (tudo à mão, sem lib) |
 | `js/dashboard/rosto-preview.js` | Desenho do rosto do robô em SVG (módulo puro, sem rede) |
 | `js/dashboard/rosto-api.js` | Leitura/gravação do rosto: PUT ao vivo no robô + persistência no Supabase |
-| `js/dashboard/mapa-api.js` | Dados do Mapa da aula: endpoint (ao vivo) + tabela (histórico) e o saneamento dos momentos |
-| `js/dashboard/mapa-timeline.js` | A linha do tempo da aula (marcadores em HTML/CSS, cada um um `<button>`) |
 | `js/dashboard/dnd.js` | **Drag and drop do quadro** (Pointer Events à mão, com teclado e `aria-live`) |
 | `js/dashboard/mesa-realtime.js` | **O quadro ao vivo**: canal do Supabase, fila durante o arraste, degradação |
 | `js/dashboard/captura.js` | **Pedido/material → plano**: o campo do pedido, o campo de link, as quatro entradas de material, a bandeja e o orçamento |
@@ -924,12 +868,11 @@ o próprio `-soft`, que são um degrau mais escuros que o branco puro. Na remedi
 | `api/melhorar-texto.mjs` | **Vercel Function** do ✨: uma frase entra, uma frase sai (não escreve no banco) |
 | `api/_lib/` | As peças delas: `auth` (as travas), `itens` (tetos), `openai`, `prompt`, `melhorar`, `sanear`, `http` |
 | `api/_lib/link/` | A leitura de link: `rede` (SSRF, redirect, tetos), `youtube` (InnerTube + legenda), `pagina` (charset, HTML→texto, anti-bot, PDF) |
-| `js/dashboard/sections/*.js` | As 7 seções: Início, Conversas, Aprendizado, **Mapa da aula**, **Mesa de Estudos**, **Rosto da Cogni**, Configurações |
+| `js/dashboard/sections/*.js` | As 6 seções: Início, Conversas, Aprendizado, **Mesa de Estudos**, **Rosto da Cogni**, Configurações |
 | `css/dashboard-onboarding.css` | Estilos do onboarding |
 | `css/dashboard-tour.css` | Estilos do tutorial guiado (véu, recorte e os três layouts do balão) |
 | `css/dashboard-tooltip.css` | Estilos das dicas: o balão, o `?` e as adaptações dele a cada cabeçalho que o hospeda |
 | `css/dashboard-rosto.css` | Estilos do editor de rosto (estética infantil, escopada em `.dash-rosto`) |
-| `css/dashboard-mapa.css` | Estilos do Mapa da aula (tons dos momentos, faixa do tempo, selo ao vivo) |
 | `css/dashboard-mesa.css` | Estilos da Mesa de Estudos (quadro, cards, arraste, captura) — o prefixo `.pl-` dos formulários fica, porque Configurações reusa |
 
 > 🧪 Para testar **com o robô ligado**: suba o servidor da Cogni (`http://127.0.0.1:3000`), pegue o código
@@ -1039,12 +982,10 @@ Cogni Software/
 │   │   ├── format.js       # Matérias, datas, durações e os helpers de texto
 │   │   ├── onboarding.js   # Boas-vindas + pareamento por código
 │   │   ├── tour.js         # Motor do tutorial guiado (foco, balão, navegação)
-│   │   ├── tour-passos.js  # O roteiro do tutorial (as 10 paradas)
+│   │   ├── tour-passos.js  # O roteiro do tutorial (as 9 paradas)
 │   │   ├── tooltip.js      # Motor das dicas contextuais (balão + botão "?")
 │   │   ├── resumo-semanal.js # Bilhete da semana (IA, servidor local)
 │   │   ├── dica.js         # Dica da Cogni (IA, servidor local)
-│   │   ├── mapa-api.js     # Mapa da aula: ao vivo (servidor) + histórico (Supabase)
-│   │   ├── mapa-timeline.js# A linha do tempo da aula (marcadores acessíveis)
 │   │   ├── dnd.js          # Drag and drop do quadro (Pointer Events + teclado)
 │   │   ├── mesa-realtime.js# O quadro ao vivo (canal do Supabase + fila)
 │   │   ├── captura.js      # Pedido/material/link → plano (entradas, bandeja, orçamento)
@@ -1059,7 +1000,7 @@ Cogni Software/
 │   │   ├── modal.js        # Diálogo acessível e reutilizável
 │   │   ├── icons.js        # Os ícones SVG do painel
 │   │   ├── linechart.js    # Gráfico de linha em SVG puro
-│   │   └── sections/       # Início, Conversas, Aprendizado, Mapa, Mesa, Rosto, Config
+│   │   └── sections/       # Início, Conversas, Aprendizado, Mesa, Rosto, Config
 │   │                       #   (+ _shared.js, as peças que todas usam)
 │   └── ...                 # e o que é de página: ui.js, particles.js,
 │                           #   product.js, game-page.js

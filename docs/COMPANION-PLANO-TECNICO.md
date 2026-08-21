@@ -54,9 +54,11 @@ A regra de ouro: **as duas pontas programam contra o contrato de dados deste doc
 ## 🗂️ Escopo do MVP (o que entra de verdade)
 
 ### Telas do dashboard
-Sidebar: **Início · Conversas · Aprendizado · Mapa da aula · Mesa de Estudos · Rosto da Cogni · Configurações** (a "Família" foi fundida em Configurações: o item da sidebar chama "Configurações", o título da tela continua "Configurações da família"). Entrada: badge de logado → dropdown → **Dashboard**.
+Sidebar: **Início · Conversas · Aprendizado · Mesa de Estudos · Rosto da Cogni · Configurações** (a "Família" foi fundida em Configurações: o item da sidebar chama "Configurações", o título da tela continua "Configurações da família"). Entrada: badge de logado → dropdown → **Dashboard**.
 
-> Os dois últimos itens nasceram depois do Figma e ficaram **fora** de Configurações de propósito: **Rosto da Cogni** (jul/2026) e **Mapa da aula** (ago/2026) são as duas contribuições que a banca precisa ver, e enterrá-las num submenu as esconderia. A tab bar do mobile aguenta os 7 itens até em 320px (verificado).
+> **Rosto da Cogni** (jul/2026) nasceu depois do Figma e ficou **fora** de Configurações de propósito: é uma das contribuições que a banca precisa ver, e enterrá-la num submenu a esconderia. A tab bar do mobile aguenta os 6 itens até em 320px (verificado).
+>
+> ⚠️ Eram 7 itens até 21/ago/2026, quando o **Mapa da aula** saiu do produto — ver a seção própria mais abaixo. `#/mapa` redireciona para `#/aprendizado`.
 
 > **Vínculo 1:1 (single-child).** No Companion, **um responsável acompanha UMA criança** — a que estiver com o **código de pareamento ativo**. Não há seletor de criança nem lista de filhos. (O robô continua multi-perfil para teste/dev, mas só o perfil pareado aparece no Companion. Despareou/pareou outro → o Companion reflete o outro.)
 
@@ -221,56 +223,12 @@ Um dado, três coelhos. 🎯
 
 Índice: `(crianca_id, criado_em desc)`. RLS: pai só **lê**; só o servidor grava (igual `conversas` e `dicas`). Diferente da `dicas`, **não** há dedup por texto — cada geração é um retrato daquela semana.
 
-### `sessoes_atencao` — o Mapa de Compreensão da Aula ⭐ NOVO (ago/2026)
-> Uma linha por **aula** (sessão de estudo), não por turno. O `conversas` conta **o que** foi conversado; esta conta **como foi** — em que minuto o assunto virou dificuldade, e sobre o quê. É a resposta à pergunta que nenhum sistema escolar responde.
-
-| Coluna | Tipo | Notas |
-| --- | --- | --- |
-| `id` | bigint identity PK | |
-| `crianca_id` | text | FK → criancas(id), on delete cascade |
-| `iniciada_em` | timestamptz | quando a sessão começou |
-| `duracao_ms` | int | duração total da sessão |
-| `turnos` | int | quantas trocas de conversa aconteceram |
-| `materias` | text[] | matérias tocadas na sessão |
-| `topicos` | text[] | tópicos finos tocados na sessão |
-| `contadores` | jsonb | `{ travada, confusa, engajada, acertos, tropecos, entendeu, precisouAjuda, tempoEfetivoMs }`. `entendeu`/`precisouAjuda` (ago/2026) vêm do marco de **compreensão** e são contados **à parte** de `acertos`/`tropecos` de propósito: um é veredito conferido, o outro é leitura da conversa. Somar tudo num placar só daria ao pai um número que nenhuma das fontes sustenta sozinha. **`tempoEfetivoMs` pega carona aqui** e não é um contador — ver a reforma de confiabilidade |
-| `momentos` | jsonb | **o coração**: a linha do tempo já cruzada (ver formato abaixo) |
-| `criado_em` | timestamptz | default now() |
-
-Índice: `(crianca_id, iniciada_em desc)`. RLS: pai só **lê**; só o servidor grava (igual `conversas`).
-
-**Formato de `momentos`** (array, cada item é um instante que importa):
-```json
-[
-  { "emMs": 252000, "tipo": "afeto", "sinal": "travada",
-    "rotulo": "precisou de mais ajuda",
-    "materia": "matematica", "topico": "fracoes equivalentes",
-    "repeticoes": 1, "confianca": "media", "superado": true },
-  { "emMs": 300000, "tipo": "pratica", "resultado": "aprendeu",
-    "rotulo": "resolveu sozinha",
-    "materia": "matematica", "topico": "fracoes equivalentes" },
-  { "emMs": 340000, "tipo": "compreensao", "resultado": "travou",
-    "rotulo": "pediu uma mão",
-    "materia": "matematica", "topico": "mmc", "superado": false }
-]
-```
-
-> [!note] `repeticoes`, `confianca` e `superado` são de ago/2026 — ver a **reforma de confiabilidade** mais abaixo
-> `confianca` e `superado` são **derivados e recalculados na leitura**: eles aparecem no payload do endpoint mesmo em sessões antigas, que foram gravadas sem eles. Quem lê a tabela direto (via RLS) recebe os `momentos` crus, **sem** esses dois campos.
-
-> [!important] ⭐ `tipo: "compreensao"` é NOVO (ago/2026) — e é a razão de o mapa deixar de viver vazio
-> Antes existiam só dois tipos, e os dois exigiam uma condição rara: `afeto` só marca com **webcam ligada + MediaPipe baixado + rosto enquadrado + evidência forte**, e `pratica` só marca quando o ciclo de exercícios **propôs e conferiu** uma questão. Uma aula inteira de explicação e dúvida produzia **zero momentos** — e o resumo, honestamente, dizia "correu tranquila".
+### ~~`sessoes_atencao`~~ — TABELA ÓRFÃ (desde 21/ago/2026)
+> **Ninguém escreve, ninguém lê.** Ela existia para o Mapa de Compreensão da Aula, que **saiu do produto nas duas pontas** (ver a seção própria mais abaixo). O robô não grava mais; o site não consulta mais.
 >
-> O terceiro tipo vem da própria **conversa**: a mesma IA que já lê cada turno já dizia como a criança se saiu; só faltava carimbar a hora. Custo de API: **zero**.
+> **A tabela FICA no Supabase, dormindo** — decisão explícita do Nicolas: nada de `DROP TABLE`, nada de SQL, nada de migração. As linhas antigas continuam intactas caso um dia alguém queira olhar. As colunas eram `id`, `crianca_id`, `iniciada_em`, `duracao_ms`, `turnos`, `materias[]`, `topicos[]`, `contadores` (jsonb) e `momentos` (jsonb, a linha do tempo já cruzada).
 >
-> **O que o site precisa fazer:** tratar `compreensao` como um terceiro tipo no `switch` de forma/cor/ícone da timeline (hoje: círculo = câmera, losango = exercício). Ele tem os mesmos campos de `pratica` (`resultado: 'travou' | 'aprendeu'`), então o caminho já existe. **Um `default` que ignore o tipo desconhecido fará os momentos mais frequentes sumirem da tela em silêncio.**
->
-> As três fontes **não valem o mesmo**, e isso pode aparecer visualmente: exercício conferido é **fato**, câmera é **impressão**, conversa é **leitura**. Sugestão (não obrigatória): a compreensão com um marcador mais discreto que os outros dois.
-
-`emMs` é o **offset desde o início da sessão** (não timestamp absoluto) — é o que permite desenhar a linha do tempo direto, sem conta nenhuma no front. O `topico` de cada momento é o assunto que estava valendo **naquele segundo** (o servidor já cruzou); o site não precisa correlacionar nada.
-
-> [!warning] Vocabulário: `travada` NUNCA aparece cru na tela
-> Vale a mesma regra da trilha de aprendizado. O `sinal` é dado interno; o que se mostra ao pai é o `rotulo`, que já vem pronto e escrito em linguagem de apoio ("precisou de mais ajuda", "estava embalada"). Não invente rótulo no front, e não traduza `sinal` por conta própria.
+> **Não reconstruir.** Se algum código voltar a ler daqui, ele estará ressuscitando uma feature que foi removida de propósito.
 
 ### ~~`pareamentos`~~ — DESCARTADA
 > A tabela `pareamentos` do plano original **não é usada** (foi dropada). Em vez de um código temporário numa tabela à parte, o código vive **no próprio perfil** (`criancas.codigo_pareamento`): é fixo, nasce com o perfil e não expira. Mais simples e bate com o modelo single-child. Ver o fluxo de pareamento no contrato de dados abaixo.
@@ -306,7 +264,7 @@ Todas as tabelas com RLS **habilitado** e default-deny. O `service_role` (servid
 - **criancas**: pai só vê/edita as crianças onde `responsavel_id = auth.uid()`.
 - **conversas**: pai só **lê** (SELECT) as conversas dos próprios filhos; **não escreve** (só o servidor grava).
 - **dicas**: pai só **lê** (SELECT) as dicas dos próprios filhos; **não escreve** (só o servidor grava). Mesma policy de `conversas`.
-- **sessoes_atencao**: pai só **lê** (SELECT) as sessões dos próprios filhos; **não escreve** (só o servidor grava). Mesma policy de `conversas`.
+- ~~**sessoes_atencao**~~: a policy continua lá (pai só lê), mas **nenhuma ponta consulta a tabela desde 21/ago/2026** — ela ficou órfã com a saída do Mapa da aula.
 - **planos_estudo**: pai vê/cria/edita planos dos próprios filhos.
 - **plano_tarefas** ⭐ (ago/2026): **mesma policy de `planos_estudo`** — pai vê/cria/edita/apaga as tarefas dos próprios filhos. É a segunda (e última) tabela em que o site escreve. O servidor também escreve aqui (service_role, bypassa RLS), mas **só a coluna** — ver "🧩 Mesa de Estudos".
 - **pareamento**: não há tabela exposta. O código mora em `criancas.codigo_pareamento` e o vínculo (setar `responsavel_id`) é feito **só pelo servidor** (service_role, via `POST /api/pareamento/vincular`) — o site nunca escreve esse campo direto.
@@ -329,9 +287,8 @@ O site lê/escreve via `@supabase/supabase-js` (anon key, já carregado nos HTML
 - **Resumo Semanal:** **não** é Supabase — é um endpoint do servidor (a chave da OpenAI vive só lá). O site faz `GET {SERVIDOR}/api/resumo-semanal?criancaId=<id>` e recebe `{ resumo, periodoDias, totalConversas, materias, topicos, vazio }`. O servidor lê as conversas dos últimos 7 dias e gera o bilhete com IA, sob demanda (quando o pai abre a tela). `vazio: true` = sem conversas na semana (o `resumo` já vem com uma mensagem amigável). `{SERVIDOR}` = a URL do servidor local da Cogni (ex: `http://localhost:3000`).
 - **Dica do Cogni (tela Início):** endpoint do servidor (IA + chave da OpenAI). O site faz `GET {SERVIDOR}/api/dica?criancaId=<id>` e recebe `{ dica, deCache, vazio }`. A IA gera **uma** dica curta e acionável pros pais, com base nas memórias + tópicos recentes da criança. **Cache curto de 1h** no servidor (reflete a conversa recente sem gerar a cada reload — antes era 1 dia, dava "delay"). `deCache: true` = veio do cache; `vazio: true` = perfil sem dados ainda (dica genérica amigável). `?forcar=1` ignora o cache. Cada dica gerada é **guardada na tabela `dicas`** (só se diferente da última).
 - **Histórico de dicas (tela "Dicas da Cogni", em Aprendizado):** o site **lê direto do Supabase** (RLS), igual conversas: `from('dicas').select('*').eq('crianca_id', id).order('criado_em', { ascending: false })`. A dica **atual** (destaque) vem do `GET /api/dica`; o **histórico** (lista) vem desse select. Essa tela é a antiga "Curiosidades da criança", renomeada pra **"Dicas da Cogni"**.
-- **Mapa de Compreensão (tela nova):** o site faz `GET {SERVIDOR}/api/mapa-aula?criancaId=<id>` e recebe `{ emAndamento, sessao, historico[] }`. **Se há uma sessão acontecendo agora** (a criança está conversando com o robô neste momento), `emAndamento: true` e `sessao` é a linha do tempo **ao vivo** — a tela pode dar poll a cada ~10s e ver os momentos aparecendo. Sem ninguém conversando, `emAndamento: false` e vem o histórico (do Supabase, mesma forma). Alternativa: ler direto do Supabase (`from('sessoes_atencao')...`) — mas aí você perde o ao vivo, que é justamente a parte que impressiona.
-- **Resumo do mapa em texto:** `GET {SERVIDOR}/api/mapa-aula/resumo?criancaId=<id>` → `{ texto, emAndamento }`. Duas ou três frases geradas por IA sobre a última sessão (ou a atual), já no vocabulário de apoio. `texto: null` + `motivo: 'sem_sessao'` = ainda não houve aula registrada. Chamar quando o pai **abre** a tela, não a cada render (passa pelo mesmo rate limit dos outros endpoints de IA).
-- **Escrita de conversa:** o site **nunca** insere em `conversas` nem em `sessoes_atencao` (RLS bloqueia) — quem grava é o servidor.
+- ~~**Mapa de Compreensão**~~ · ~~**Resumo do mapa em texto**~~: **removidos** (21/ago/2026). Os endpoints `GET /api/mapa-aula` e `GET /api/mapa-aula/resumo` não existem mais no robô, e a leitura de `sessoes_atencao` saiu do site. Ver a seção própria mais abaixo — **não reconstruir**.
+- **Escrita de conversa:** o site **nunca** insere em `conversas` (RLS bloqueia) — quem grava é o servidor.
 - **Pareamento (onboarding do site):** quando o pai loga e **não tem criança vinculada** (o `select` de `criancas` por `responsavel_id` vem vazio), o site mostra o onboarding pedindo o **código de pareamento** (6 caracteres, o pai pega no robô — na tela do painel ou pedindo pra Cogni falar). O site faz `POST {SERVIDOR}/api/pareamento/vincular` com `{ codigo, responsavelId }` (o `responsavelId` = `auth.uid()` do pai logado). Respostas: `200 { ok:true, jaPareado?, criancaId, nome }` (pareou ou já era dele) · `404` código inválido · `409` criança já vinculada a outro responsável · `400` dados faltando. Depois de pareado, o site lê a criança normalmente por `responsavel_id` (RLS) e tudo (conversas/planos/aprendizado) vem junto. O **vínculo é permanente** (não expira); só some se despareado. `{SERVIDOR}` = a URL do servidor local da Cogni.
 - **Despareamento:** `POST {SERVIDOR}/api/pareamento/desvincular` com `{ criancaId, responsavelId }`. Zera o `responsavel_id` da criança (**só** se quem pede for o dono — um pai não desvincula filho de outro). Respostas: `200 { ok:true, jaDesvinculado? }` (`jaDesvinculado:true` quando já não estava vinculada a ele — idempotente) · `404` criança não encontrada · `400` dados faltando. O `codigo_pareamento` **não muda**, então dá pra reparear depois com o mesmo código. Uso no site (etapa "status de vínculo"): mostrar "Conectado ao perfil de [nome]" + botão "Desvincular" (recomenda-se confirmar antes — apagar o vínculo tira o acesso às conversas daquele filho).
 
@@ -534,162 +491,28 @@ Decisões que valem registro:
 
 ---
 
-## 🗺️ Mapa de Compreensão da Aula (ago/2026) — a tela nova
+## 🗺️ ~~Mapa de Compreensão da Aula~~ — ❌ REMOVIDO (21/ago/2026)
 
-> [!important] Tabela nova + 2 endpoints novos — **servidor e tela prontos** (ago/2026)
-> O que o site construiu, e as 4 decisões que o backend precisa conhecer, está no fim desta seção ("Como o site construiu").
+> [!warning] **Esta função saiu do produto, nas duas pontas.** Decisão do Nicolas: perdeu viabilidade técnica. **Não reconstruir** — nem a tela, nem os endpoints, nem o motor.
 
-### Por que esta tela existe (o contexto competitivo)
+**O que era:** o robô guardava numa sessão em RAM cada turno (matéria + tópico), cada sinal afetivo forte lido pela câmera e cada veredito do ciclo de prática, cruzava tudo no eixo do tempo e entregava ao Companion uma linha do tempo da aula (`GET /api/mapa-aula`) mais um resumo de 2-3 frases escrito por IA (`GET /api/mapa-aula/resumo`). Ao encerrar, a sessão virava uma linha em `sessoes_atencao`.
 
-O concorrente mais forte do TCC é um **CRM para professores**, e a feature mais elogiada é a **chamada automática**. Chamada responde *"quem estava na sala?"* — a métrica mais fácil de coletar e a que menos diz sobre aprendizado. Ela para exatamente onde a educação começa.
+| Ponta | O que foi removido |
+|---|---|
+| **Robô** | `server/modules/atencao.js`, `server/modules/brain/mapa-aula.js`, `server/scripts/teste-atencao.mjs`, as rotas `GET /api/mapa-aula` e `GET /api/mapa-aula/resumo`, os helpers `registrarSessaoAtencao` / `lerSessoesAtencao` do `supabase.js` e os pontos de instrumentação `marcarTurno` / `marcarAfeto` / `marcarPratica` / `marcarCompreensao` |
+| **Site** | A seção `#/mapa` e o item "Mapa da aula" da sidebar e da tab bar, `js/dashboard/sections/mapa.js`, `js/dashboard/mapa-api.js`, `js/dashboard/mapa-timeline.js`, `css/dashboard-mapa.css` e a leitura de `sessoes_atencao`. `#/mapa` redireciona para `#/aprendizado` |
 
-O Cogni responde o que acontece **depois** que o aluno já está presente. A frase que resume a tela inteira:
+**O que NÃO saiu junto** (é fácil confundir):
+- A **percepção afetiva pela câmera** continua viva (`esp-visao.js` + `brain/emocao.js`): ela muda a explicação da Cogni no mesmo instante. O que acabou foi o **registro** daquilo numa linha do tempo.
+- A **trilha de aprendizado** (`criancas.progresso`), o **Diário** (`conversas`), a **Dica**, o **Resumo Semanal** e a **Mesa de Estudos** nunca foram o Mapa e seguem de pé.
 
-> *"aos 4min12, quando entrou 'frações equivalentes', ela travou por 40s."*
+**A tabela `sessoes_atencao` fica no banco, dormindo** — decisão explícita: nada de `DROP TABLE`, nada de SQL. Ninguém escreve, ninguém lê; as linhas antigas continuam intactas caso um dia alguém queira olhar.
 
-**Um CRM registra o que aconteceu. O Cogni intervém enquanto acontece** — e o mapa é a prova visual disso, porque o mesmo sinal que virou linha no gráfico já tinha mudado a explicação da Cogni naquele segundo.
+### 🧹 O que a saída arrastou no site (21/ago/2026)
 
-### O que o servidor já faz (nada disso é do site)
-
-Durante a conversa, o servidor grava marcos numa sessão em RAM (`server/modules/atencao.js`): cada turno com **matéria + tópico**, cada sinal afetivo **forte** lido pela câmera, e cada **veredito de exercício** do ciclo de prática. Ao encerrar (reset, troca de perfil, 15min de silêncio ou shutdown), cruza tudo no eixo do tempo e grava uma linha em `sessoes_atencao`. Custo de API: **zero** — todos esses dados já passavam pelo servidor; a novidade é guardar *quando*.
-
-### O que o site precisa construir
-
-1. **Linha do tempo da sessão** — eixo horizontal = `emMs` (0 até `duracao_ms`), marcadores nos `momentos`. Cor por `sinal`/`resultado`, texto = `rotulo` + `topico`.
-2. **Resumo em texto** no topo (`GET /api/mapa-aula/resumo`), que é o que o pai lê primeiro.
-3. **Modo ao vivo**: quando `emAndamento: true`, poll a cada ~10s e um selo "acontecendo agora". **É a parte que impressiona** — dá pra abrir o Companion no celular e ver a aula se desenhando.
-4. **Histórico**: lista das sessões anteriores (o `historico[]` já vem no mesmo GET).
-
-### Regras de produto (inegociáveis)
-
-- **Nunca** mostrar `sinal` cru (`travada`/`confusa`). Use o `rotulo`, que já vem pronto.
-- **Não é placar.** Nada de "% de acerto", nota, ranking ou comparação com outras crianças.
-- Sessão sem nenhum momento = **"correu tranquila"**, não uma tela vazia com cara de erro.
-- A tela é de **apoio**, não de vigilância: o texto sempre sugere o que fazer junto, nunca aponta defeito.
-
-### ✅ Como o site construiu (ago/2026 — feito)
-
-Seção **"Mapa da aula"** (`#/mapa`, 7º item da sidebar e da tab bar), em `js/dashboard/sections/mapa.js` + `mapa-api.js` (dados) + `mapa-timeline.js` (o desenho) + `css/dashboard-mapa.css`. Quatro decisões que o backend precisa conhecer:
-
-1. **Duas fontes, como no Resumo Semanal e na Dica.** O endpoint é a única fonte da sessão ao vivo, mas quando ela existe o `historico[]` volta **vazio** (a rota prioriza a sessão em RAM). Então o site lê o histórico **direto de `sessoes_atencao`** (RLS, `getSessoesAtencao()`), e as aulas anteriores continuam na tela durante o ao vivo — e com o robô desligado. Endpoint = fresco; tabela = estável.
-2. **`pontoDeAtrito` é recalculado no front quando não vem.** Ele só viaja na sessão **ao vivo**: o `historico[]` da rota (e a tabela) trazem os `momentos` sem esse campo derivado. O site aplica exatamente a mesma regra do servidor (primeiro `sinal: 'travada'`, senão o primeiro `resultado: 'travou'`) — nenhuma correlação nova, só o mesmo critério sobre os momentos já cruzados. **Se um dia o campo passar a ser persistido, o site usa o do servidor** (ele tem prioridade).
-
-   > ⚠️ **ago/2026 — a regra mudou e a cópia do site precisa acompanhar.** O critério ganhou um **terceiro** nível, depois dos dois atuais: `compreensao` com `resultado: 'travou'`. Ele vem por último de propósito (é o sinal mais abundante e o menos duro; na frente, afogaria os outros dois em toda sessão). Sem esse terceiro nível, o front vai calcular `null` justamente nas sessões que antes vinham vazias — que são a maioria.
-   >
-   > **Boa notícia:** o servidor agora manda `pontoDeAtrito` **também no `historico[]`** do endpoint, já calculado. Prefira sempre o do servidor; o cálculo local vira só o fallback pra tabela lida direto do Supabase.
-3. **Os `rotulo` chegam sem acento** (o repo do robô é escrito sem acentuação): `ficou em duvida`, `tropecou no exercicio`. O site tem uma tabela que restaura os diacríticos da **mesma frase**, palavra por palavra (não traduz, não inventa rótulo) — o pai não pode ler "duvida" no painel. Se o servidor passar a mandar acentuado, nada quebra. **Rótulo desconhecido passa como veio**; rótulo igual ao `sinal`/`resultado` do próprio momento vira um neutro ("um momento da aula"), porque `ROTULO_SINAL[sinal] || sinal` faria um sinal novo (um `dispersa` de amanhã) vazar cru pra tela.
-4. **Os `contadores` não viram números na tela.** Ficam disponíveis no payload, mas exibir "2 acertos × 1 tropeço" é boletim com outro nome — e o que o pai precisa (onde ajudar) a linha do tempo já diz. O cabeçalho da aula mostra só duração e trocas de conversa.
-
-Acessibilidade: cada marcador é um `<button>` com o momento inteiro no `aria-label`; o tipo do momento vira **forma** (círculo = câmera, losango = exercício) além da cor; e a linha do tempo tem sempre a lista **"Momento a momento"** em texto embaixo. No modo ao vivo, um `aria-live` discreto anuncia só o momento novo, e o poll pausa com a aba em segundo plano e morre quando o pai troca de seção.
-
-### 🆕 `assuntoMaisDificil` — "o que rever amanhã" (ago/2026)
-
-O `pontoDeAtrito` responde **"quando foi"**; ele ancora a linha do tempo (*"aos 4min12, em frações"*). Mas ele é o **primeiro** sinal da sessão, e o primeiro nem sempre é o que mais importou: uma travada isolada às 2min em "frações" pesa menos do que quatro tropeços espalhados em "mmc" ao longo da aula — e só o segundo merece os cinco minutos do pai amanhã.
-
-Por isso existe um segundo campo derivado, que responde **"o que rever"**:
-
-```json
-"assuntoMaisDificil": { "topico": "mmc", "materia": "matematica", "peso": 6, "ocorrencias": 3 }
-```
-
-- Soma **todos** os sinais de atrito por tópico na sessão, com peso por confiança da fonte: `pratica` = 3 (fato conferido), `afeto` = 2 (observação), `compreensao` = 1 (leitura). É a mesma hierarquia do ponto de atrito, só que somável.
-- `null` quando não houve atrito nenhum — e isso também é informação.
-- Vem **calculado pelo servidor** na sessão ao vivo **e** em cada item do `historico[]`. Diferente do `pontoDeAtrito`, ele **não** tem cópia no front: não replique a regra, use o que vem.
-
-**Sugestão de uso:** é o melhor candidato a virar o destaque do cabeçalho da aula (*"O ponto que mais pediu ajuda hoje: **mmc**"*), acima da timeline. `peso` é interno — não mostre o número. `ocorrencias` pode virar texto, com cuidado pra não soar placar.
+Além dos 4 arquivos apagados, estes ficaram sem dono e saíram junto: `getSessoesAtencao()` (em `mock-data.js` **e** `supabase-data.js`, mais o array de exemplo `sessoesAtencao`), `formatTempoNaAula()` no `format.js`, o ícone `ICON.timeline`, as regras `.mp-*` do `dashboard-tooltip.css`, o rótulo de leitor de tela em `sections/_shared.js` e a parada "mapa" do tutorial guiado (10 → **9 paradas**; o texto que dizia "sete telas" agora diz seis).
 
 ---
-
----
-
-## 🩺 Reforma de confiabilidade do Mapa (ago/2026) — 🔴 **exige trabalho no site**
-
-> [!important] Esta é a mudança mais importante que o Mapa já teve, e ela **muda o que o payload significa** — não só o que ele contém.
-> Nenhum campo antigo sumiu e nenhum mudou de tipo, então **a tela não quebra se vocês não fizerem nada**. Mas ela vai passar a mostrar menos conclusões, e o motivo importa: as que sumiram eram as erradas.
-
-### O relato que originou tudo
-
-> *"Sinto que o mapa da aula não é confiável. Às vezes ele dá uma mentida, às vezes ele inventa."*
-
-Estava certo. Uma auditoria do motor (`server/modules/atencao.js`) encontrou **seis** defeitos independentes, todos silenciosos, todos com o mesmo padrão: **o mapa afirmava com confiança algo que os dados não sustentavam.** Nenhum deles gerava erro, log ou tela quebrada — só uma frase errada no painel do pai.
-
-| # | O que o pai lia | Causa | Correção |
-| --- | --- | --- | --- |
-| 1 | *"ela travou em frações aos 47min"* — 44 min **depois** de frações sair da mesa | O assunto de um momento era o último tópico visto até ali, **sem prazo de validade** | O assunto **vence** em 4 min (renovado a cada turno que fala dele). Vencido, o momento fica com `topico: null` |
-| 2 | Uma careta de 2s ganhava de um **exercício conferido errado** | A câmera era o **primeiro** critério do `pontoDeAtrito` | A ordem virou a da confiança na fonte: exercício → conversa → câmera |
-| 3 | *"penou muito em mmc"* depois de **um** mau humor de 2 min | O cooldown do cliente é por *percepção*; `triste`→`brava`→`triste` são três percepções que viram o mesmo sinal `travada` | Sinal repetido em 1 min **engrossa** o mesmo momento (campo `repeticoes`) em vez de criar quatro |
-| 4 | Todo `emMs` da sessão **deslocado** | A câmera **abria a sessão** — o eixo do tempo começava quando a webcam via um rosto, não quando a aula começava | Só um **turno de conversa** abre aula. Careta fora de aula é ignorada |
-| 5 | *"aula de 47 minutos"* de uma aula de 6 | O TTL de ociosidade olhava o último marco de **qualquer** tipo, então webcam ligada segurava a sessão viva | O relógio da aula é o **último turno**. E nasceu `tempoEfetivoMs` |
-| 6 | *"ela penou em frações"* — sobre um assunto que ela **destravou na própria aula** | Só somávamos atrito; nunca olhávamos o que veio depois | Atrito **superado** sai da conta do que rever |
-
-### As duas ideias novas
-
-**🤝 Corroboração — a câmera parou de concluir sozinha.**
-A leitura facial continua na linha do tempo: o cruzamento afeto × assunto *é* a ideia da feature, e a demo pra banca não perde nada. O que ela perde é o direito de **concluir** sozinha. Um `crianca-triste` pode ser tédio, sono, uma briga com o irmão fora do quadro ou o detector errando — então ele só entra no `pontoDeAtrito` e no `assuntoMaisDificil` quando **outra fonte, no mesmo assunto e por perto no tempo (3 min)**, disse a mesma coisa. Careta não corrobora careta.
-
-**🔗 Um assunto só.**
-`"tabuada"` e `"tabuada do 7"` agora somam no mesmo balde — usando a **mesma chave** que a trilha de aprendizado do robô já usa. Antes, cada jeito que a IA escrevia o mesmo tema abria um balde próprio, o peso se fragmentava e o "assunto mais difícil" saía quase por sorteio. O `topico` devolvido é o **rótulo mais frequente do grupo** (não a chave normalizada — o pai lê o nome como ele foi dito na aula).
-
-### 🆕 Campos novos no payload
-
-Todos **derivados e recalculados na leitura** — inclusive para o `historico[]` e para a última sessão do `/resumo`. Nada disso é persistido (exceto `tempoEfetivoMs`, ver abaixo).
-
-```json
-{
-  "tempoEfetivoMs": 360000,
-  "qualidade": {
-    "confianca": "alta",
-    "fontes": { "exercicio": 2, "conversa": 5, "camera": 1 },
-    "camerasSemApoio": 1
-  },
-  "momentos": [
-    { "emMs": 252000, "tipo": "afeto", "sinal": "travada",
-      "rotulo": "precisou de mais ajuda",
-      "materia": "matematica", "topico": "fracoes equivalentes",
-      "repeticoes": 3, "confianca": "media", "superado": false }
-  ],
-  "assuntoMaisDificil": {
-    "topico": "mmc", "materia": "matematica",
-    "peso": 6, "ocorrencias": 3, "confianca": "alta"
-  }
-}
-```
-
-| Campo | Onde | O que é | Sugestão de uso |
-| --- | --- | --- | --- |
-| `momentos[].confianca` | só em `tipo: "afeto"` | `'media'` = a câmera bateu com outra fonte no mesmo assunto. `'baixa'` = é só impressão | Marcador **mais discreto** (contorno em vez de preenchido, opacidade menor) quando for `'baixa'`. Nunca escrever a palavra "confiança" pro pai |
-| `momentos[].superado` | em todo momento de atrito | `true` = ela venceu isso **depois**, na mesma aula | É a **melhor notícia da tela**. Vale um tratamento próprio: *"aqui ela emperrou — e destravou sozinha"* |
-| `momentos[].repeticoes` | só em `tipo: "afeto"` | Quantas leituras iguais couberam no episódio. `1` é o normal | **Não mostre como número.** Se quiser usar, use como intensidade visual (marcador levemente maior) |
-| `tempoEfetivoMs` | na sessão | Duração **sem** os silêncios longos (cada intervalo entre turnos entra capado em 3 min) | Prefira este no cabeçalho quando ele existir. `null` em sessões antigas → use `duracaoMs` |
-| `qualidade.confianca` | na sessão | `'alta'` (houve exercício conferido) · `'media'` (houve conversa) · `'baixa'` (só câmera) | Serve pra **calibrar o tom** da tela, não pra virar selo. Numa sessão `'baixa'`, evite cabeçalho conclusivo |
-| `assuntoMaisDificil.confianca` | no campo derivado | Idem, mas da melhor fonte que sustenta **aquele** assunto | Se for `'baixa'`, prefira *"parece que…"* a *"o ponto do dia foi…"* |
-
-> [!note] `tempoEfetivoMs` pega **carona** no jsonb `contadores`
-> Ele é persistido como `contadores.tempoEfetivoMs` em vez de virar coluna nova. Não é elegante — um jsonb chamado "contadores" com um campo de tempo dentro —, mas evita uma migração no Supabase, e o custo real de uma migração neste projeto não é o `ALTER TABLE`: é o período em que o robô grava um campo que a tabela ainda não tem, **em silêncio**, até alguém lembrar de rodar o SQL. O endpoint já normaliza isso e devolve `tempoEfetivoMs` no topo do objeto — **se vocês lerem pelo endpoint, nem percebem**. Quem lê a tabela direto (o histórico via RLS) precisa saber que ele mora ali dentro.
-
-### ⚠️ O que MUDA na tela mesmo sem vocês mexerem em nada
-
-1. **`pontoDeAtrito` vai ser `null` com mais frequência** — e mais ainda no histórico antigo. Isso é a correção funcionando: as sessões que antes vinham com um ponto de atrito apoiado **só** numa careta agora não vêm com nenhum. O estado vazio ("correu tranquila") vai aparecer mais, e agora ele é verdade.
-2. **O histórico é REINTERPRETADO na leitura.** O `jsonb` gravado não muda, mas `pontoDeAtrito`, `assuntoMaisDificil` e `qualidade` são recalculados com o critério novo toda vez que a linha é servida. Aulas gravadas antes da reforma param de repetir as leituras erradas de ontem. **Consequência:** se vocês tinham cache/snapshot desses derivados no front, invalidem.
-3. **`assuntoMaisDificil` pode trocar de tópico** numa sessão que vocês já viram — por causa do agrupamento de assunto e do desconto do atrito superado. É esperado.
-4. **A ordem do `pontoDeAtrito` inverteu.** Se o front ainda tem o recálculo local como fallback (dívida nº 2, já resolvida na origem), **ele agora diverge do servidor**. A regra local era: primeiro `sinal: 'travada'` → depois `resultado: 'travou'`. A do servidor é o contrário, com a câmera por último e **só se corroborada**.
-
-> [!warning] 🔴 A recomendação é **deletar** o recálculo local do `pontoDeAtrito`
-> Ele não dá pra replicar direito: a regra nova depende de `confianca` e `superado`, que por sua vez dependem de agrupar tópico com a **mesma chave da trilha do robô** (normalização + canonização de conceito). Reimplementar isso no front é convidar as duas cópias a divergirem em silêncio — exatamente o que a dívida nº 2 já tinha resolvido.
->
-> O servidor manda o campo pronto na sessão ao vivo **e** em cada item do `historico[]`. Para o histórico lido direto da tabela via RLS (o contorno da dívida nº 3), a saída certa é **não calcular**: mostre a timeline sem cabeçalho conclusivo, ou peça o histórico ao endpoint. Um `pontoDeAtrito` calculado com a regra velha é pior que nenhum.
-
-### O resumo em texto também foi refeito
-
-O `GET /api/mapa-aula/resumo` continua com o mesmo contrato (`{ texto, emAndamento }`), mas por dentro mudou de figura:
-
-- **O molde é decidido em código, não pelo modelo.** O prompt antigo exigia três partes (estudou → onde precisou de ajuda → sugestão); sem atrito na sessão, o modelo preenchia a parte do meio do nada. Agora o servidor manda o **molde A** (houve ponto em aberto) ou o **molde B** (não houve — e citar dificuldade é proibido).
-- **Verificador pós-geração.** Reprova texto que cite matéria fora da sessão, use palavra proibida (`travou`, `dificuldade`, `desempenho`…) ou fale de dificuldade no molde B. Reprovou → refaz uma vez com o motivo.
-- **Fallback determinístico.** Falhou de novo, ou a OpenAI está fora do ar? A frase é montada **em código** com os mesmos dados.
-
-> [!tip] Efeito prático pro site: **`texto: null` praticamente acabou**
-> Antes, qualquer falha (rede, JSON malformado, rate limit da OpenAI) devolvia `null` e o card do resumo sumia de cena. Agora só há dois casos de `null`: **sem sessão nenhuma** (`motivo: 'sem_sessao'`, que já era tratado) e a sessão sem turno algum. Se o card tem um estado de "não deu pra gerar", ele passa a ser raríssimo — mas **mantenham**, porque um 429 do rate limit ainda derruba a requisição inteira antes de chegar no fallback.
-
 
 ## 📝 Correção Visual do Caderno (ago/2026) — **não é tarefa pro site**
 
@@ -698,58 +521,23 @@ O `GET /api/mapa-aula/resumo` continua com o mesmo contrato (`{ texto, emAndamen
 
 O que muda de observável pro Companion — e é só isto:
 
-- O turno de correção entra no **Diário** (`conversas`) e no **Mapa da Aula** como qualquer outro turno, porque corrigir lição *é* estudar. A matéria/tópico saem da mesma classificação por IA de sempre.
-- Quando a correção é pedida pelo **botão** do painel (e não por voz), o `texto_usuario` gravado é a frase sintética **"Corrige minha lição, por favor."** (acentuada — é balão que o pai lê no Diário; ver a dívida nº 1 abaixo, que é o mesmo princípio). É o preço de fazer os dois gatilhos passarem pelo mesmo `conversar()` — o que garante que a correção entre no histórico e no Diário. Se um dia isso incomodar na timeline do pai, a solução é do **robô** (marcar a origem), não do site.
+- O turno de correção entra no **Diário** (`conversas`) como qualquer outro turno, porque corrigir lição *é* estudar. A matéria/tópico saem da mesma classificação por IA de sempre.
+- Quando a correção é pedida pelo **botão** do painel (e não por voz), o `texto_usuario` gravado é a frase sintética **"Corrige minha lição, por favor."** (acentuada — é balão que o pai lê no Diário). É o preço de fazer os dois gatilhos passarem pelo mesmo `conversar()` — o que garante que a correção entre no histórico e no Diário. Se um dia isso incomodar na timeline do pai, a solução é do **robô** (marcar a origem), não do site.
 - A rota `POST /api/caderno/corrigir` tem **rate limit próprio** (6/min **por criança**), e não o `limiteResumo`. Dois motivos: o `keyGenerator` do `limiteResumo` lê `req.query.criancaId`, que não existe num POST com o id no *body* — toda correção cairia no balde do **IP**, misturando as crianças; e é a rota mais cara do projeto (visão com `detail: 'high'`), a única disparável em rajada por clique. **Ela não divide cota com o Resumo Semanal nem com a Dica.**
 
 Se um dia virar tela no Companion (**não está planejado**), o que faria sentido é o pai ver *"a lição de terça: 3 de 5 questões conferidas"*. Exigiria tabela nova + persistência — nada disso existe hoje.
 
 ---
 
-## 🧾 Dívidas do BACKEND reveladas pela tela do Mapa (ago/2026)
-
-> Três coisas que o site contornou **corretamente** do lado dele, mas cuja origem é do robô. Estão listadas aqui pra não virarem workaround permanente. **O site não precisa fazer nada** — quando o backend resolver, os contornos podem sair (e nenhum deles quebra se sair).
-
-| # | Dívida | Onde nasce | O que o site fez | Status |
-| --- | --- | --- | --- | --- |
-| 1 | **Rótulos vão sem acento** (`ficou em duvida`, `tropecou no exercicio`) | `ROTULO_SINAL` em `server/modules/atencao.js` — a convenção de escrever o repo sem acentuação vazou de comentário pra **string de UI** | Tabela que restaura os diacríticos da mesma frase, palavra por palavra | ✅ **CORRIGIDO no robô** (ago/2026) |
-| 2 | **`pontoDeAtrito` não vinha no histórico** — só viajava na sessão ao vivo | `registrarSessaoAtencao` não grava o campo derivado, e o endpoint não o recalculava ao ler o histórico | Recalcula no front com a mesma regra; usa a do servidor se ela passar a vir | ✅ **RESOLVIDO no robô** (ago/2026) |
-| 3 | **`historico[]` volta vazio durante o ao vivo** | `GET /api/mapa-aula` prioriza a sessão em RAM e devolve `historico: []` | Lê o histórico direto de `sessoes_atencao` via RLS | ⏳ aberta |
-
-### ✅ Dívida nº 1 resolvida — o que muda pro site
-
-O servidor agora manda os rótulos **acentuados**: `ficou em dúvida` e `tropeçou no exercício` (os outros três — `precisou de mais ajuda`, `estava embalada`, `resolveu sozinha` — nunca tiveram acento pra restaurar). Há um teste no robô que falha se um rótulo voltar a sair sem acento, então **isto não regride em silêncio**.
-
-> [!note] O contorno do site pode sair — mas não precisa ter pressa
-> A tabela de restauração de diacríticos **continua funcionando como está**: rótulo já acentuado não casa com as entradas dela e passa como veio. Removê-la é limpeza, não urgência. Se removerem, vale manter a regra de que **rótulo desconhecido passa como veio** — essa parte protege contra um `sinal` novo vazar cru pra tela e não tem nada a ver com acento.
->
-> ⚠️ **Sessões antigas gravadas em `sessoes_atencao` antes desta correção ainda têm os `momentos` com o rótulo sem acento no jsonb** — o campo é histórico, não é recalculado na leitura. Enquanto houver aulas velhas no histórico do pai, a tabela de restauração ainda tem o que fazer.
-
-### ✅ Dívida nº 2 resolvida — `pontoDeAtrito` agora vem no histórico
-
-`GET /api/mapa-aula` passou a **recalcular** o campo ao servir cada linha do histórico (e o `/mapa-aula/resumo` faz o mesmo com a última sessão). Continua **derivado, não persistido** — a coluna guarda os `momentos`, e o ponto de atrito sai deles na leitura. Para o site, o efeito prático é que **`historico[i].pontoDeAtrito` agora existe**, com exatamente o mesmo formato do que já vinha na sessão ao vivo.
-
-O critério virou a função `acharPontoDeAtrito` (`server/modules/atencao.js`), usada tanto pelo `montarMapa` quanto pelo endpoint — regra única, um lugar só. Há teste que reprova se as duas divergirem.
-
-> [!tip] O recálculo do front pode sair — e agora sem o risco que você apontou
-> Era essa a preocupação certa: o contorno não ia quebrar, ia **divergir calado**. Agora não há segunda cópia da regra pra divergir. Se preferirem manter o recálculo como fallback, mantenham a prioridade que vocês já documentaram (**o campo do servidor ganha**) — aí o dia em que o critério mudar aqui, a tela acompanha sozinha.
-
-> [!warning] 🔴 **ago/2026 — aquele "dia em que o critério mudar" chegou.** O recálculo local **precisa sair**.
-> A regra do `pontoDeAtrito` inverteu (a câmera saiu da frente e foi pro fim, e só entra se corroborada) e passou a depender de `confianca` e `superado` — dois campos derivados que exigem agrupar tópico com a **mesma chave da trilha de aprendizado do robô**. Isso não dá pra replicar no front sem recriar a normalização inteira, e uma reimplementação parcial é justamente o cenário de divergência silenciosa.
->
-> **Onde o servidor manda pronto:** sessão ao vivo e cada item do `historico[]` do endpoint. **Onde não tem:** o histórico lido direto de `sessoes_atencao` via RLS (o contorno da dívida nº 3). Nesse caso, a saída certa é **não calcular** — mostre a timeline sem cabeçalho conclusivo. Um `pontoDeAtrito` com a regra velha é pior que nenhum: ele reintroduz exatamente as leituras erradas que a reforma removeu. Detalhes na seção "Reforma de confiabilidade do Mapa".
-
-### 🤝 Acordos entre as duas pontas (contrato que não está em código)
+## 🤝 Acordos entre as duas pontas (contrato que não está em código)
 
 Coisas que **um lado assume** sobre o outro e que não dá pra descobrir lendo o payload. Mudou aqui, avisa lá — nesta lista, o silêncio é que quebra.
 
 | O que é assumido | Quem depende | Regra |
 | --- | --- | --- |
-| ~~**O critério do `pontoDeAtrito`**~~ | ~~O site, que replica a regra no front~~ | ✅ **Resolvido na origem** — o servidor agora manda o campo no histórico, então não há segunda cópia da regra pra divergir. Continua valendo o aviso se o critério mudar, mas agora o silêncio não custa nada: a tela acompanha sozinha |
-| **O piso da sessão**: menos de **60s** (`MINIMO_PARA_GRAVAR_MS`) **ou** zero turnos não vira linha em `sessoes_atencao` | O **site**, que escreve o estado vazio como *"quando ela conversar alguns minutinhos com a Cogni, o mapa aparece aqui"* | Confirmado ✅. Se o piso mudar, o robô avisa — o texto do estado vazio muda junto, senão o site promete ao pai algo que não acontece |
-| **`RATE_LIMIT_WINDOW_MS` = 10s** com limite 10 no `limiteResumo`, compartilhado por 5 rotas | O **site**, onde um 429 é silencioso (o card do resumo some de cena) | Se a janela crescer (10 min, p.ex.), Mapa e Resumo Semanal passam a brigar pela mesma cota. O robô avisa antes de mexer na janela; a rota do caderno já saiu desse balde |
-| **`momentos[].topico` pode ser `null` mesmo com a sessão inteira tendo tópicos** (ago/2026) | O **site**, que desenha o assunto embaixo de cada marcador | O assunto de um momento **vence em 4 min** sem ser mencionado. Um momento sem `topico` não é bug nem dado faltando: é o servidor se recusando a chutar. Na tela, algo neutro ("um momento da aula") — **nunca** cair no primeiro item de `topicos[]` pra preencher, que é literalmente o bug que a reforma consertou |
-| **Os derivados (`pontoDeAtrito`, `assuntoMaisDificil`, `qualidade`) são recalculados a cada leitura** | O **site**, se cachear a resposta do endpoint | O mesmo `id` de sessão pode devolver derivados **diferentes** depois de uma mudança de critério no robô. É intencional (é o que reinterpreta o histórico antigo). Cache de `momentos` é seguro; cache de derivado, não |
+| **`RATE_LIMIT_WINDOW_MS` = 10s** com limite 10 no `limiteResumo`, compartilhado pelas rotas de IA | O **site**, onde um 429 é silencioso (o card do resumo some de cena) | Se a janela crescer (10 min, p.ex.), Resumo Semanal e Dica passam a brigar pela mesma cota. O robô avisa antes de mexer na janela; a rota do caderno já saiu desse balde |
+
+> [!note] Esta lista já teve quatro linhas a mais, todas do **Mapa da aula** (o critério do `pontoDeAtrito`, o piso de 60s da sessão, o `momentos[].topico` que podia vir `null` e o recálculo dos derivados a cada leitura). Saíram com a função, em 21/ago/2026 — junto com as "dívidas do backend reveladas pela tela do Mapa", que existiam só por causa dela.
 
 ---
 
@@ -881,19 +669,16 @@ Ver a seção "Matérias (lista fixa)" acima. O que precisa mudar:
 | `js/dashboard/format.js` | `MATERIAS` (as 7 novas) + `MATERIA_LABELS` (com acento e maiúscula: "Física", "Educação Física"…) |
 | `js/dashboard/icons.js` | `MATERIA_ICONS` — 7 SVGs novos |
 | `css/dashboard.css` | Tokens `--mat-*` e `--mat-*-soft` nos **dois** temas (claro e escuro) |
-| `dashboard-conversas.css` · `dashboard-aprendizado.css` · `dashboard-mapa.css` · `dashboard-planos.css` | Os mapeamentos `[data-materia="…"]` |
+| `dashboard-conversas.css` · `dashboard-aprendizado.css` · `dashboard-planos.css` | Os mapeamentos `[data-materia="…"]` |
 | `sections/conversas.js` | O dropdown de filtro é populado por `MATERIAS` — deve funcionar sozinho, mas **14 opções numa lista** pede uma olhada no layout |
 | `sections/planos.js` · `sections/config.js` | Os `<select>` de `foco` e de matéria favorita/difícil idem |
 | `sections/aprendizado.js:175` | O saneamento `MATERIAS.includes(item.materia) ? … : "outros"` passa a aceitar as novas — **sem isso, a trilha do ensino médio inteira vira "Outros" em silêncio** |
 
 **Sugestão de agrupamento visual** (opcional, mas ajuda com 14 itens): Linguagens (`portugues`, `idiomas`, `artes`) · Matemática · Natureza (`ciencias`, `fisica`, `quimica`, `biologia`) · Humanas (`historia`, `geografia`, `filosofia`, `sociologia`) · Corpo (`educacao_fisica`) · Outros. Só não invente um agrupamento **no dado** — é apresentação.
 
-### 2. Mapa da aula: novo tipo de momento + `assuntoMaisDificil` 🔴 **exige trabalho no site**
+### 2. ~~Mapa da aula: novo tipo de momento + `assuntoMaisDificil`~~ — ❌ sem efeito
 
-Ver as duas caixas na seção do Mapa. Resumo: tratar `tipo: "compreensao"` na timeline (senão os momentos mais frequentes somem da tela em silêncio), preferir o `pontoDeAtrito` que agora vem no `historico[]`, e considerar exibir o `assuntoMaisDificil` no cabeçalho da aula.
-
-> [!important] 🩺 **E depois disso veio a reforma de confiabilidade (ago/2026)** — seção própria, logo após a do Mapa.
-> Seis correções no motor + o resumo em texto refeito. Nenhum campo antigo sumiu, então **a tela não quebra**; mas o `pontoDeAtrito` passa a ser `null` com mais frequência (de propósito), o histórico é **reinterpretado na leitura**, e o **recálculo local do `pontoDeAtrito` agora diverge do servidor** — a recomendação é deletá-lo. Campos novos pra tela: `confianca`, `superado`, `repeticoes`, `tempoEfetivoMs` e `qualidade`.
+Esta frente (o `tipo: "compreensao"` na timeline, o `pontoDeAtrito` no `historico[]`, o `assuntoMaisDificil` no cabeçalho) foi construída em ago/2026 e **saiu junto com o Mapa da aula em 21/ago/2026**. Fica registrada só pra ninguém reabrir a tarefa: ver a seção da remoção.
 
 ### 3. Onboarding conversacional 🟢 **nada a fazer no site**
 
@@ -908,9 +693,7 @@ O onboarding **do site** (pareamento por código) é outra coisa e **não mudou 
 
 Depois de 15 min parado (ou segurando o botão de reset por 2,5 s), o robô desliga Wi-Fi/tela/áudio e entra em *light sleep* (<1 mA). Acorda em qualquer botão físico.
 
-O único reflexo observável no Companion é **bom**: ao hibernar, o robô avisa o servidor, que **fecha a sessão do Mapa da Aula na hora**. Antes, um robô que parava de ser usado deixava a sessão pendurada como "em andamento" por até 15 min — o pai que abrisse o Companion logo depois via uma aula ao vivo de uma criança que já tinha ido embora. Agora a linha vai pro `sessoes_atencao` no mesmo instante.
-
-> Efeito colateral pro modo ao vivo: `emAndamento: true` some mais rápido do que antes. Isso é a correção de um bug, não uma regressão — mas se o poll do site assumia que a sessão dura o silêncio inteiro, vale reconferir a transição ao-vivo → histórico.
+Na época, o único reflexo observável no Companion era o fechamento imediato da sessão do Mapa da Aula ao hibernar — **função removida em 21/ago/2026**. Hoje a hibernação não tem reflexo nenhum na tela do pai: o robô simplesmente fica offline, que é o estado normal quando ele abre o painel.
 
 ---
 
@@ -1092,7 +875,7 @@ A tela de **Planos** fazia uma coisa só: o pai digitava um parágrafo e a Cogni
 | 1 | **Escrever plano dá trabalho** | O pai já tem a informação — está na agenda escolar, na folha de exercícios, no bilhete da professora. Ele só não quer digitar tudo de novo. Na prática, plano que dá trabalho não é criado |
 | 2 | **O plano era um parágrafo, não um progresso** | `conteudo` é texto corrido: ninguém sabe o que já foi feito, o que está rolando e o que falta. Nem o pai na tela, nem a Cogni no prompt. Ela ficava puxando "vamos de matemática?" quando podia puxar "e aqueles exercícios da página 42?" |
 
-O nome **Mesa de Estudos** (rota `#/mesa`) cobre as três coisas que a tela passa a fazer, e entra na mesma família de "Mapa da aula" e "Rosto da Cogni". `#/planos` continua funcionando com redirect — link velho no histórico do pai não pode dar 404.
+O nome **Mesa de Estudos** (rota `#/mesa`) cobre as três coisas que a tela passa a fazer, e entra na mesma família de "Rosto da Cogni". `#/planos` continua funcionando com redirect — link velho no histórico do pai não pode dar 404.
 
 ### As três funções da tela
 
@@ -1919,7 +1702,7 @@ Cobertura nova: **`npm run teste:trilha`** (19 casos — a fila de vencidos, as 
 - **A IA nos campos** (rodada 4, site) → no formulário manual, escrever *"fração prova sexta"* no título e clicar no sparkle → vira uma frase legível **e o desfazer volta ao original**. Campo de título **vazio** → botão desabilitado com a dica, nunca erro depois do clique. Pedir pra melhorar um detalhe que diz "páginas 42 e 43" → a IA **não pode** inventar uma data de entrega que não estava lá. Sem login → **401**.
 - **Internet cai com servidor no ar** → robô continua conversando (cache RAM).
 - **Site** → logar → badge → Dashboard → dados da criança vinculada aparecem; criança de outra família **não** aparece (RLS).
-- **Mapa de Compreensão** → conversar com o robô por >1min tocando 2 assuntos, com a câmera ligada → `GET /api/mapa-aula` retorna `emAndamento: true` com os momentos; após reset (ou 15min parado) a linha aparece em `sessoes_atencao`.
+- **Link velho do Mapa** (21/ago/2026) → abrir `dashboard.html#/mapa` → cai em `#/aprendizado`, com o item certo marcado na sidebar. Nenhuma requisição a `/api/mapa-aula` sai do site.
 - **Pareamento** → código no robô → digita no site → criança vincula.
 - **Perfil por voz** → falar *"não fale sobre morte com ele"* → o log mostra `[Perfil] promptPersonalizado (acrescentar por voz): …` e o campo aparece preenchido na tela de Configurações do Companion. Depois, *"pode voltar a falar de futebol"* → o log mostra `(substituir por voz)` e a linha some. Sem rede/API: `npm run teste:perfil` (40 casos, offline).
 - **Perfil por voz, lado do site** → com Configurações **já aberta**, ditar uma instrução ao robô e voltar pra aba: o card se atualiza sozinho. Abrir o modal → a instrução ditada está lá, em linha própria. Editar só o nome e salvar → o texto ditado **continua inteiro** (não foi sobrescrito).

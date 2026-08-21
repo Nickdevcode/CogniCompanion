@@ -7,7 +7,7 @@
  * painel. Aqui não há dependência nenhuma — dá pra importar de qualquer camada.
  *
  * O que passa por este servidor são as features que dependem de IA ou de
- * `service_role` (Resumo Semanal, Dica, Pareamento, Mapa da Aula, rosto do robô) e
+ * `service_role` (Resumo Semanal, Dica, Pareamento, rosto do robô) e
  * os avisos ao robô. Ele roda junto do robô — ex.: no notebook da apresentação —
  * e **costuma estar desligado** na hora em que o pai mexe no painel. Nada aqui
  * trata isso como erro.

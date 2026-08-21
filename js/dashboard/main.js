@@ -31,7 +31,6 @@ import { montarPassos } from "./tour-passos.js";
 import { renderInicio } from "./sections/inicio.js";
 import { renderConversas } from "./sections/conversas.js";
 import { renderAprendizado } from "./sections/aprendizado.js";
-import { renderMapa } from "./sections/mapa.js";
 import { renderMesa } from "./sections/mesa.js";
 import { renderRosto } from "./sections/rosto.js";
 import { renderConfig } from "./sections/config.js";
@@ -39,14 +38,19 @@ import { renderConfig } from "./sections/config.js";
 const LOGIN_URL = "login.html";
 
 /**
- * Rotas que mudaram de nome (chave velha → chave nova).
+ * Rotas que saíram do ar (chave velha → pra onde mandar o pai).
  *
- * "Planos" virou "Mesa de Estudos" em ago/2026. Link velho no histórico do pai não
- * pode dar 404 — e cair no fallback do router seria pior que 404: ele manda hash
- * desconhecido pro `DEFAULT_ROUTE` ("inicio"), então `#/planos` levaria o pai
- * silenciosamente pra tela errada. Por isso o alias é explícito.
+ * Duas origens, mesmo remédio. "Planos" virou "Mesa de Estudos" (ago/2026), e o
+ * "Mapa da aula" foi REMOVIDO do produto nas duas pontas (21/ago/2026) — o robô
+ * não tem mais os endpoints, então a tela não tinha o que desenhar. Link velho no
+ * histórico do pai não pode dar 404, e cair no fallback do router seria pior que
+ * 404: ele manda hash desconhecido pro `DEFAULT_ROUTE` ("inicio"), então `#/mapa`
+ * levaria o pai silenciosamente pra tela errada. Por isso o alias é explícito.
+ *
+ * O Mapa vai pro Aprendizado por ser a tela que responde a pergunta mais próxima
+ * ("como ela está indo em cada assunto"), agora sem o corte por minuto.
  */
-const ALIAS_ROTA = { planos: "mesa" };
+const ALIAS_ROTA = { planos: "mesa", mapa: "aprendizado" };
 
 /**
  * Reescreve o hash quando ele aponta pra uma rota que mudou de nome.
@@ -258,7 +262,6 @@ async function init() {
   router.register("inicio", renderInicio);
   router.register("conversas", renderConversas);
   router.register("aprendizado", renderAprendizado);
-  router.register("mapa", renderMapa);
   router.register("mesa", renderMesa);
   router.register("rosto", renderRosto);
   router.register("config", renderConfig);

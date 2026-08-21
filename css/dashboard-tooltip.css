@@ -206,24 +206,6 @@ h3 .dash-dica-info {
   height: 0.65rem;
 }
 
-/* Subtítulo "Momento a momento" (Mapa): virou título + "?", então precisa ser
-   uma linha flex, e não um bloco de texto. */
-.mp-subtitulo {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-/* Selo "Acontecendo agora" (Mapa): o "?" acompanha a cor do selo. */
-.mp-live .dash-dica-info {
-  width: 1rem;
-  height: 1rem;
-}
-.mp-live .dash-dica-info svg {
-  width: 0.7rem;
-  height: 0.7rem;
-}
-
 /* Cabeçalho de card em Configurações: alinhado ao TOPO (o subtítulo empurra a
    caixa pra baixo), então o "?" precisa descer um fio pra ficar na altura do
    título em vez de na do ícone. */

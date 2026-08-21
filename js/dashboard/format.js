@@ -279,28 +279,6 @@ export function formatMinutos(min) {
   return formatDuracao((Number(min) || 0) * 60000);
 }
 
-/**
- * Instante DENTRO de uma aula (offset desde o início), como um humano diria:
- *   40000  -> "40s"
- *   252000 -> "4min12"
- *   300000 -> "5min"
- *
- * Diferente de `formatDuracao`, que arredonda pra minutos: aqui os segundos são o
- * ponto. A frase que o Mapa da Aula existe pra dizer é "aos 4min12, quando entrou
- * frações equivalentes, ela travou" — em "4 min" ela perderia a precisão que dá
- * credibilidade. Espelha `tempoLegivel` do servidor (modules/brain/mapa-aula.js),
- * pra o texto gerado pela IA e a linha do tempo falarem a mesma língua.
- * @param {number} ms
- * @returns {string}
- */
-export function formatTempoNaAula(ms) {
-  const seg = Math.max(0, Math.round((Number(ms) || 0) / 1000));
-  if (seg < 60) return `${seg}s`;
-  const min = Math.floor(seg / 60);
-  const resto = seg % 60;
-  return resto === 0 ? `${min}min` : `${min}min${String(resto).padStart(2, "0")}`;
-}
-
 /* --------------------------------------------------------------------------
    Datas — Intl pt-BR, com rótulos relativos "Hoje"/"Ontem"
    -------------------------------------------------------------------------- */
@@ -765,8 +743,8 @@ export function primeiroNome(nome) {
  *   - **`de` + nome** — "o dia de Pedro" / "o dia de Ana" ✅
  *     (o coloquial "do Pedro"/"da Ana" é o que tem gênero; "de" não tem)
  *
- * O `mapa.js` já fazia assim desde ago/2026 — estas funções só transformam aquela
- * decisão local na regra da casa, com o fallback de quando não há nome.
+ * A prática nasceu numa seção só (ago/2026) e estas funções a transformaram na
+ * regra da casa, com o fallback de quando não há nome.
  *
  * @param {string} nome — primeiro nome já extraído (pode vir vazio)
  * @returns {string} o sujeito da frase ("Pedro" ou "a criança")

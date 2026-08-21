@@ -37,7 +37,7 @@ export function montarPassos({ nomeCrianca } = {}) {
       rota: "inicio",
       titulo: "Deixa eu te mostrar o painel",
       texto: [
-        "São 10 paradas rápidas, uma por tela. Eu troco de seção sozinho: você só lê e vai clicando em “Próximo”.",
+        "São 9 paradas rápidas, uma por tela. Eu troco de seção sozinho: você só lê e vai clicando em “Próximo”.",
         "Dá pra sair a qualquer momento e voltar depois em Configurações.",
       ],
     },
@@ -50,13 +50,13 @@ export function montarPassos({ nomeCrianca } = {}) {
       raio: 14,
       titulo: "Por aqui você anda pelo painel",
       texto: [
-        "São sete telas: Início, Conversas, Aprendizado, Mapa da aula, Mesa de Estudos, Rosto da Cogni e Configurações.",
+        "São seis telas: Início, Conversas, Aprendizado, Mesa de Estudos, Rosto da Cogni e Configurações.",
         `Logo acima fica o card ${nome === "a criança" ? "da criança pareada" : "de " + nome}: é o perfil que este painel está lendo do robô.`,
       ],
       // No celular a mesma navegação mora na barra de baixo, e a frase acima
       // menciona um card que só existe na sidebar. Trocamos as duas coisas.
       textoMobile: [
-        "São sete telas, todas na barra de baixo. Deslize nela pra ver as que não couberam.",
+        "São seis telas, todas na barra de baixo, sempre à mão.",
         "O menu de cima (as três linhas) abre a lista inteira com o perfil da criança e a sua conta.",
       ],
     },
@@ -94,18 +94,6 @@ export function montarPassos({ nomeCrianca } = {}) {
       texto: [
         "Quanto tempo em cada matéria, os tópicos explorados e a trilha do que já ficou firme e do que ainda está sendo praticado.",
         "A trilha quem escreve é o robô, conversando. Você não precisa preencher nada aqui.",
-      ],
-    },
-    {
-      id: "mapa",
-      rota: "mapa",
-      alvo: '[data-tour="mp-sessao"]',
-      posicao: "top",
-      raio: 20,
-      titulo: "A aula, minuto a minuto",
-      texto: [
-        "O Mapa é a leitura fina: em que minuto cada assunto entrou, onde a Cogni precisou dar mais apoio e onde a coisa engatou.",
-        "Quando o robô está ligado no meio de uma aula, esta tela anda ao vivo.",
       ],
     },
     {

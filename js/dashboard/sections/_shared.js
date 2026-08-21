@@ -36,7 +36,7 @@ export function el(tag, opts = {}) {
 }
 
 /**
- * Nome de cada seção pro leitor de tela. A chave da rota ("mapa", "config") é
+ * Nome de cada seção pro leitor de tela. A chave da rota ("rosto", "config") é
  * identificador, não texto: anunciada como está, a landmark saía "região config".
  * Aqui ela vira o mesmo rótulo que o pai lê na sidebar.
  */
@@ -44,7 +44,6 @@ const ROTULO_DA_SECAO = {
   inicio: "Início",
   conversas: "Conversas",
   aprendizado: "Aprendizado",
-  mapa: "Mapa da aula",
   mesa: "Mesa de Estudos",
   rosto: "Rosto da Cogni",
   config: "Configurações",

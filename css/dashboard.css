@@ -59,7 +59,7 @@
   --dash-card-header-bg: var(--brand-navy);
   --dash-card-header-text: #ffffff;
 
-  /* Cores por matéria (usadas em Conversas, Aprendizado, Mapa e Planos). Tom
+  /* Cores por matéria (usadas em Conversas, Aprendizado e Mesa de Estudos). Tom
      forte (texto/ícone) + tom suave (fundo da badge), seguindo a paleta do Figma.
 
      São 14 desde ago/2026, e a paleta é organizada por ÁREA: as ciências da
@@ -207,14 +207,13 @@
    Matéria → par de cores, em UM lugar só.
 
    Todo componente que pinta por matéria (a badge do Diário, os cards e chips do
-   Aprendizado, os assuntos do Mapa, o disco dos Planos) lê `--mat-color` e
-   `--mat-soft` e não conhece nome de matéria nenhum: quem escreve `data-materia`
-   no elemento herda o par por cascata.
+   Aprendizado, os cards da Mesa de Estudos) lê `--mat-color` e `--mat-soft` e não
+   conhece nome de matéria nenhum: quem escreve `data-materia` no elemento herda o
+   par por cascata.
 
-   É o mesmo desenho que a seção do Mapa já usava pro `data-tom`, e existe porque
-   a alternativa não escala — com 14 matérias, repetir a lista em cada CSS de
-   seção daria ~250 linhas iguais em 4 arquivos, e a 15ª matéria teria 4 chances
-   de ser esquecida em um deles.
+   O desenho existe porque a alternativa não escala — com 14 matérias, repetir a
+   lista em cada CSS de seção daria ~250 linhas iguais espalhadas por vários
+   arquivos, e a 15ª matéria teria uma chance de ser esquecida em cada um deles.
    -------------------------------------------------------------------------- */
 [data-materia="portugues"] {
   --mat-color: var(--mat-portugues);
@@ -672,7 +671,7 @@
   flex: 1;
   width: 100%;
   /* Num monitor de 1920 sobram 1664px de conteúdo depois da sidebar, e aí as
-     linhas de texto do Diário e do Mapa passam de 150 caracteres — muito além dos
+     linhas de texto do Diário passam de 150 caracteres — muito além dos
      ~75 em que o olho ainda acha o começo da linha seguinte. O teto centraliza o
      conteúdo em vez de esticá-lo; até 1440 nada muda (a conta dá 1184px). */
   max-width: 1500px;
@@ -1176,8 +1175,9 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    /* São 7 abas: em 320px cada uma fica com ~45px de largura, e aí a altura é a
-       única dimensão que ainda dá pra garantir. 48px é o piso confortável. */
+    /* São 6 abas: em 320px cada uma fica com ~49px de largura (medido), e aí a
+       altura é a única dimensão que ainda dá pra garantir. 48px é o piso
+       confortável. */
     min-height: 48px;
     gap: 3px;
     padding: 0.4rem 0.2rem;
