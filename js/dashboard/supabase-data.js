@@ -619,8 +619,18 @@ export function mensagemDeErroDePareamento(motivo) {
 
 /** `true` quando o erro do PostgREST é "essa função não existe no banco". */
 function ehFuncaoAusente(error) {
+  if (!error) return false;
   // PGRST202 = função não encontrada no schema cache. 42883 = undefined_function.
-  return !!error && (error.code === "PGRST202" || error.code === "42883");
+  // 42501 = insufficient_privilege: a função EXISTE, mas o `grant execute to
+  // authenticated` não pegou — o que acontece se o SQL desta rodada rodar pela
+  // metade. Entra aqui de propósito: pro pai, "não instalaram direito" e "não
+  // deram permissão" são o mesmo problema, e nenhum dos dois se resolve
+  // digitando o código de novo. Sem isto, ele cairia na mensagem genérica
+  // ("tente de novo") e tentaria pra sempre.
+  //
+  // Verificado contra o banco real: com a chave anônima, estas RPCs respondem
+  // exatamente 42501 — a trava do `revoke from anon` funcionando.
+  return error.code === "PGRST202" || error.code === "42883" || error.code === "42501";
 }
 
 /**
