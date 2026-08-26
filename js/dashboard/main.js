@@ -212,9 +212,11 @@ async function init() {
 
   if (!crianca) {
     iniciarOnboarding({
-      user,
       nomeResponsavel,
-      servidorUrl: SERVIDOR_URL,
+      // O portão passou a falar com o BANCO (RPC), não com o servidor do robô:
+      // ele precisa da camada de dados, não de uma URL. Ver `servidor.js` pra o
+      // porquê — em resumo, o site na Vercel não alcança mais a rede local.
+      mock,
       onPareado: () => window.location.reload(),
     });
     return; // o onboarding assume a tela; o painel só monta após parear
@@ -251,7 +253,11 @@ async function init() {
     crianca,
     nomeResponsavel,
     mock, // todas as seções leem/escrevem pelo mesmo módulo de dados
-    servidorUrl: SERVIDOR_URL, // endpoints não-Supabase (Resumo, desvincular)
+    // Base do servidor local, ou "" quando esta página não o alcança (é o caso
+    // do painel na Vercel — ver `servidor.js`). Quem consome já trata a string
+    // vazia como "não tente": sobrou só o que é AO VIVO (refresh do Resumo e da
+    // Dica, e o rosto chegando no robô enquanto a criança arrasta o slider).
+    servidorUrl: SERVIDOR_URL,
     now: mock.getNow(), // "agora" (data real no modo Supabase; MOCK_NOW no mock)
     abrirTour, // usado pelo botão "Rever o tutorial" (Configurações)
   };

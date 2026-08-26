@@ -16,8 +16,11 @@
  *   - `plano_tarefas` (Mesa de Estudos, ago/2026): CRUD direto, mesma policy de
  *     `planos_estudo`. É a segunda e última tabela em que o site escreve. O
  *     servidor também escreve nela, mas SÓ a coluna (`moverTarefa()`).
- *   - O pareamento (setar `responsavel_id`) NUNCA acontece aqui: é só pelo
- *     endpoint do servidor (service_role). Ver onboarding.js.
+ *   - O pareamento (setar `responsavel_id`) não é escrito por este arquivo: ele
+ *     CHAMA a RPC `vincular_por_codigo`, que roda no banco como `SECURITY
+ *     DEFINER` e tira o id do pai do `auth.uid()`. Até 26/ago/2026 isso passava
+ *     pelo servidor local do robô, e o Chrome deixou de permitir. Ver
+ *     "Vínculo pai ↔ criança" mais abaixo e `servidor.js`.
  *
  * Erros: as funções de leitura lançam em falha real de query (o router do painel
  * já trata exibindo a tela de erro). `getCrianca` devolve `null` quando não há
@@ -556,6 +559,168 @@ export async function atualizarCrianca(patch) {
   // trazer o perfil salvo (e não o de antes de o pai editar).
   invalidarCacheCrianca();
   return data;
+}
+
+/* ==========================================================================
+   Vínculo pai ↔ criança (pareamento) ⭐ 26/ago/2026
+
+   Até esta data o vínculo passava pelo servidor local do robô
+   (`POST /api/pareamento/vincular`). Não passa mais, por dois motivos que se
+   somam e que estão documentados em `servidor.js`: o Chrome 141+ bloqueia
+   site público → rede local, e o CORS do robô nunca liberou a origem da Vercel.
+
+   O detalhe que decidiu o desenho: o servidor **nunca fez nada de local aqui**.
+   O `vincularPorCodigo` dele só rodava duas queries no Supabase — era um proxy
+   de um banco que o site já alcança sozinho. Agora quem faz o trabalho é uma
+   função `SECURITY DEFINER` no Postgres, e sobra segurança de graça:
+
+   • O `responsavel_id` vem do `auth.uid()` do token, não do corpo do request.
+     Antes o site MANDAVA o id do pai — qualquer um podia parear um filho alheio
+     à própria conta chamando o endpoint na mão.
+   • O código só é comparado dentro do banco. A RLS continua sendo a única
+     guardiã: sem vínculo, o pai não lê a linha da criança nem por acidente.
+   ========================================================================== */
+
+/**
+ * Traduz a falha da RPC no mesmo vocabulário que a tela já sabia mostrar.
+ *
+ * Os quatro primeiros motivos são idênticos aos que o servidor devolvia (o
+ * `mapa` em `routes/api.js`), então nenhuma mensagem em PT-BR precisou mudar de
+ * lugar. Os dois últimos são novos e só existem porque a função agora roda
+ * exposta na internet, sem o rate-limit por IP que o servidor dava.
+ *
+ * @param {string} motivo
+ * @returns {string} mensagem pronta pro pai
+ */
+export function mensagemDeErroDePareamento(motivo) {
+  const MENSAGENS = {
+    // A frase diz onde o erro costuma estar: o código é ditado por voz pela
+    // Cogni, e o alfabeto dela não tem os caracteres que se confundem ouvindo.
+    // (Mesma string que o servidor passou a usar, pra as duas pontas não
+    // ensinarem coisas diferentes sobre o mesmo código.)
+    codigo_invalido:
+      "Código inválido. São 6 caracteres, e ele nunca tem 0, O, 1 nem I.",
+    ja_pareada: "Essa criança já está vinculada a outro responsável.",
+    crianca_invalida: "Criança não encontrada.",
+    sem_sessao: "Sua sessão expirou. Entre de novo pra continuar.",
+    // Um pai, uma criança (single-child). Quem quer trocar de filho desvincula
+    // primeiro, em Configurações — e o caminho é dito aqui, porque esta frase é
+    // o único lugar onde ele descobre que existe.
+    ja_tem_crianca:
+      "Este painel já acompanha uma criança. Desvincule o perfil atual em Configurações antes de conectar outro.",
+    muitas_tentativas:
+      "Muitas tentativas seguidas. Espere alguns minutos e tente de novo.",
+    // A RPC não existe no banco ainda (o SQL desta rodada não rodou).
+    rpc_ausente:
+      "O pareamento ainda não está disponível neste servidor. Avise o responsável técnico.",
+  };
+  return MENSAGENS[motivo] || "Não foi possível parear agora. Tente de novo.";
+}
+
+/** `true` quando o erro do PostgREST é "essa função não existe no banco". */
+function ehFuncaoAusente(error) {
+  // PGRST202 = função não encontrada no schema cache. 42883 = undefined_function.
+  return !!error && (error.code === "PGRST202" || error.code === "42883");
+}
+
+/**
+ * Vincula a criança dona do código ao responsável logado.
+ *
+ * Chama `vincular_por_codigo(p_codigo)` — o `responsavel_id` sai do `auth.uid()`
+ * DENTRO da função, e por isso não há (nem pode haver) parâmetro pra ele aqui.
+ *
+ * @param {string} codigo — o que o pai digitou (espaço/hífen e caixa são tolerados)
+ * @returns {Promise<{ok:boolean, jaPareado?:boolean, criancaId?:string, nome?:string, idade?:number, serie?:string, motivo?:string}>}
+ *   Nunca lança por código errado: erro do pai é resultado, não exceção. Só
+ *   falha de rede/banco vira `{ok:false, motivo}` genérico. `idade`/`serie`
+ *   existem pra a tela de sucesso distinguir homônimos (há dois "Marcos" entre
+ *   os perfis do robô).
+ */
+export async function parearPorCodigo(codigo) {
+  const { data, error } = await client().rpc("vincular_por_codigo", {
+    p_codigo: String(codigo || ""),
+  });
+
+  if (error) {
+    // O SQL desta rodada ainda não rodou no banco. Vale uma mensagem própria: é
+    // a diferença entre "o pai digitou errado" e "falta um passo de instalação".
+    if (ehFuncaoAusente(error)) {
+      console.error("[Companion] A RPC vincular_por_codigo não existe no banco.", error);
+      return { ok: false, motivo: "rpc_ausente" };
+    }
+    console.error("[Companion] Pareamento falhou:", error);
+    return { ok: false, motivo: "erro_interno" };
+  }
+
+  // Pareou: o cache guarda o "sem criança" de antes — a próxima leitura tem que
+  // ir ao banco, senão o painel remonta no estado que acabou de deixar de valer.
+  if (data && data.ok) invalidarCacheCrianca();
+
+  return data || { ok: false, motivo: "erro_interno" };
+}
+
+/**
+ * Desfaz o vínculo da criança com o responsável logado.
+ *
+ * Idempotente (`jaDesvinculado: true` quando já não era dele) e seguro por
+ * construção: a função só zera `responsavel_id` se quem pede for o dono. O
+ * `codigo_pareamento` **não muda** — dá pra reparear depois com o mesmo código.
+ *
+ * @param {string} criancaId
+ * @returns {Promise<{ok:boolean, jaDesvinculado?:boolean, motivo?:string}>}
+ */
+export async function desvincularCrianca(criancaId) {
+  const { data, error } = await client().rpc("desvincular_crianca", {
+    p_crianca_id: String(criancaId || ""),
+  });
+
+  if (error) {
+    if (ehFuncaoAusente(error)) {
+      console.error("[Companion] A RPC desvincular_crianca não existe no banco.", error);
+      return { ok: false, motivo: "rpc_ausente" };
+    }
+    console.error("[Companion] Desvincular falhou:", error);
+    return { ok: false, motivo: "erro_interno" };
+  }
+
+  if (data && data.ok) invalidarCacheCrianca();
+  return data || { ok: false, motivo: "erro_interno" };
+}
+
+/**
+ * Os robôs que estão **vivos e com a janela de pareamento aberta** agora.
+ *
+ * É a descoberta de verdade — a que a sonda antiga fingia fazer. Ela não varre
+ * a rede (um site em HTTPS não pode: sem mDNS, sem UDP, sem broadcast, e cada
+ * tentativa esbarraria no mesmo bloqueio que derrubou o pareamento). Quem se
+ * anuncia é o robô, publicando um heartbeat no Supabase; aqui a gente só lê.
+ *
+ * O que vem: `apelido` (o hostname da máquina do robô) e `visto_em`. **Nada de
+ * criança entra nesta tabela** — nem nome, nem id. A policy deixa qualquer pai
+ * autenticado ler as linhas enquanto a janela está aberta, então a identidade
+ * aqui é a MÁQUINA, não quem usa ela. (A primeira versão deste desenho tinha
+ * `crianca_id` como chave e furava o próprio acordo: o id sairia no `select` pra
+ * qualquer pai. Além de não funcionar — o robô tem vários perfis, e nenhum
+ * ativo quando ninguém está conversando.) Quem autentica o vínculo continua
+ * sendo o código de 6 caracteres.
+ *
+ * @returns {Promise<Array<{apelido:string, visto_em:string}>>}
+ *   Lista vazia quando não há ninguém — e também quando a tabela ainda não
+ *   existe no banco. Os dois casos são o mesmo recado pra tela ("não achei
+ *   nenhuma Cogni agora"), e nenhum deles é motivo pra quebrar o portão.
+ */
+export async function getRobosDisponiveis() {
+  const { data, error } = await client()
+    .from("robos_online")
+    .select("apelido, visto_em")
+    .order("visto_em", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    console.debug("[Companion] Descoberta indisponível (tabela ausente ou RLS):", error);
+    return [];
+  }
+  return data || [];
 }
 
 /* ==========================================================================

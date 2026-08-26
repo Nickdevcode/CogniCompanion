@@ -549,6 +549,101 @@
 }
 
 /* --------------------------------------------------------------------------
+   Os candidatos da descoberta ⭐ 26/ago/2026
+
+   A lista das Cognis que se anunciaram. Ela ENTRA e SAI sozinha (o robô pode
+   ser ligado com o portão já aberto), então nasce sem altura nenhuma quando
+   está vazia — nada de espaço reservado piscando embaixo do formulário.
+
+   Um cartão aqui não pareia: o botão só escolhe o robô e leva o foco pro
+   código. Por isso ele é `--ghost` e não a cor primária — a ação principal
+   desta tela continua sendo o campo de cima.
+   -------------------------------------------------------------------------- */
+.ob-robos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 26rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ob-robos:empty {
+  display: none;
+}
+.ob-robo {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 12%, transparent);
+  border-radius: 14px;
+  /* Mesma receita das superfícies do portão (ver `.ob-ajuda`, `.ob-code__box`):
+     um véu do texto sobre a página, que atravessa claro e escuro sem tabela de
+     exceção. `--surface-*` não existe neste projeto. */
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  animation: ob-robo-entra 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ob-robo__ico {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: var(--brand-gold-deep);
+}
+.ob-robo__ico svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+.ob-robo__txt {
+  display: flex;
+  min-width: 0; /* deixa o nome truncar em vez de empurrar o botão pra fora */
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 0.1rem;
+  text-align: left;
+}
+.ob-robo__nome {
+  overflow: hidden;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ob-robo__visto {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  color: color-mix(in srgb, var(--text-primary) 55%, transparent);
+}
+.ob-robo__btn {
+  flex: 0 0 auto;
+  padding-inline: 0.9rem;
+}
+
+@keyframes ob-robo-entra {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Quem pediu menos movimento não precisa ver o cartão deslizar pra entender
+   que ele chegou — a lista aparecer já é o recado. */
+@media (prefers-reduced-motion: reduce) {
+  .ob-robo {
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
    Sucesso: a única virada real do produto merece uma tela
 
    Substitui o conteúdo da tela de pareamento por ~1,4s, enquanto o painel
@@ -588,6 +683,17 @@
   border: 2px solid #1f9d57;
   animation: ob-anel 0.9s ease-out 0.15s both;
 }
+/* Idade · série, logo abaixo do nome: é o que distingue dois perfis com o MESMO
+   nome (há dois "Marcos" entre os perfis do robô). Fica discreto de propósito —
+   quem parear certo mal repara; quem parear errado tem como perceber na hora,
+   em vez de descobrir depois por uma trilha de aprendizado que "está errada". */
+.ob-sucesso__marcas {
+  margin: -0.35rem 0 0;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: color-mix(in srgb, var(--text-primary) 55%, transparent);
+}
+
 .ob-screen.is-sucesso {
   justify-content: center;
   min-height: 20rem;

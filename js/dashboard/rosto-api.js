@@ -38,8 +38,16 @@ const TIMEOUT_MS = 4000;
  *   - "salvando": request em voo.
  */
 
-/** fetch com timeout — devolve null em qualquer falha (incluindo servidor off). */
+/**
+ * fetch com timeout — devolve null em qualquer falha (incluindo servidor off).
+ *
+ * `url` vazia (ou que começa sem base) significa que o servidor local não está
+ * ao alcance desta página — ver `servidor.js`. Sair aqui evita disparar um
+ * request relativo contra a Vercel, que responderia 404 pra `/api/esp/rosto` e
+ * ainda gastaria os 4s do timeout antes de cair no mesmo `null`.
+ */
 async function fetchOuNull(url, opcoes = {}) {
+  if (!url || url.startsWith("/api/")) return null;
   try {
     const resp = await fetch(url, {
       ...opcoes,

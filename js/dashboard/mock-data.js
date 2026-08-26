@@ -81,6 +81,12 @@ const crianca = {
     "Incentive a curiosidade do Pedro sobre ciências e use exemplos com " +
     "dinossauros quando possível. Evite respostas longas demais.",
   responsavel_id: responsavel.id,
+  // Código FIXO do perfil (6 chars, alfabeto sem 0/O/1/I). Quem gera é o robô,
+  // no nascimento do perfil. Entrou no mock em 26/ago/2026, quando as
+  // Configurações passaram a lê-lo da própria linha da criança em vez de buscar
+  // no servidor local — sem ele, a tela de demonstração mostraria "Indisponível"
+  // justamente no card que explica o vínculo.
+  codigo_pareamento: "K7H2QM",
   // Trilha de aprendizado (student model). READ-ONLY pro site: quem escreve é o
   // servidor, no pipeline pós-resposta. Datas relativas a MOCK_NOW (2026-05-27)
   // e coerentes com as conversas de exemplo abaixo — é o que o Painel de
@@ -1146,4 +1152,99 @@ export async function atualizarCrianca(patch) {
   return USAR_SUPABASE
     ? supa.atualizarCrianca(patch)
     : _mockAtualizarCrianca(patch);
+}
+
+/* ==========================================================================
+   Vínculo pai ↔ criança (pareamento) ⭐ 26/ago/2026
+
+   Passou a morar aqui quando o pareamento saiu do servidor local e virou RPC no
+   Supabase (o porquê está em `servidor.js` e em `supabase-data.js`). Ficar na
+   camada de dados, e não na tela do onboarding, é o que deixa o portão funcionar
+   igual nos dois modos — inclusive na demonstração com `USAR_SUPABASE = false`,
+   onde não há robô nenhum pra parear.
+   ========================================================================== */
+
+/**
+ * Vincula ao responsável logado a criança dona do código.
+ * @param {string} codigo — 6 caracteres (espaço/hífen/caixa tolerados)
+ * @returns {Promise<{ok:boolean, jaPareado?:boolean, criancaId?:string, nome?:string, motivo?:string}>}
+ */
+export async function parearPorCodigo(codigo) {
+  return USAR_SUPABASE ? supa.parearPorCodigo(codigo) : _mockParear(codigo);
+}
+
+/**
+ * Desfaz o vínculo (o pai escolheu desconectar este perfil).
+ * @param {string} criancaId
+ * @returns {Promise<{ok:boolean, jaDesvinculado?:boolean, motivo?:string}>}
+ */
+export async function desvincularCrianca(criancaId) {
+  return USAR_SUPABASE
+    ? supa.desvincularCrianca(criancaId)
+    : _mockDesvincular(criancaId);
+}
+
+/**
+ * Robôs vivos e com a janela de pareamento aberta (a lista de candidatos do
+ * portão). Nunca lança e nunca pareia nada — só lista.
+ * @returns {Promise<Array<{apelido:string, visto_em:string}>>}
+ */
+export async function getRobosDisponiveis() {
+  return USAR_SUPABASE ? supa.getRobosDisponiveis() : _mockRobos();
+}
+
+/**
+ * Mensagem em PT-BR pro motivo de falha do pareamento. Vive na camada de dados
+ * (e não na tela) porque os motivos são o contrato da RPC — quem muda um, muda
+ * o outro no mesmo lugar.
+ * @param {string} motivo
+ * @returns {string}
+ */
+export function mensagemDeErroDePareamento(motivo) {
+  return supa.mensagemDeErroDePareamento(motivo);
+}
+
+/** No mock, o único código que "existe" é o da criança de exemplo. */
+async function _mockParear(codigo) {
+  await delay();
+  const digitado = String(codigo || "")
+    .replace(/[\s-]/g, "")
+    .toUpperCase();
+  if (digitado !== crianca.codigo_pareamento) {
+    return { ok: false, motivo: "codigo_invalido" };
+  }
+  return {
+    ok: true,
+    jaPareado: false,
+    criancaId: crianca.id,
+    nome: crianca.nome,
+    idade: crianca.idade,
+    serie: crianca.serie,
+  };
+}
+
+async function _mockDesvincular() {
+  await delay();
+  // Não zera a criança de exemplo: o mock existe pra demonstrar telas cheias, e
+  // um desvincular "de verdade" deixaria a demonstração num portão vazio.
+  return { ok: true, jaDesvinculado: false };
+}
+
+/**
+ * Um candidato de exemplo, pra a lista do portão ter o que mostrar na demo.
+ *
+ * ⚠️ Este é o único mock ancorado no relógio REAL, e não em `MOCK_NOW`. Um
+ * heartbeat é "o robô está de pé AGORA", e a tela o compara com `Date.now()`
+ * pra escrever "vista agora" — com a data fixa dos outros dados de exemplo, o
+ * card anunciava "vista há 131094 min", que é o mock mentindo sobre si mesmo.
+ * O resto do mock continua em `MOCK_NOW`: aquilo é histórico, isto é presença.
+ */
+async function _mockRobos() {
+  await delay();
+  return [
+    {
+      apelido: "cogni-da-sala",
+      visto_em: new Date(Date.now() - 20 * 1000).toISOString(),
+    },
+  ];
 }

@@ -34,52 +34,28 @@ import {
 } from "../format.js";
 
 /**
- * Busca o código de pareamento do perfil no servidor local (não-Supabase).
- *   GET {servidorUrl}/api/pareamento/codigo?usuarioId=<id> → { codigo, nome }
- * @returns {Promise<string|null>} o código, ou null se indisponível/erro
- */
-async function buscarCodigoPareamento(servidorUrl, criancaId) {
-  try {
-    const url = `${servidorUrl}/api/pareamento/codigo?usuarioId=${encodeURIComponent(
-      criancaId
-    )}`;
-    const resp = await fetch(url);
-    if (!resp.ok) return null;
-    const dados = await resp.json();
-    return dados && dados.codigo ? dados.codigo : null;
-  } catch (e) {
-    console.error("[Companion] Não consegui buscar o código de pareamento:", e);
-    return null;
-  }
-}
-
-/**
  * Desvincula a criança do responsável (o pai escolheu desfazer o vínculo).
- *   POST {servidorUrl}/api/pareamento/desvincular { criancaId, responsavelId }
- *   → 200 { ok, jaDesvinculado } · 404 · 400
+ *
+ * ⛔ 26/ago/2026: era `POST {servidorUrl}/api/pareamento/desvincular`, e nunca
+ * chegava ao robô a partir da Vercel — o botão simplesmente não fazia nada em
+ * produção. Agora é a RPC `desvincular_crianca`, que roda no banco e só zera o
+ * `responsavel_id` se quem pede for o dono. O `codigo_pareamento` não muda: dá
+ * pra reparear depois com o mesmo código. Ver `servidor.js`.
+ *
+ * @param {object} mock — camada de dados
+ * @param {string} criancaId
  * @returns {Promise<{ok:boolean, erro?:string}>}
  */
-async function desvincularCrianca(servidorUrl, criancaId, responsavelId) {
+async function desvincularCrianca(mock, criancaId) {
   try {
-    const resp = await fetch(`${servidorUrl}/api/pareamento/desvincular`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ criancaId, responsavelId }),
-    });
-    let dados = {};
-    try {
-      dados = await resp.json();
-    } catch (_) {
-      /* sem corpo */
-    }
-    if (resp.ok && dados.ok) return { ok: true };
-    return { ok: false, erro: dados.erro || "Não foi possível desvincular agora." };
+    const r = await mock.desvincularCrianca(criancaId);
+    if (r && r.ok) return { ok: true };
+    return { ok: false, erro: mock.mensagemDeErroDePareamento(r && r.motivo) };
   } catch (e) {
     console.error("[Companion] Desvincular falhou:", e);
     return {
       ok: false,
-      erro:
-        "Não consegui falar com a Cogni. Confirme que o robô/servidor está ligado.",
+      erro: "Não consegui conectar agora. Confira sua internet e tente de novo.",
     };
   }
 }
@@ -909,12 +885,17 @@ function blocoTema() {
 }
 
 /* --------------------------------------------------------------------------
-   Bloco: Vínculo com o robô (pareamento real — servidor local)
+   Bloco: Vínculo com a Cogni (pareamento real)
    Mostra "Conectado ao perfil de [nome]", o código de pareamento (pra reparear
-   ou compartilhar) e o botão de desvincular (com confirmação). O código e o
-   desvincular passam pelo servidor (service_role); o site nunca escreve o vínculo.
+   ou compartilhar) e o botão de desvincular (com confirmação).
+
+   ⭐ 26/ago/2026: os dois dados que este bloco mostra vinham do servidor local
+   e, em produção, nunca chegavam — o código ficava "Indisponível" e o
+   desvincular não fazia nada. Agora o código sai da própria linha da criança
+   (já em memória) e o desvincular é uma RPC. O site continua sem escrever
+   `responsavel_id` com as próprias mãos: quem faz isso é a função no banco.
    -------------------------------------------------------------------------- */
-function blocoVinculo({ crianca, servidorUrl, user, onDesvinculado }) {
+function blocoVinculo({ crianca, mock, onDesvinculado }) {
   const bloco = el("section", { class: "dash-card cfg-block cfg-block--status" });
   bloco.appendChild(
     blocoHead(
@@ -976,17 +957,21 @@ function blocoVinculo({ crianca, servidorUrl, user, onDesvinculado }) {
     svg: ICON_COPY,
   });
 
-  let codigoAtual = null;
-  buscarCodigoPareamento(servidorUrl, crianca.id).then((cod) => {
-    if (cod) {
-      codigoAtual = cod;
-      codigoValor.textContent = cod;
-      copiarBtn.removeAttribute("disabled");
-    } else {
-      codigoValor.textContent = "Indisponível";
-      codigoValor.classList.add("is-muted");
-    }
-  });
+  // O código vem da PRÓPRIA linha da criança, que o painel já leu no boot
+  // (`buscarCrianca()` faz `select("*")`). Zero rede, zero espera, e funciona
+  // com o robô desligado — antes isto era um `GET` no servidor local, que em
+  // produção nunca respondia e deixava o card dizendo "Indisponível" pra sempre.
+  //
+  // Só continua nulo se o perfil nasceu antes de a coluna existir (o backfill é
+  // do robô, que é quem sabe gerar o código no alfabeto certo).
+  const codigoAtual = crianca.codigo_pareamento || null;
+  if (codigoAtual) {
+    codigoValor.textContent = codigoAtual;
+    copiarBtn.removeAttribute("disabled");
+  } else {
+    codigoValor.textContent = "Indisponível";
+    codigoValor.classList.add("is-muted");
+  }
 
   copiarBtn.addEventListener("click", async () => {
     if (!codigoAtual) return;
@@ -1013,7 +998,7 @@ function blocoVinculo({ crianca, servidorUrl, user, onDesvinculado }) {
             children: [
               el("span", { text: "Código de pareamento" }),
               dicaInfo(
-                "O mesmo código que liga outro aparelho a este perfil. Ele não muda, e só aparece com o robô ligado.",
+                "O mesmo código que liga outro aparelho a este perfil. Ele não muda e não expira — nem precisa do robô ligado pra aparecer aqui.",
                 { rotulo: "Código de pareamento" }
               ),
             ],
@@ -1038,7 +1023,7 @@ function blocoVinculo({ crianca, servidorUrl, user, onDesvinculado }) {
     ],
   });
   desvBtn.addEventListener("click", () =>
-    confirmarDesvincular({ crianca, servidorUrl, user, onDesvinculado })
+    confirmarDesvincular({ crianca, mock, onDesvinculado })
   );
 
   bloco.appendChild(
@@ -1055,7 +1040,7 @@ function blocoVinculo({ crianca, servidorUrl, user, onDesvinculado }) {
 }
 
 /** Modal de confirmação do desvincular (tira o acesso às conversas do filho). */
-function confirmarDesvincular({ crianca, servidorUrl, user, onDesvinculado }) {
+function confirmarDesvincular({ crianca, mock, onDesvinculado }) {
   openModal({
     title: "Desvincular perfil",
     size: "sm",
@@ -1095,7 +1080,7 @@ function confirmarDesvincular({ crianca, servidorUrl, user, onDesvinculado }) {
         cancel.disabled = true;
         feedback.textContent = "Desvinculando…";
         feedback.classList.remove("is-error");
-        const r = await desvincularCrianca(servidorUrl, crianca.id, user.id);
+        const r = await desvincularCrianca(mock, crianca.id);
         if (r.ok) {
           close();
           if (window.cognifyToast)
@@ -1327,8 +1312,7 @@ export async function renderConfig(ctx) {
   const blocoRobo = criancaAtual
     ? blocoVinculo({
         crianca: criancaAtual,
-        servidorUrl: ctx.servidorUrl,
-        user: ctx.user,
+        mock: ctx.mock,
         onDesvinculado: () => window.location.reload(),
       })
     : null;

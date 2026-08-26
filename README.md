@@ -134,7 +134,7 @@ O painel lê de **duas fontes**, e ambas já estão integradas:
 | Fonte | O quê | Como |
 | --- | --- | --- |
 | 🗄️ **Supabase** | Criança, conversas (Diário), planos de estudo, perfil, **trilha de aprendizado** | `@supabase/supabase-js` (anon key + RLS). Conversas e trilha são **só leitura** pelo site; planos têm CRUD |
-| 🖥️ **Servidor local da Cogni** | Resumo Semanal (IA), Dica da Cogni (IA), rosto do robô, pareamento/despareamento | `fetch` nos endpoints `/api/...` (precisa do robô/servidor ligado) |
+| 🖥️ **Servidor local da Cogni** | Só o que é **ao vivo**: refresh do Resumo e da Dica (IA) e o rosto chegando no robô em tempo real | `fetch` nos endpoints `/api/...`, e **só quando o painel está aberto em casa** — ver *Servidor local*. Pareamento, despareamento e código do perfil **saíram daqui** em 26/ago/2026 |
 
 ### 🎛️ A chave que liga tudo: `USAR_SUPABASE`
 
@@ -151,18 +151,42 @@ export const USAR_SUPABASE = true;  // true = dados reais · false = dados de ex
 As implementações reais ficam isoladas em `js/dashboard/supabase-data.js` (mesma "cara" do mock — por isso
 trocar a flag não muda nenhuma tela).
 
-### 🌐 Servidor local (`SERVIDOR_URL`)
+### 🌐 Servidor local (`SERVIDOR_URL`) — e o muro que apareceu sozinho
 
-Tudo que depende de IA ou de falar com o robô passa pelo servidor que roda junto dele. A URL fica no topo
-de `js/dashboard/servidor.js` (o `main.js` só a reexporta, pra não quebrar quem já importava de lá):
+`js/dashboard/servidor.js` decide **se esta página consegue falar com o robô**, olhando de onde ela foi
+servida. Não é mais uma constante: é uma decisão.
 
 ```js
-export const SERVIDOR_URL = "http://127.0.0.1:3000";
+export const SERVIDOR_URL = resolverBaseServidor(); // "" quando fora de alcance
+export const SERVIDOR_AO_ALCANCE = SERVIDOR_URL !== "";
 ```
+
+| Onde o painel está aberto | O que ele usa | Por quê |
+| --- | --- | --- |
+| `file://` ou `localhost`/`127.0.0.1` | `http://127.0.0.1:3000` | mesma máquina do servidor |
+| Um IP da casa (`192.168.x.x`, `10.x`, `.local`) | `http://<esse host>:3000` | o painel foi servido **pelo próprio robô** — o servidor mora ali |
+| **A Vercel** (ou qualquer origem pública) | **`""`** | inalcançável por construção; tentar só gera espera e ruído |
+
+> ⛔ **O que quebrou na apresentação de 26/ago/2026.** Este arquivo apontava fixo pra `127.0.0.1:3000`, e
+> isso deixou de funcionar **sem ninguém mudar uma linha**: a partir do **Chrome 141/142**, um site de
+> origem pública não alcança mais loopback nem rede privada sem uma permissão explícita do usuário — é o
+> *Local Network Access*. Medido em Chrome 149: o `fetch` da Vercel pra `127.0.0.1:3000` **pendura e nunca
+> chega ao servidor**, enquanto o mesmo request feito de uma página em `http://127.0.0.1:3000` responde na
+> hora. Por baixo disso havia um segundo bloqueio: o CORS do robô nunca liberou a origem da Vercel.
+
+> 🤫 **Por que ninguém percebeu antes.** Quase tudo que passava por ali tinha fallback silencioso (a Dica e
+> o Resumo caem na tabela do Supabase). O **pareamento** era a única coisa sem rede de proteção — por isso
+> foi ele que apareceu na frente do professor. Fallback silencioso não é resiliência: é anestesia.
 
 > ⚠️ **Por que `127.0.0.1` e não `localhost`?** O servidor escuta só em IPv4, e os navegadores costumam
 > resolver `localhost` para IPv6 (`::1`) primeiro — o que derruba o `fetch` com `ERR_CONNECTION_RESET`.
-> Forçar `127.0.0.1` (IPv4) evita o problema. Se você subir o servidor noutra máquina/porta, troque aqui.
+> Forçar `127.0.0.1` (IPv4) evita o problema. Se você subir o servidor noutra porta, troque a constante
+> `PORTA_SERVIDOR`.
+
+**O que sobrou passando pelo servidor local** (e só funciona com o painel aberto em casa): o *refresh* do
+Resumo Semanal e da Dica com IA, e o rosto chegando no robô **enquanto a criança arrasta o slider**. Tudo
+o mais foi pro banco — inclusive o pareamento, que nunca precisou do robô: o endpoint dele só rodava duas
+queries no Supabase.
 
 **Plano criado no site chega na Cogni na hora.** Quem faz isso é o **Realtime do Supabase** (o servidor
 escuta `planos_estudo`); o site ainda dá um `POST /api/planos/refrescar` depois de criar, editar ou excluir
@@ -180,16 +204,48 @@ explicar e desbloquear.
   pareamento (código de 6 caracteres).
 - **Depois** (ou se despareou): vai **direto** pra tela de pareamento, sem repetir a apresentação.
 
-O código é validado **pelo servidor** (que seta o vínculo com a `service_role`) — o site **nunca** escreve
-o `responsavel_id` direto. Em **Configurações** dá pra ver o código do perfil e **desvincular** (com
-confirmação). O vínculo é **permanente**: só some se você desvincular.
+O código é validado **dentro do banco**, por uma função `SECURITY DEFINER` (`vincular_por_codigo`) — o
+site **nunca** escreve o `responsavel_id` direto. Em **Configurações** dá pra ver o código do perfil e
+**desvincular** (com confirmação). O vínculo é **permanente**: só some se você desvincular.
+
+> ⭐ **26/ago/2026 — o pareamento saiu do robô e foi pro banco.** Era `POST /api/pareamento/vincular` no
+> servidor local, e quebrou na apresentação do TCC (ver *Servidor local*, acima). O endpoint do robô só
+> fazia duas queries no Supabase: ele era um proxy de um banco que o site já alcança sozinho. Agora:
+>
+> | Antes | Agora | O que se ganha |
+> | --- | --- | --- |
+> | `POST {SERVIDOR}/api/pareamento/vincular` | `rpc('vincular_por_codigo', { p_codigo })` | funciona **de qualquer lugar**, inclusive do celular |
+> | `responsavelId` ia **no corpo** do request | vem do `auth.uid()` **do token** | ninguém pareia filho alheio chamando o endpoint na mão |
+> | `POST .../desvincular` | `rpc('desvincular_crianca')` | o botão voltou a fazer alguma coisa em produção |
+> | `GET .../pareamento/codigo` | lê `crianca.codigo_pareamento` | **zero rede** — o dado já veio no `select("*")` do boot |
+>
+> As RPCs vivem em `js/dashboard/supabase-data.js` e são roteadas pelo `mock-data.js`, como todo o resto
+> da camada de dados — o portão nunca fala com o banco por conta própria.
+
+#### 📡 A descoberta: o robô se anuncia, o site só lista
+
+A tela mostra as Cognis que estão **de pé e com a janela de pareamento aberta**, lidas da tabela
+`robos_online` (o servidor do robô publica um heartbeat lá). Duas regras que valem mais que a feature:
+
+- **A descoberta NUNCA pareia sozinha.** Ela lista candidatos; clicar em **"Parear"** só escolhe o robô e
+  leva o foco pro código. Decisão do Nicolas, textual: *não tirar o controle dos pais*. O que autentica o
+  vínculo continua sendo o código de 6 caracteres.
+- **A lista não tem nada de criança** — nem nome, nem id. Só o apelido da máquina e um *"vista agora"*.
+  Ela é legível por **qualquer responsável logado** enquanto a janela está aberta, e dado de menor não
+  pode viajar por aí.
+
+> 🕵️ **O que isso substituiu, e por que a versão antiga era pior que nada.** Havia uma "sonda de rede"
+> que dava um `fetch` num IP fixo e chamava aquilo de procurar. Ela nunca descobriu coisa alguma — e,
+> depois do Chrome 141, respondia *"não estou enxergando a Cogni"* **mesmo com o robô ligado ao lado**.
+> Um site em HTTPS **não faz** descoberta de rede: sem mDNS, sem UDP, sem broadcast. Não é implementação
+> ruim, é impossível. Quem tem que se anunciar é o dispositivo.
 
 #### O que a rodada de refinamento (ago/2026) trouxe
 
 | O que | Por quê |
 | --- | --- |
 | **"Passo 2 de 3"** + barra de progresso | Saber quanto falta é o que separa "deixa eu ver" de "isso vai tomar minha tarde?" |
-| **Sonda de rede** antes de digitar (`Procurando a Cogni…` → `Cogni encontrada` / `Não estou enxergando`) | Descobrir que o robô está desligado **depois** de digitar 6 caracteres vira "este site não funciona". A sonda **nunca bloqueia** o envio: navegadores tratam rede privada de formas diferentes, e um falso negativo não pode barrar um pareamento que funcionaria |
+| ~~**Sonda de rede** antes de digitar~~ → **lista de candidatos** (26/ago) | O motivo continua o mesmo: descobrir que o robô está desligado **depois** de digitar 6 caracteres vira "este site não funciona". O que mudou foi a fonte — a sonda perguntava a um IP que ela mesma chutou; a lista lê quem se anunciou. E ela **nunca bloqueia** o envio: digitar o código funciona mesmo com a lista vazia |
 | **"Onde encontro o código?"** embutido (`<details>` nativo) | Mandar quem está no meio de um formulário de 6 caixinhas pra outra página é perder metade das pessoas |
 | **Envio automático** ao completar o 6º caractere | Código completo na tela + botão ainda por apertar é um passo sem nenhuma decisão dentro |
 | **Tela de sucesso** com o nome da criança | É a única virada real do produto, e o painel demora ~1,4s pra recarregar. Um `<p>` verde não marcaria o momento |
@@ -875,9 +931,12 @@ o próprio `-soft`, que são um degrau mais escuros que o branco puro. Na remedi
 | `css/dashboard-rosto.css` | Estilos do editor de rosto (estética infantil, escopada em `.dash-rosto`) |
 | `css/dashboard-mesa.css` | Estilos da Mesa de Estudos (quadro, cards, arraste, captura) — o prefixo `.pl-` dos formulários fica, porque Configurações reusa |
 
-> 🧪 Para testar **com o robô ligado**: suba o servidor da Cogni (`http://127.0.0.1:3000`), pegue o código
-> de pareamento (na tela do servidor ou pedindo pra Cogni falar) e digite no onboarding. Para testar **sem
-> o robô**, vire `USAR_SUPABASE = false` e o painel roda com os dados de exemplo.
+> 🧪 **Testar o pareamento não precisa mais do robô ligado** — ele fala com o banco. Basta ter um perfil
+> em `criancas` com `codigo_pareamento` e digitar o código. Para testar **sem banco nenhum**, vire
+> `USAR_SUPABASE = false`: o mock aceita o código `K7H2QM` e a lista de candidatos mostra um robô de
+> exemplo. O servidor da Cogni (`http://127.0.0.1:3000`) só é necessário pra ver o **rosto mudando ao
+> vivo** e pra forçar um refresh do Resumo/Dica — e, nesse caso, abra o painel em `localhost`, não na
+> Vercel.
 
 ---
 

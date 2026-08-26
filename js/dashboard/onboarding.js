@@ -17,10 +17,25 @@
  * apresentação já cumpriu o papel dela no primeiro passe.
  *
  * Pareamento: o código (6 chars, sem ambíguos) é validado e o vínculo é setado
- * SÓ pelo servidor (service_role) — o site nunca escreve `responsavel_id`:
- *   POST {servidorUrl}/api/pareamento/vincular  { codigo, responsavelId }
- *   → 200 {ok, jaPareado, criancaId, nome} · 404 inválido · 409 de outro pai
- *     · 400 faltando · 503 indisponível
+ * dentro do BANCO, por uma função `SECURITY DEFINER` — o site continua sem
+ * escrever `responsavel_id` com as próprias mãos:
+ *   mock.parearPorCodigo(codigo)  →  rpc('vincular_por_codigo', { p_codigo })
+ *   → {ok, jaPareado, criancaId, nome, idade, serie} · {ok:false, motivo}
+ *
+ * `idade`/`serie` vêm só pra a tela de sucesso desambiguar homônimos — há dois
+ * "Marcos" entre os perfis do robô, com códigos diferentes. Como as duas são
+ * nullable (e vazias é o caso COMUM nos perfis reais), a tela fecha a linha com
+ * o próprio código digitado, que sempre existe e sempre distingue.
+ *
+ * ⛔ 26/ago/2026 — POR QUE ISTO DEIXOU DE PASSAR PELO ROBÔ
+ * Era `POST {servidorUrl}/api/pareamento/vincular`, e quebrou na apresentação do
+ * TCC: a partir do Chrome 141/142, um site de origem pública (a Vercel) não
+ * alcança mais `127.0.0.1` nem a rede local sem permissão explícita — o request
+ * pendura e nunca chega. O endpoint do robô, por baixo disso, só rodava duas
+ * queries no Supabase; ele era um proxy de um banco que o site já alcança. O
+ * caminho novo funciona do celular do pai, em qualquer lugar, e ainda tira o
+ * `responsavelId` do corpo do request (agora vem do `auth.uid()` do token).
+ * O detalhe todo está em `servidor.js` e em `supabase-data.js`.
  *
  * ────────────────────────────────────────────────────────────────────────────
  * O QUE ESTE FLUXO FAZ DE PROPÓSITO (e por quê)
@@ -35,10 +50,20 @@
  *   Mandar o pai pra outra página no meio de um formulário de 6 caixinhas é
  *   perder metade deles.
  *
- * • **O painel avisa ANTES de o pai digitar** que não está enxergando a Cogni na
- *   rede. Descobrir isso depois de digitar seis caracteres e apertar "Conectar"
- *   é a diferença entre "ah, o robô está desligado" e "este site não funciona".
- *   A sondagem nunca bloqueia o envio: ela só acrescenta um recado.
+ * • **O painel lista as Cognis que se anunciaram, ANTES de o pai digitar.** Isso
+ *   já foi uma "sonda de rede" que dava um fetch num IP fixo e chamava aquilo de
+ *   procurar — ela respondia "não estou enxergando a Cogni" mesmo com o robô
+ *   ligado ao lado, porque um site em HTTPS não varre rede nenhuma (sem mDNS,
+ *   sem UDP, sem broadcast; e cada tentativa esbarraria no mesmo bloqueio que
+ *   derrubou o pareamento). Agora quem se anuncia é o robô, publicando um
+ *   heartbeat no Supabase, e a lista é leitura disso. Um indicador que mente com
+ *   convicção é pior que indicador nenhum.
+ *
+ * • **A descoberta NUNCA pareia sozinha.** Ela lista candidatos; clicar em
+ *   "Parear" só escolhe com quem o pai vai falar e leva o foco pro código. Regra
+ *   do Nicolas, textual: não tirar o controle dos pais. O que autentica o
+ *   vínculo continua sendo o código de 6 caracteres — a lista só encurta o
+ *   caminho e prova que o robô está de pé.
  *
  * • **Slide fora de vista é slide INERTE.** Um carrossel com as três telas no
  *   DOM deixa o Tab passear pelos campos da tela seguinte, invisíveis. Aqui só a
@@ -49,6 +74,9 @@
 import { el } from "./sections/_shared.js";
 import { ICON } from "./icons.js";
 import { marcarTourPendente } from "./tour.js";
+// Rótulos de idade/série: os mesmos do resto do painel, pra o portão não
+// inventar um segundo jeito de escrever "3º ano".
+import { idadeLabel, serieLabel } from "./format.js";
 
 /** Chave que marca que a apresentação completa já foi vista neste navegador. */
 const FLAG_VISTO = "cognify-onboarding-visto";
@@ -57,8 +85,13 @@ const FLAG_VISTO = "cognify-onboarding-visto";
 const ALFABETO_CODIGO = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const TAMANHO_CODIGO = 6;
 
-/** Teto da sondagem do servidor local. Curto: é um indicador, não uma etapa. */
-const TIMEOUT_SONDA_MS = 3500;
+/**
+ * De quanto em quanto tempo a lista de robôs é relida enquanto o pai está no
+ * portão. Curto o bastante pra o robô que acabou de ser ligado aparecer sem
+ * ninguém apertar nada, longo o bastante pra não virar polling agressivo num
+ * banco que o pai ainda nem usou.
+ */
+const INTERVALO_DESCOBERTA_MS = 15000;
 
 /** Normaliza um caractere digitado: caixa alta e só aceita do alfabeto válido. */
 function normalizarChar(ch) {
@@ -69,12 +102,13 @@ function normalizarChar(ch) {
 /**
  * Inicia o fluxo de onboarding/pareamento.
  * @param {object} cfg
- * @param {object} cfg.user — usuário logado (responsável)
  * @param {string} cfg.nomeResponsavel — primeiro nome (saudação)
- * @param {string} cfg.servidorUrl — base do servidor local da Cogni
+ * @param {object} cfg.mock — camada de dados (parear, listar robôs). O portão
+ *   nunca fala com o banco por conta própria: assim ele funciona igual no modo
+ *   real e no de demonstração, sem saber qual dos dois está no ar.
  * @param {Function} cfg.onPareado — callback chamado após parear com sucesso
  */
-export function iniciarOnboarding({ user, nomeResponsavel, servidorUrl, onPareado }) {
+export function iniciarOnboarding({ nomeResponsavel, mock, onPareado }) {
   const jaViu = lerFlagVisto();
 
   // Overlay raiz que cobre o painel inteiro.
@@ -93,7 +127,7 @@ export function iniciarOnboarding({ user, nomeResponsavel, servidorUrl, onParead
     telas.push(telaBoasVindas(nomeResponsavel));
     telas.push(telaComoFunciona());
   }
-  const pareamento = telaPareamento({ user, servidorUrl });
+  const pareamento = telaPareamento({ mock });
   telas.push(pareamento.node);
 
   telas.forEach((t) => track.appendChild(t));
@@ -460,10 +494,10 @@ function telaComoFunciona() {
  * Monta a tela de pareamento por código.
  * @returns {{ node:HTMLElement, focar:Function, aoEntrar:Function, aoConcluir:Function }}
  */
-function telaPareamento({ user, servidorUrl }) {
+function telaPareamento({ mock }) {
   const tela = el("article", { class: "ob-screen ob-screen--pair" });
   let concluirCb = null;
-  let sondou = false;
+  let timerDescoberta = null;
 
   // Cabeçalho com robô compacto.
   const header = el("div", {
@@ -552,63 +586,126 @@ function telaPareamento({ user, servidorUrl }) {
   ajuda.appendChild(
     el("p", {
       class: "ob-ajuda__nota",
+      // Até 26/ago/2026 esta nota dizia que o pareamento exigia estar na mesma
+      // rede do robô — e era verdade, porque o site falava com ele direto. Não é
+      // mais: o vínculo acontece no banco, então dá pra conectar do celular, do
+      // trabalho, de onde for. Só o CÓDIGO precisa vir do robô.
       text:
-        "Este passo (e só ele) precisa que o painel alcance a Cogni pela rede. " +
-        "Use o mesmo computador ou a mesma casa do robô; depois de conectado, o " +
-        "painel funciona de qualquer lugar.",
+        "Você pode conectar de qualquer lugar — não precisa estar na mesma rede " +
+        "do robô. O que precisa vir dele é só o código.",
     })
   );
 
   /* ---- Sonda: a Cogni está ao alcance? ---------------------------------- */
 
-  const sondaTxt = el("span", { class: "ob-sonda__txt", text: "Procurando a Cogni na rede…" });
+  const sondaTxt = el("span", { class: "ob-sonda__txt", text: "Procurando a Cogni…" });
   const sondaPonto = el("span", { class: "ob-sonda__ponto", attrs: { "aria-hidden": "true" } });
   const sondaBtn = el("button", {
     class: "ob-sonda__acao",
     attrs: { type: "button", hidden: "hidden" },
-    text: "Verificar de novo",
+    text: "Procurar de novo",
   });
   const sonda = el("p", {
     class: "ob-sonda",
     attrs: { "data-estado": "procurando", role: "status", "aria-live": "polite" },
     children: [sondaPonto, sondaTxt, sondaBtn],
   });
-  sondaBtn.addEventListener("click", () => sondar());
+  sondaBtn.addEventListener("click", () => descobrir());
+
+  /** Onde os cartões dos robôs encontrados são pintados (vazio = nada achado). */
+  const listaRobos = el("ul", {
+    class: "ob-robos",
+    attrs: { "aria-label": "Cognis encontradas" },
+  });
 
   /**
-   * Descobre se o servidor da Cogni responde, ANTES de o pai digitar.
+   * Lê os robôs que se anunciaram e monta a lista de candidatos.
    *
-   * `mode: "no-cors"` de propósito: não queremos ler a resposta, só saber se
-   * houve uma. Assim a sonda não depende de o servidor liberar CORS numa rota
-   * de saúde que talvez nem exista. Resposta opaca = servidor vivo; rejeição =
-   * fora do ar, outra rede, ou bloqueado pelo navegador.
+   * Isto NÃO varre a rede — e é justamente por isso que funciona. Quem se
+   * anuncia é o robô, publicando um heartbeat no Supabase enquanto está de pé e
+   * com a janela de pareamento aberta; aqui a gente só lê essa mesa. Um site em
+   * HTTPS não tem como fazer descoberta de rede (sem mDNS, sem UDP, sem
+   * broadcast), e a versão anterior disto fingia que tinha: dava um fetch num IP
+   * fixo e chamava de "procurar".
    *
-   * O resultado NUNCA bloqueia o formulário: navegadores tratam requisição a
-   * rede privada de formas diferentes, e um falso negativo não pode impedir um
-   * pareamento que funcionaria.
+   * Falha nunca vira erro de tela: tabela ausente, RLS ou rede caída são todos o
+   * mesmo recado — "não achei nenhuma agora" —, e nenhum deles impede o pai de
+   * digitar o código, que é o caminho que sempre funciona.
    */
-  async function sondar() {
+  async function descobrir() {
     sonda.setAttribute("data-estado", "procurando");
-    sondaTxt.textContent = "Procurando a Cogni na rede…";
+    sondaTxt.textContent = "Procurando a Cogni…";
     sondaBtn.hidden = true;
+
+    let robos = [];
     try {
-      await fetch(servidorUrl + "/", {
-        mode: "no-cors",
-        cache: "no-store",
-        signal: AbortSignal.timeout(TIMEOUT_SONDA_MS),
-      });
-      sonda.setAttribute("data-estado", "ok");
-      sondaTxt.textContent = "Cogni encontrada. Pode digitar o código.";
-      sondaBtn.hidden = true;
+      robos = (await mock.getRobosDisponiveis()) || [];
     } catch (e) {
-      sonda.setAttribute("data-estado", "off");
-      sondaTxt.textContent =
-        "Não estou enxergando a Cogni. Confira se o robô está ligado e na mesma rede.";
-      sondaBtn.hidden = false;
+      // A camada de dados já engole o previsível; se algo escapou, o portão
+      // segue de pé com a lista vazia.
+      console.debug("[Companion] Descoberta falhou:", e);
     }
+
+    listaRobos.replaceChildren(...robos.map(cardRobo));
+
+    if (robos.length) {
+      sonda.setAttribute("data-estado", "ok");
+      sondaTxt.textContent =
+        robos.length === 1
+          ? "Achei uma Cogni pronta pra conectar."
+          : `Achei ${robos.length} Cognis prontas pra conectar.`;
+      sondaBtn.hidden = true;
+      return;
+    }
+
+    sonda.setAttribute("data-estado", "off");
+    // A frase diz o que FAZER, e não só o que falhou: a janela de pareamento é
+    // aberta pelo robô, então "peça o código pra ela" é literalmente a ação que
+    // faz a Cogni aparecer aqui.
+    sondaTxt.textContent =
+      "Nenhuma Cogni se anunciou ainda. Peça o código pra ela — é isso que a faz aparecer aqui. Ou digite direto, se já tiver o código.";
+    sondaBtn.hidden = false;
   }
 
-  tela.append(header, form, ajuda, sonda);
+  /**
+   * Um candidato da lista.
+   *
+   * Mostra o apelido da máquina e há quanto tempo ela foi vista — e mais nada.
+   * **Nome de criança não aparece aqui de propósito**: esta lista é legível por
+   * qualquer responsável logado enquanto a janela está aberta, e dado de menor
+   * não pode viajar por aí. O botão "Parear" **não pareia**: ele escolhe o robô
+   * e joga o foco no código, que é quem prova que o pai está mesmo naquela casa.
+   */
+  function cardRobo(robo) {
+    const btn = el("button", {
+      class: "dash-btn dash-btn--ghost ob-robo__btn",
+      attrs: { type: "button" },
+      text: "Parear",
+    });
+    btn.addEventListener("click", () => {
+      limparErro();
+      feedback.textContent = `Digite o código que aparece em ${robo.apelido}.`;
+      feedback.classList.add("is-ok");
+      inputs[0].focus();
+    });
+
+    return el("li", {
+      class: "ob-robo",
+      children: [
+        el("span", { class: "ob-robo__ico", svg: ICON.robot, attrs: { "aria-hidden": "true" } }),
+        el("span", {
+          class: "ob-robo__txt",
+          children: [
+            el("span", { class: "ob-robo__nome", text: robo.apelido || "Cogni" }),
+            el("span", { class: "ob-robo__visto", text: vistaHa(robo.visto_em) }),
+          ],
+        }),
+        btn,
+      ],
+    });
+  }
+
+  tela.append(header, form, ajuda, sonda, listaRobos);
 
   /* ---- Comportamento dos inputs do código (digitar, colar, navegar) ---- */
   function valorCodigo() {
@@ -691,21 +788,11 @@ function telaPareamento({ user, servidorUrl }) {
     enviando = true;
     setLoading(true);
     try {
-      const resp = await fetch(`${servidorUrl}/api/pareamento/vincular`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo, responsavelId: user.id }),
-      });
+      const dados = await mock.parearPorCodigo(codigo);
 
-      let dados = {};
-      try {
-        dados = await resp.json();
-      } catch (_) {
-        /* resposta sem corpo JSON */
-      }
-
-      if (resp.ok && dados.ok) {
-        mostrarSucesso(dados.nome, dados.jaPareado);
+      if (dados && dados.ok) {
+        pararDescoberta(); // pareou: a lista não tem mais o que fazer
+        mostrarSucesso(dados, codigo);
         // Pequena pausa pra a comemoração aparecer antes de recarregar.
         window.setTimeout(() => {
           if (typeof concluirCb === "function") concluirCb();
@@ -713,25 +800,23 @@ function telaPareamento({ user, servidorUrl }) {
         return;
       }
 
-      // Erros mapeados pelo servidor (mensagem já vem amigável em PT-BR).
-      mostrarErro(dados.erro || erroPorStatus(resp.status));
+      // Falhas são RESULTADO, não exceção: código errado é o caso mais comum
+      // desta tela, e a camada de dados já devolve o motivo no vocabulário que
+      // vira frase em PT-BR num lugar só.
+      mostrarErro(mock.mensagemDeErroDePareamento(dados && dados.motivo));
       enviando = false;
       setLoading(false);
       boxes.classList.add("is-error");
       inputs.forEach((i) => (i.value = ""));
       inputs[0].focus();
     } catch (err) {
-      // Falha de rede / servidor fora do ar / CORS.
+      // Sobrou aqui: o Supabase caiu, o token morreu, o navegador está offline.
+      // Nada disso é culpa do código digitado, e a frase evita mandar o pai
+      // conferir seis caracteres que provavelmente estão certos.
       console.error("[Companion] Pareamento falhou:", err);
-      mostrarErro(
-        "Não consegui falar com a Cogni. Confirme que o robô está ligado e tente de novo."
-      );
+      mostrarErro("Não consegui conectar agora. Confira sua internet e tente de novo.");
       enviando = false;
       setLoading(false);
-      // O erro é de alcance, não de código: reabre a ajuda e refaz a sonda, que
-      // é onde está a explicação do que fazer.
-      ajuda.open = true;
-      sondar();
     }
   });
 
@@ -749,8 +834,25 @@ function telaPareamento({ user, servidorUrl }) {
    * chegar (recarregamos o painel) — este é o lugar certo de dizer que deu
    * certo, com o nome de quem ele acabou de conectar.
    */
-  function mostrarSucesso(nomeCrianca, jaPareado) {
-    const quem = (nomeCrianca || "").trim();
+  function mostrarSucesso(dados, codigoUsado) {
+    const quem = ((dados && dados.nome) || "").trim();
+    // Desambiguação de HOMÔNIMOS — e eles existem de verdade: há dois "Marcos"
+    // entre os perfis do robô, com códigos diferentes. Sem isto, parear o errado
+    // é invisível na tela e só aparece depois, como uma trilha de aprendizado
+    // que "está errada" — o que parece defeito do produto, não código trocado.
+    //
+    // Idade e série vêm primeiro porque são o que o pai reconhece; mas elas são
+    // NULLABLE e, nos perfis reais, estar vazias é o caso COMUM (a maioria não
+    // completou o onboarding do robô). Por isso o código fecha a linha: ele é a
+    // única coisa que distingue os dois com certeza, e o pai acabou de digitá-lo.
+    const marcas = [
+      idadeLabel(dados && dados.idade),
+      serieLabel(dados && dados.serie),
+      codigoUsado ? `código ${codigoUsado}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
     const sucesso = el("div", {
       class: "ob-sucesso",
       attrs: { role: "status", "aria-live": "assertive" },
@@ -758,7 +860,7 @@ function telaPareamento({ user, servidorUrl }) {
         el("span", { class: "ob-sucesso__selo", svg: ICON.check, attrs: { "aria-hidden": "true" } }),
         el("h2", {
           class: "ob-title ob-title--sm",
-          text: jaPareado ? "Vocês já estavam conectados!" : "Conectado!",
+          text: dados && dados.jaPareado ? "Vocês já estavam conectados!" : "Conectado!",
         }),
         el("p", {
           class: "ob-lead",
@@ -766,6 +868,7 @@ function telaPareamento({ user, servidorUrl }) {
             ? `Este painel agora acompanha ${quem}. Abrindo…`
             : "Este painel agora acompanha o perfil do robô. Abrindo…",
         }),
+        marcas ? el("p", { class: "ob-sucesso__marcas", text: marcas }) : null,
       ],
     });
     tela.replaceChildren(sucesso);
@@ -779,19 +882,57 @@ function telaPareamento({ user, servidorUrl }) {
     inputs.forEach((i) => (i.disabled = on));
   }
 
+  /** Encerra o ciclo da descoberta (pareou, ou a tela saiu de cena). */
+  function pararDescoberta() {
+    if (timerDescoberta) {
+      clearInterval(timerDescoberta);
+      timerDescoberta = null;
+    }
+  }
+
   return {
     node: tela,
     focar: () => inputs[0] && inputs[0].focus({ preventScroll: true }),
-    /** Chamado quando esta tela vira a ativa (só sonda uma vez por visita). */
+    /**
+     * Chamado quando esta tela vira a ativa. Procura na hora e continua
+     * procurando: o caso real é o pai chegar aqui e SÓ ENTÃO ir ligar o robô —
+     * uma busca única deixaria a tela dizendo "não achei" pelo resto da visita,
+     * que é exatamente o defeito da sonda antiga.
+     */
     aoEntrar: () => {
-      if (sondou) return;
-      sondou = true;
-      sondar();
+      if (timerDescoberta) return;
+      descobrir();
+      timerDescoberta = window.setInterval(descobrir, INTERVALO_DESCOBERTA_MS);
     },
     aoConcluir: (cb) => {
       concluirCb = cb;
     },
   };
+}
+
+/**
+ * "vista agora" / "vista há 2 min" — o quanto o robô é recente.
+ *
+ * A policy do banco só entrega robôs vistos há menos de 2 minutos, então
+ * qualquer número maior que isso é ANOMALIA, não informação: relógio do robô
+ * fora de hora, fuso mal gravado, ou o modo de demonstração (cuja data é fixa).
+ * Nesses casos a frase vira vaga em vez de exibir um número absurdo — a foto do
+ * primeiro teste desta tela mostrava "vista há 131094 min", que não ajuda
+ * ninguém a decidir se aquele robô é o da sala.
+ *
+ * Diferença negativa (relógio do servidor adiantado) cai no mesmo lugar de
+ * "acabou de ser vista", que é a leitura correta.
+ *
+ * @param {string} iso
+ * @returns {string}
+ */
+function vistaHa(iso) {
+  const t = Date.parse(iso || "");
+  if (!Number.isFinite(t)) return "vista agora";
+  const seg = Math.round((Date.now() - t) / 1000);
+  if (seg < 45) return "vista agora";
+  if (seg > 300) return "vista há pouco";
+  return `vista há ${Math.round(seg / 60)} min`;
 }
 
 /* ==========================================================================
@@ -805,15 +946,6 @@ const CHEVRON =
 /** Porta com seta pra fora — o "sair" do rodapé do portão. */
 const ICON_SAIR =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 17v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v2"/><path d="M10 12h10M17 8.5l3.5 3.5L17 15.5"/></svg>';
-
-/** Mensagem genérica por status HTTP, caso o servidor não mande o corpo. */
-function erroPorStatus(status) {
-  if (status === 404) return "Código inválido. Confira os 6 caracteres.";
-  if (status === 409) return "Essa criança já está vinculada a outro responsável.";
-  if (status === 400) return "Confira o código e tente de novo.";
-  if (status === 503) return "Pareamento indisponível no momento. Tente mais tarde.";
-  return "Não foi possível parear agora. Tente de novo.";
-}
 
 function lerFlagVisto() {
   try {
