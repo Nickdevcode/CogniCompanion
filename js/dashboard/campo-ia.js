@@ -144,6 +144,11 @@ function mensagemDeStatus(status) {
  * Só a REDE é falsa — mesma prática do resto do fluxo de material. O suficiente pra
  * exercitar offline o que realmente precisa de olho: o desfazer, o corte no teto, o
  * botão desabilitado sem contexto e o estado "escrevendo…".
+ *
+ * ⚠️ O texto SAI PLAUSÍVEL de propósito. Antes ele carimbava "(exemplo, sem rede)"
+ * no resultado, o que era ótimo pra depurar e péssimo no lugar onde este código
+ * mais aparece: o modo demonstração, em que alguém avalia o produto pela tela. Quem
+ * precisa saber que é exemplo lê este comentário — o visitante lê a interface.
  */
 function exemploLocal({ campo, acao, texto, contexto, teto }) {
   const base = String(texto || "").replace(/\s+/g, " ").trim();
@@ -158,15 +163,20 @@ function exemploLocal({ campo, acao, texto, contexto, teto }) {
           : campo === "tarefa.titulo"
             ? contexto.tituloDoPlano || (contexto.cards || [])[0]
             : contexto.tituloDaTarefa;
+    const limpa = maiuscula(String(fonte || "").replace(/\.$/, ""));
+    // Título é campo curto: qualquer complemento só seria cortado pelo teto.
+    const ehTitulo = campo === "plano.titulo" || campo === "tarefa.titulo";
     return cortarSemPartirPalavra(
-      maiuscula(String(fonte || "").replace(/\.$/, "")) + " (exemplo, sem rede)",
+      ehTitulo
+        ? limpa
+        : `${limpa}: um pouco por dia, no ritmo da criança, com a Cogni puxando exemplos do dia a dia.`,
       teto
     );
   }
   if (acao === "encurtar") return cortarSemPartirPalavra(maiuscula(base), Math.ceil(teto / 2));
   if (acao === "detalhar") {
     return cortarSemPartirPalavra(
-      `${maiuscula(base)}: o que fazer, com que assunto e em que ordem (exemplo, sem rede)`,
+      `${maiuscula(base)}: o que fazer, com que assunto e em que ordem.`,
       teto
     );
   }

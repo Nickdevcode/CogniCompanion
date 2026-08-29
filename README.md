@@ -25,6 +25,7 @@ Mais do que um robô, o Cogni é a união de **hardware + IA** numa experiência
 
 - [De onde vêm os dados](#-de-onde-vêm-os-dados)
 - [A chave que liga tudo: `USAR_SUPABASE`](#️-a-chave-que-liga-tudo-usar_supabase)
+- [Modo demonstração (login de apresentação)](#-modo-demonstração-login-de-apresentação)
 - [Servidor local (`SERVIDOR_URL`)](#-servidor-local-servidor_url)
 - [Onboarding & pareamento](#-onboarding--pareamento)
 - [Primeira visita: o tutorial guiado](#-primeira-visita-o-tutorial-guiado)
@@ -150,6 +151,40 @@ export const USAR_SUPABASE = true;  // true = dados reais · false = dados de ex
 
 As implementações reais ficam isoladas em `js/dashboard/supabase-data.js` (mesma "cara" do mock — por isso
 trocar a flag não muda nenhuma tela).
+
+### 🎭 Modo demonstração (login de apresentação)
+
+Existe uma situação em que o Cogni precisa ser avaliado **sem o Cogni**: alguém abre a URL da Vercel pra
+julgar o *site* — design, navegação, telas — sem robô pra parear, sem conta no Supabase e sem estar na LAN
+de casa. No fluxo normal essa pessoa não passa do login. O **modo demonstração** é a resposta. 🎬
+
+**Como entra:** não há tela nova. É o mesmo formulário de `login.html`, com um par fixo:
+
+| Campo | Valor |
+| --- | --- |
+| E-mail | `testecogni@gmail.com` |
+| Senha | `cogni1234` (ou `Cogni1234` — as duas passam) |
+
+O e-mail é comparado sem espaços e sem diferenciar maiúsculas. **Qualquer outro par segue o fluxo real do
+Supabase Auth, intacto.** Bateu o par → vai direto pro painel, já cheio.
+
+**O que muda quando está ligado** — três pontos de enxerto, e só três:
+
+| Onde | O que faz |
+| --- | --- |
+| `js/demo/demo.js` | troca `window.cognifyAuth` por um stub cujo `getClient()` é `null` — isso sozinho apaga Supabase, RLS e Realtime |
+| `js/dashboard/mock-data.js` | `USAR_SUPABASE` nasce `false`, então valem os dados de exemplo acima |
+| `js/dashboard/servidor.js` | `SERVIDOR_URL` nasce vazio — a ponte HTTP do robô fica fora de alcance |
+
+Nenhuma tela sabe que o modo existe: **não há `if (demo)` espalhado pelo painel**. Consequências que valem
+saber:
+
+- 🚫 **Zero requisição de rede** pro Supabase, pro robô ou pras Vercel Functions. Verificado percorrendo as 6 seções.
+- ✍️ **Nada é gravado.** Mudar o rosto, desvincular, criar plano: tudo dá feedback na tela e morre em memória.
+- 🧹 **Nada persiste.** O estado mora em `sessionStorage`, e o "Sair da conta" apaga também a marca do
+  tutorial guiado — cada apresentação começa igual à anterior.
+- 📅 **As datas acompanham o relógio.** O mock era ancorado numa data fixa e envelhecia em silêncio (o Diário
+  chegou a mostrar "Hoje" e, logo abaixo, "25 de maio"). Agora as fixtures deslizam em dias inteiros até hoje.
 
 ### 🌐 Servidor local (`SERVIDOR_URL`) — e o muro que apareceu sozinho
 

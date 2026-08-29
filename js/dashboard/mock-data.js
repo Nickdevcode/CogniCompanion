@@ -32,8 +32,22 @@ import { ordenarPlanos } from "./format.js";
 /**
  * Liga (true) os dados reais do Supabase; desliga (false) volta pro mock.
  * Padrão: true (integração ativa). Vire pra false pra demonstrar com o mock.
+ *
+ * ⭐ 28/ago/2026 — o MODO DEMONSTRAÇÃO desliga isto sozinho. Quando a aba entrou
+ * pelo login de demonstração (`js/demo/demo.js`), o painel inteiro precisa rodar
+ * de dados em memória, e este já é o interruptor que faz exatamente isso: todo
+ * o roteamento abaixo, mais os exemplos locais de `campo-ia.js`, `captura.js` e
+ * `material/link.js`, obedecem a esta flag. Reaproveitá-la é o que evita um
+ * segundo caminho paralelo — e um `if (demo)` dentro de cada tela.
+ *
+ * Constante de propósito: o modo é decidido no login, antes deste módulo
+ * carregar, e não muda no meio da sessão.
  */
-export const USAR_SUPABASE = true;
+export const USAR_SUPABASE = !(
+  typeof window !== "undefined" &&
+  window.cognifyDemo &&
+  window.cognifyDemo.ativo()
+);
 
 /**
  * "Agora" de referência usado pelas seções (rótulos "Hoje/Ontem", janela da
@@ -532,6 +546,101 @@ let tarefas = [
     criado_em: "2026-05-18T11:00:00-03:00",
     atualizado_em: "2026-05-24T17:20:00-03:00",
   },
+  /* --- Cards do plano 21 ("Leitura divertida"), o primeiro da fila ---------
+     Este é o plano que a Mesa abre por padrão. Sem cards aqui, a tela mais
+     visual do painel abria com as TRÊS colunas vazias — e "Nada esperando
+     aqui" é a primeira coisa que alguém vê da Mesa de Estudos. Os cards
+     conversam com o resto do exemplo: é o mesmo capítulo que o Pedro anda
+     lendo, e a redação que ele pediu ajuda no Diário. */
+  {
+    id: 109,
+    plano_id: 21,
+    crianca_id: crianca.id,
+    titulo: "Ler 15 minutos por dia",
+    detalhe: "Um trecho do livro dos dinossauros, em voz alta",
+    materia: "portugues",
+    coluna: "a_fazer",
+    ordem: 1000,
+    prazo: "2026-05-30",
+    estimativa_min: 15,
+    origem: "pai",
+    movida_por: null,
+    movida_em: null,
+    evidencia: null,
+    confianca: null,
+    concluida_em: null,
+    criado_em: "2026-05-19T08:30:00-03:00",
+    atualizado_em: "2026-05-19T08:30:00-03:00",
+  },
+  {
+    id: 110,
+    plano_id: 21,
+    crianca_id: crianca.id,
+    titulo: "Caça-palavras dos animais",
+    detalhe: null,
+    materia: "portugues",
+    coluna: "a_fazer",
+    ordem: 2000,
+    prazo: null,
+    estimativa_min: 10,
+    origem: "pai",
+    movida_por: null,
+    movida_em: null,
+    evidencia: null,
+    confianca: null,
+    concluida_em: null,
+    criado_em: "2026-05-21T18:15:00-03:00",
+    atualizado_em: "2026-05-21T18:15:00-03:00",
+  },
+  {
+    // A Cogni moveu sozinha: o Pedro pediu ajuda com a redação hoje (Diário).
+    id: 111,
+    plano_id: 21,
+    crianca_id: crianca.id,
+    titulo: "Escrever sobre o dia favorito",
+    detalhe: "Cinco linhas, do jeito dele",
+    materia: "portugues",
+    coluna: "fazendo",
+    ordem: 1000,
+    prazo: "2026-05-28",
+    estimativa_min: 20,
+    origem: "pai",
+    movida_por: "cogni",
+    movida_em: "2026-05-27T18:35:00-03:00",
+    evidencia: {
+      motivo: "conversa",
+      conceito: "redação",
+      em: "2026-05-27T18:35:00-03:00",
+    },
+    confianca: null,
+    concluida_em: null,
+    criado_em: "2026-05-20T09:10:00-03:00",
+    atualizado_em: "2026-05-27T18:35:00-03:00",
+  },
+  {
+    id: 112,
+    plano_id: 21,
+    crianca_id: crianca.id,
+    titulo: "Contar a história pra Cogni",
+    detalhe: "O capítulo do T-Rex, com as próprias palavras",
+    materia: "portugues",
+    coluna: "feito",
+    ordem: 1000,
+    prazo: null,
+    estimativa_min: 15,
+    origem: "pai",
+    movida_por: "cogni",
+    movida_em: "2026-05-25T17:05:00-03:00",
+    evidencia: {
+      motivo: "conversa",
+      conceito: "interpretação de texto",
+      em: "2026-05-25T17:05:00-03:00",
+    },
+    confianca: null,
+    concluida_em: "2026-05-25T17:05:00-03:00",
+    criado_em: "2026-05-18T10:00:00-03:00",
+    atualizado_em: "2026-05-25T17:05:00-03:00",
+  },
   /* --- Cards do rascunho vindo de foto (plano 25) --- */
   {
     id: 107,
@@ -646,11 +755,101 @@ const resumoSemanal = {
 };
 
 /* ==========================================================================
-   "Agora" do mock — fixa a data de referência pra os rótulos relativos
+   "Agora" do mock — a data de referência pra os rótulos relativos
    ("Hoje"/"Ontem") baterem com os dados de exemplo acima.
-   Ao integrar, troque por `new Date()` (ou remova e use a data real).
    ========================================================================== */
-export const MOCK_NOW = new Date("2026-05-27T19:00:00-03:00");
+
+/**
+ * A data em que os exemplos acima foram escritos. É a âncora ORIGINAL: todas as
+ * datas literais deste arquivo foram compostas em relação a ela.
+ */
+const MOCK_ANCORA = "2026-05-27T19:00:00-03:00";
+
+/**
+ * Quantos dias inteiros separam a âncora do dia de hoje.
+ *
+ * ⭐ 28/ago/2026 — POR QUE ISTO EXISTE. As datas de exemplo eram fixas, e um mock
+ * com data fixa envelhece em silêncio: os rótulos relativos continuavam certos
+ * (o painel lê `getNow()`, que devolvia a âncora), mas o Diário imprime a data
+ * ABSOLUTA nos separadores de dia — então, meses depois, a tela mostrava "Hoje"
+ * e "Ontem" e logo abaixo "25 de maio". Deslizar a âncora até hoje conserta os
+ * dois de uma vez, sem tocar em nenhuma das 60+ datas escritas à mão.
+ *
+ * Em DIAS INTEIROS de propósito: preserva a hora e o fuso de cada registro
+ * (18:32 continua 18:32), então a linha do tempo de um dia não se embaralha.
+ */
+const DESLIZE_DIAS = (() => {
+  const hoje = new Date();
+  const base = new Date(MOCK_ANCORA);
+  const emDias = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  return Math.round((emDias(hoje) - emDias(base)) / 86400000);
+})();
+
+/** Zero-pad de 2 dígitos, pra remontar a data ISO. */
+const pad2 = (n) => String(n).padStart(2, "0");
+
+/**
+ * Desliza a parte da DATA de um timestamp ISO, mantendo hora e offset intactos.
+ *
+ * Trabalha na string, e não em milissegundos, porque somar `dias * 86400000` a
+ * um `Date` escorrega uma hora quando a janela atravessa uma virada de horário
+ * de verão — e o resultado seria "18:32" virar "17:32" só em parte dos registros.
+ *
+ * Aceita as DUAS formas que as fixtures usam: o timestamp completo
+ * (`criado_em`, `visto`, `movida_em`) e a data pura dos prazos (`prazo:
+ * "2026-05-29"`). Deixar a data pura de fora era um buraco silencioso: os
+ * timestamps chegavam em hoje e só os prazos ficavam três meses atrás, o que
+ * pintaria o quadro inteiro de "atrasado".
+ *
+ * @param {string} iso — ex.: "2026-05-25T17:22:00-03:00" ou "2026-05-29"
+ * @returns {string} a mesma data, deslizada; ou a entrada, se não for ISO.
+ */
+function deslizarISO(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(.*)$/.exec(iso);
+  if (!m) return iso;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  d.setUTCDate(d.getUTCDate() + DESLIZE_DIAS);
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(
+    d.getUTCDate()
+  )}${m[4]}`;
+}
+
+/** Reconhece uma data ISO (com ou sem hora) — é o que decide o que deslizar. */
+const EH_ISO = /^\d{4}-\d{2}-\d{2}(T|$)/;
+
+/**
+ * Percorre a estrutura e desliza toda string de data que encontrar, no lugar.
+ *
+ * Genérico (varre por FORMATO, não por lista de campos) pra um campo de data
+ * novo em qualquer fixture já nascer deslizado — uma allowlist de nomes seria
+ * mais uma lista pra alguém esquecer de atualizar.
+ */
+function deslizarDatas(alvo) {
+  if (Array.isArray(alvo)) {
+    alvo.forEach(deslizarDatas);
+    return;
+  }
+  if (!alvo || typeof alvo !== "object") return;
+  for (const [chave, valor] of Object.entries(alvo)) {
+    if (typeof valor === "string" && EH_ISO.test(valor)) {
+      alvo[chave] = deslizarISO(valor);
+    } else if (valor && typeof valor === "object") {
+      deslizarDatas(valor);
+    }
+  }
+}
+
+// Só no modo mock: em produção nada disto é lido, e varrer as fixtures à toa a
+// cada carregamento do painel seria trabalho para ninguém.
+if (!USAR_SUPABASE && DESLIZE_DIAS !== 0) {
+  deslizarDatas([responsavel, crianca, conversas, planos, tarefas, dicas, resumoSemanal]);
+}
+
+/**
+ * "Agora" do mock, já deslizado pra hoje — é o que `getNow()` devolve e o que
+ * todas as telas usam pra escrever "Hoje", "Ontem" e a janela da semana.
+ */
+export const MOCK_NOW = new Date(deslizarISO(MOCK_ANCORA));
 
 /* ==========================================================================
    API de leitura (mesmo shape do que o Supabase devolverá)

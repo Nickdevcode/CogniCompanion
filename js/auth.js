@@ -17,6 +17,9 @@
   "use strict";
 
   const REDIRECT_AFTER_AUTH = "index.html"; // destino após LOGIN bem-sucedido
+  // Modo demonstração: vai DIRETO pro painel. É o que o visitante veio ver, e
+  // passar pela home só adiciona um clique entre ele e as telas avaliadas.
+  const REDIRECT_DEMO = "dashboard.html";
   const REDIRECT_AFTER_SIGNUP = "login.html"; // após CADASTRO: manda logar
   const MIN_PASSWORD = 6; // padrão do Supabase
 
@@ -278,6 +281,34 @@
         markFieldError(passInput);
         passInput.focus();
         return notifyError(form, "Digite sua senha.");
+      }
+
+      // ---- Modo demonstração ----------------------------------------
+      // ANTES do Supabase, de propósito: este par de credenciais não existe no
+      // Auth, então deixá-lo seguir o fluxo real só renderia "e-mail ou senha
+      // incorretos" depois de um request. Qualquer OUTRO par cai fora deste if
+      // e segue exatamente o caminho de sempre. Ver js/demo/demo.js.
+      if (window.cognifyDemo && window.cognifyDemo.credenciaisConferem(email, password)) {
+        setLoading(form, true);
+        // Garante que nenhuma sessão real fique por baixo da demonstração.
+        // `scope: "local"` limpa só o storage do navegador — não vai à rede.
+        try {
+          const real = window.cognifyAuth && window.cognifyAuth.getClient();
+          if (real) await real.auth.signOut({ scope: "local" });
+        } catch (e) {
+          /* sem sessão real pra limpar: seguimos pra demonstração */
+        }
+        if (window.cognifyDemo.ligar()) {
+          window.location.href = REDIRECT_DEMO;
+          return;
+        }
+        // sessionStorage bloqueado (navegação privada estrita): sem onde guardar
+        // o estado, o painel abriria deslogado. Melhor dizer do que fingir.
+        setLoading(form, false);
+        return notifyError(
+          form,
+          "Seu navegador está bloqueando o armazenamento local, e a demonstração precisa dele."
+        );
       }
 
       const client = ensureReady(form);

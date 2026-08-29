@@ -76,6 +76,14 @@ function resolverBaseServidor() {
   // SSR/teste sem DOM: sem `location` não há como decidir — assume fora de alcance.
   if (typeof location === "undefined") return "";
 
+  // Modo demonstração: não existe robô nenhum pra alcançar, e a demo costuma
+  // rodar em `localhost` — que é justamente o caso 1 abaixo. Sem esta saída, o
+  // painel de demonstração iria bater em `127.0.0.1:3000` de verdade. "Fora de
+  // alcance" já é a linguagem que todos os consumidores entendem.
+  if (typeof window !== "undefined" && window.cognifyDemo && window.cognifyDemo.ativo()) {
+    return "";
+  }
+
   const { protocol, hostname } = location;
   if (protocol === "file:") return LOOPBACK;
   if (EH_LOOPBACK.test(hostname)) return LOOPBACK;

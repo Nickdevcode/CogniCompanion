@@ -370,6 +370,10 @@
       defer
     ></script>
     <script src="js/supabase-config.js" defer></script>
+    <!-- Modo demonstração: precisa vir DEPOIS do supabase-config (que cria o
+         window.cognifyAuth real) e ANTES de session.js / dashboard/main.js,
+         que já o consomem. Fora da demo o arquivo não faz nada. -->
+    <script src="js/demo/demo.js" defer></script>
     <script src="js/toast.js" defer></script>
     <script src="js/session.js" defer></script>
 
