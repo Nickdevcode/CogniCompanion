@@ -85,9 +85,17 @@
 .team-card__role {
   font-family: "Gugi", var(--font-body);
   font-size: 0.85rem;
+  line-height: 1.35;
   color: var(--card-team-role);
   opacity: 0.6;
   margin-top: 0.25rem;
+  /* Reserva a altura de DUAS linhas em todos os cards. As funções têm
+     comprimentos bem diferentes ("Design" ao lado de "Liderança e
+     Desenvolvimento"), e a partir de ~1300px de tela o card encolhe até 230px e
+     as mais longas quebram. Sem esta reserva, o texto de um card termina 20px
+     acima do vizinho e os cards perdem a linha de base comum — some justamente
+     na largura em que o carrossel mostra mais cards lado a lado. */
+  min-height: 2.7em;
 }
 .team-card__socials {
   display: flex;
