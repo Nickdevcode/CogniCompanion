@@ -160,6 +160,16 @@ export function sanear(cru, { aviso = null, temMaterial = true, temLink = false 
   // A precedência é a mesma do prompt: a escola manda, depois o link, depois o pedido.
   const padrao = temMaterial ? PADROES.material : temLink ? PADROES.link : PADROES.pedido;
 
+  /**
+   * 🔴 Houve algo pra LER? É isso que decide o default de `confianca`, logo abaixo.
+   *
+   * O chip da tela diz *"A Cogni não teve certeza do que leu nesta parte do material"*,
+   * e num plano nascido só do pedido escrito ela não leu material nenhum — não havia o
+   * que entender errado. O chip acendia mesmo assim, porque o default era 0.5 e o corte
+   * é 0.6: a Cogni duvidando de uma leitura que nunca aconteceu.
+   */
+  const houveLeitura = temMaterial || temLink;
+
   if (!cru || cru.legivel === false) {
     return { legivel: false, motivo: cortar(cru?.motivo, 240) || padrao.motivo };
   }
@@ -185,11 +195,15 @@ export function sanear(cru, { aviso = null, temMaterial = true, temLink = false 
       prazo: /^\d{4}-\d{2}-\d{2}$/.test(t?.prazo) ? t.prazo : null,
       estimativa_min: grampear(t?.estimativa_min, 1, 600),
       /**
-       * Sem confiança declarada assumimos BAIXA (0.5), não alta: o chip "confira"
-       * aparecendo à toa custa um olhar do pai; faltando, custa uma tarefa errada
-       * entrando no plano sem ninguém conferir.
+       * Sem confiança declarada assumimos BAIXA (0.5) **quando houve leitura**: o chip
+       * "confira" aparecendo à toa custa um olhar do pai; faltando, custa uma tarefa
+       * errada entrando no plano sem ninguém conferir.
+       *
+       * Sem leitura nenhuma o default se inverte. Não é otimismo: é que a dúvida que o
+       * chip comunica é sobre O QUE ELA LEU, e não houve leitura. Um número declarado
+       * pela IA continua mandando nos dois casos — o default só cobre o silêncio dela.
        */
-      confianca: grampear(t?.confianca, 0, 1) ?? 0.5,
+      confianca: grampear(t?.confianca, 0, 1) ?? (houveLeitura ? 0.5 : 1),
     }))
     .filter((t) => t.titulo);
 
