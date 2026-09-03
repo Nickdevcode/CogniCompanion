@@ -35,6 +35,23 @@
 /** De quanto em quanto tempo relemos quando o canal está fora. */
 const POLL_DEGRADADO_MS = 20000;
 
+/**
+ * 🔴 O poll de RESERVA — o que roda mesmo com o canal "no ar".
+ *
+ * O cabeçalho deste arquivo já mandava: *"`SUBSCRIBED` não prova que a tabela está
+ * publicada... é por isso que o polling de reserva existe mesmo com o canal no ar"*. O
+ * código fazia o contrário — `desligarPoll()` no `SUBSCRIBED` — e o resultado era o
+ * pior modo de falha possível: com `plano_tarefas` fora do `supabase_realtime`, o canal
+ * sobe, o selo diz **"Atualizando ao vivo"**, os `.on()` nunca disparam e o plano B
+ * está desligado. O quadro congela e a tela jura que está vivo.
+ *
+ * 2 minutos, e não os 20 segundos do degradado, porque aqui ele é rede de segurança e
+ * não o transporte principal: se o Realtime estiver mesmo funcionando, cada leitura
+ * destas é desperdício puro. É barato o bastante pra não pesar e frequente o bastante
+ * pra o pai não ficar olhando um quadro parado.
+ */
+const POLL_RESERVA_MS = 120000;
+
 /** Releitura ao voltar pra aba só se o canal ficou quieto por mais que isto. */
 const SILENCIO_SUSPEITO_MS = 30000;
 
@@ -77,6 +94,7 @@ export function assinarMesa({
   /** Eventos represados durante um arraste. */
   let fila = [];
   let timerPoll = 0;
+  let cadenciaDoPoll = 0;
   let timerTtl = 0;
   let ultimoEventoEm = Date.now();
   let vivo = true;
@@ -209,19 +227,29 @@ export function assinarMesa({
 
   /* ---- Degradação -------------------------------------------------------- */
 
-  function ligarPoll() {
-    if (timerPoll) return;
+  /**
+   * Liga (ou retroca a cadência do) poll.
+   *
+   * A cadência é guardada porque `setInterval` não deixa consultar a dele: sem isso, a
+   * troca entre reserva e degradado ou não aconteceria (o `if (timerPoll) return`
+   * antigo) ou recriaria o timer a cada evento de canal, que dá na mesma.
+   */
+  function ligarPoll(ms) {
+    if (timerPoll && cadenciaDoPoll === ms) return;
+    desligarPoll();
+    cadenciaDoPoll = ms;
     timerPoll = window.setInterval(() => {
       if (!vivo) return;
       if (document.visibilityState !== "visible") return;
       relerAgora();
-    }, POLL_DEGRADADO_MS);
+    }, ms);
   }
 
   function desligarPoll() {
     if (!timerPoll) return;
     window.clearInterval(timerPoll);
     timerPoll = 0;
+    cadenciaDoPoll = 0;
   }
 
   /* ---- Canal ------------------------------------------------------------- */
@@ -243,7 +271,9 @@ export function assinarMesa({
       console.info("[Companion] Realtime da Mesa:", status);
       if (status === "SUBSCRIBED") {
         aoStatus("ao-vivo");
-        desligarPoll();
+        // NÃO desliga o poll: só afrouxa. Ver `POLL_RESERVA_MS` — o canal estar de pé
+        // não prova que os eventos chegam.
+        ligarPoll(POLL_RESERVA_MS);
         // Releitura SEMPRE ao assinar: fecha a janela entre o SELECT inicial e o
         // canal subir, e o buraco de qualquer reconexão. É barato e evita a classe
         // inteira de bug "o card mudou enquanto eu conectava".
@@ -258,7 +288,7 @@ export function assinarMesa({
       // Sem toast de propósito: isso dispara a cada oscilação de Wi-Fi e assustaria
       // o pai por algo que a tela já contorna sozinha.
       aoStatus("degradado");
-      ligarPoll();
+      ligarPoll(POLL_DEGRADADO_MS);
     });
 
   /* ---- Voltar pra aba ---------------------------------------------------- */
