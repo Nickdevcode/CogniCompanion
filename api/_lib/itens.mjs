@@ -17,7 +17,23 @@ import { ErroHttp } from "./http.mjs";
 /** Teto do corpo inteiro. O cliente para em 4,0 MB; a plataforma corta em 4,5 MB. */
 const CORPO_MAX = 4_200_000;
 
-const MAX_ITENS = 6;
+/**
+ * Itens na lista ACHATADA — e isto NÃO é "6 materiais na tela".
+ *
+ * 🔴 O número era 6 aqui e 6 no cliente, e os dois contavam coisas diferentes: a
+ * bandeja conta CARDS (é o que o pai vê, e é o que `revisao.js` lista, uma linha por
+ * material), enquanto aqui chega um array achatado em que **um vídeo vale até cinco
+ * itens** (4 quadros + a trilha). O pai via "2 de 6" na tela e levava
+ * "No máximo 6 materiais por vez." no envio, sobre uma conta que a tela não mostra.
+ *
+ * O limite de UX continua sendo 6 materiais, e ele mora no cliente, que é o único
+ * lado que enxerga a agrupação — aqui só chega a lista achatada. Este teto passou a
+ * ser o que ele sempre deveria ter sido: a rede de segurança para quem NÃO passou
+ * pelo nosso cliente. 12 cobre o pior caso legítimo de 6 cards (1 vídeo = 4 imagens +
+ * 1 áudio, mais 1 PDF e 4 textos), e o que protege de verdade continua sendo o teto
+ * de bytes e as contagens por tipo logo abaixo.
+ */
+const MAX_ITENS = 12;
 const MAX_IMAGENS = 4;
 const MAX_PDFS = 1;
 const MAX_AUDIOS = 1;
@@ -104,7 +120,9 @@ export function validarCorpo(corpo) {
     );
   }
   if (bruto.length > MAX_ITENS) {
-    throw new ErroHttp(413, `No máximo ${MAX_ITENS} materiais por vez.`);
+    // A frase fala de PEDAÇOS, não de "materiais": quem chega aqui não passou pela
+    // bandeja, e "6 materiais" seria uma dica errada sobre o que reduzir.
+    throw new ErroHttp(413, `No máximo ${MAX_ITENS} pedaços de material por vez.`);
   }
 
   const contagem = { imagem: 0, pdf: 0, texto: 0, audio: 0 };

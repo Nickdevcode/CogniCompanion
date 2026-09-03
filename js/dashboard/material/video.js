@@ -253,10 +253,10 @@ async function decodificarTrilha(file) {
  *
  * @param {File} file
  * @param {ReturnType<import("./orcamento.js").novoOrcamento>} orcamento
- * @param {{onProgresso?:Function, signal?:AbortSignal}} [ctx]
+ * @param {{onProgresso?:Function, signal?:AbortSignal, maxImagens?:number}} [ctx]
  * @returns {Promise<{itens:object[], bytes:number, resumo:object, aviso:string|null}>}
  */
-export async function deArquivo(file, orcamento, { onProgresso, signal } = {}) {
+export async function deArquivo(file, orcamento, { onProgresso, signal, maxImagens } = {}) {
   const url = URL.createObjectURL(file);
   let video = null;
 
@@ -294,7 +294,18 @@ export async function deArquivo(file, orcamento, { onProgresso, signal } = {}) {
     orcamento.reservar(reserva);
     try {
       /* 2. Quadros primeiro (ver o cabeçalho: é a ordem que salva o plano). */
-      const quantos = quadrosQueCabem(orcamento.restante());
+      /**
+       * O teto de imagens do plano entra aqui junto com o de bytes.
+       *
+       * `quadrosQueCabem` só sabia de espaço; o teto de IMAGENS (4 por plano, o mesmo
+       * do servidor) vive na bandeja. Sem cruzar os dois, um segundo vídeo extraía
+       * mais 4 quadros que cabiam em bytes e estouravam a contagem, e quem avisava era
+       * o 413 depois do envio. `undefined` (ninguém passou) mantém o comportamento
+       * antigo, que é o dos testes e do modo mock.
+       */
+      const quantos = Number.isFinite(maxImagens)
+        ? Math.min(quadrosQueCabem(orcamento.restante()), Math.max(0, maxImagens))
+        : quadrosQueCabem(orcamento.restante());
       const alvoPorQuadro = Math.floor(orcamento.restante() / quantos);
       quadros = await extrairQuadros(video, quantos, alvoPorQuadro, {
         onProgresso,

@@ -43,7 +43,15 @@ import { USAR_SUPABASE } from "./mock-data.js";
 import { montarRevisao } from "./revisao.js";
 import { prepararMaterial, MaterialNaoSuportado } from "./material/index.js";
 import { prepararLink, extrairUrl, ErroDeLink, MAX_LINKS } from "./material/link.js";
-import { novoOrcamento, MAX_ITENS, TETO, CORPO_MAX } from "./material/orcamento.js";
+import {
+  novoOrcamento,
+  MAX_ITENS,
+  TETO,
+  CORPO_MAX,
+  MAX_IMAGENS,
+  contarItens,
+  porQueNaoCabe,
+} from "./material/orcamento.js";
 import { criarGravador, suportaGravacao, ErroDeGravacao } from "./material/gravador.js";
 import { formatarBytes, formatarDuracao, tamanhoSerializado } from "./material/bytes.js";
 
@@ -63,6 +71,17 @@ const TIMEOUT_MS = 120_000;
  * então o `maxlength` daqui é o que garante que nada seja cortado sem o pai ver.
  */
 const PEDIDO_MAX = 600;
+
+/**
+ * O que o corpo gasta ALÉM dos materiais: o envelope JSON (`{"itens":[…],"pedido":…,
+ * "hoje":…}`) e o pedido escrito, que podem dobrar de tamanho no escape do JSON.
+ *
+ * 🔴 Sem esta reserva a bandeja e o botão discordavam na mesma tela: `orcamento` só
+ * recebia `gastar()` de material, então ele podia dizer "4,0 MB de 4,0 MB, cabe"
+ * enquanto a checagem final — que mede o corpo inteiro — recusava com outro número.
+ * Dois números da mesma tela sobre a mesma coisa, e o pai sem saber em qual acreditar.
+ */
+const RESERVA_ENVELOPE = 2_000;
 
 /**
  * Exemplos que viram o pedido num toque.
@@ -324,7 +343,7 @@ function criarFluxo({ ctx, aoSalvar }) {
   let lendoLink = null;
   /** Depois de repintar, devolve o foco pra onde o pai estava (só o link precisa). */
   let devolverFocoAoLink = false;
-  let orcamento = novoOrcamento();
+  let orcamento = novoOrcamento(CORPO_MAX - RESERVA_ENVELOPE);
   let preparando = false;
   let gravador = null;
   let fechar = () => {};
@@ -640,8 +659,15 @@ function criarFluxo({ ctx, aoSalvar }) {
         jaNaBandeja: materiais.map((m) => m.chave).filter(Boolean),
       });
       if (controle.signal.aborted) return;
-      materiais.push(material);
+      const naoCoube = aceitarNaBandeja(material);
       lendoLink = null;
+      if (naoCoube) {
+        // O endereço volta pro campo, igual ao caminho de erro logo abaixo: o pai não
+        // deve reescrever o link porque a bandeja estava cheia.
+        textoDoLink = url;
+        etapaEscolher(naoCoube);
+        return;
+      }
       etapaEscolher();
       anunciar(`${material.rotulo} adicionado.`);
     } catch (err) {
@@ -717,8 +743,15 @@ function criarFluxo({ ctx, aoSalvar }) {
         const material = await prepararMaterial(file, orcamento, {
           onProgresso: (t) => etapaProgresso(t, { cancelavel: false }),
           signal: controle.signal,
+          // Quantos quadros o vídeo ainda pode extrair sem estourar o teto de imagens.
+          // Sem isto, dois vídeos rendiam 8 quadros e o 413 do servidor era a primeira
+          // notícia que o pai tinha do limite.
+          maxImagens: Math.max(0, MAX_IMAGENS - contarItens(materiais).imagem),
         });
-        materiais.push(material);
+        const naoCoube = aceitarNaBandeja(material);
+        // Entra na mesma lista de falhas do lote: um arquivo que não coube é do mesmo
+        // tipo de notícia que um `.docx` corrompido, e os dois saem juntos no fim.
+        if (naoCoube) falhas.push(naoCoube);
       } catch (err) {
         const amigavel =
           err instanceof MaterialNaoSuportado || err?.name === "ErroDeZip"
@@ -746,6 +779,28 @@ function criarFluxo({ ctx, aoSalvar }) {
         ? `${materiais.length} ${materiais.length === 1 ? "material pronto" : "materiais prontos"}.`
         : "Nenhum material foi adicionado."
     );
+  }
+
+  /**
+   * Aceita o material na bandeja, ou devolve o orçamento e diz por quê.
+   *
+   * As TRÊS entradas (arquivo, link e gravação) passam por aqui, porque era a divergência
+   * entre elas que deixava furo: o `receber()` checava `MAX_ITENS`, o `juntarLink()`
+   * também, e a gravação não checava nada. Um lugar só, e a regra de tipo mora no
+   * `orcamento.js`, junto dos tetos.
+   *
+   * @returns {string|null} a frase do problema, ou null se entrou
+   */
+  function aceitarNaBandeja(material) {
+    const problema = porQueNaoCabe(materiais, material);
+    if (problema) {
+      // O material já gastou do orçamento durante o preparo. Sem devolver, a bandeja
+      // ficaria com bytes fantasmas reservados por algo que nem entrou.
+      orcamento.devolver(material.bytes);
+      return problema;
+    }
+    materiais.push(material);
+    return null;
   }
 
   /* ---- A bandeja --------------------------------------------------------- */
@@ -888,7 +943,7 @@ function criarFluxo({ ctx, aoSalvar }) {
           class: "cap__contagem",
           text:
             `${materiais.length} de ${MAX_ITENS} · ` +
-            `${formatarBytes(usado)} de ${formatarBytes(CORPO_MAX)}`,
+            `${formatarBytes(usado)} de ${formatarBytes(orcamento.total)}`,
         })
       );
     }
@@ -904,6 +959,27 @@ function criarFluxo({ ctx, aoSalvar }) {
   async function abrirGravador() {
     if (materiais.some((m) => m.origem === "audio")) {
       etapaEscolher("Já tem um áudio aqui. Remova o atual pra gravar outro.");
+      return;
+    }
+    /**
+     * A MESMA guarda que `receber()` e `juntarLink()` já faziam, e que só o gravador
+     * não tinha: ele era a única entrada que empurrava na bandeja sem contar.
+     * Com a bandeja cheia o contador chegava a imprimir "7 de 6" e o envio tomava 413.
+     *
+     * Aqui e não no `guardarGravacao`, porque recusar DEPOIS de gravar seria cobrar do
+     * pai um minuto de fala pra dizer que não cabia antes dele começar.
+     */
+    if (materiais.length >= MAX_ITENS) {
+      etapaEscolher(`Você já tem ${MAX_ITENS} materiais. Remova um pra gravar um áudio.`);
+      return;
+    }
+    // Sem byte sobrando não há gravação possível, e abrir o gravador aqui só serviria
+    // pra recusar depois de o pai falar. (O caso "sobra pouco" continua com o corte por
+    // tamanho do próprio gravador, que agora funciona mesmo com teto baixo.)
+    if (!orcamento.restante()) {
+      etapaEscolher(
+        "O material que já está aqui ocupou todo o espaço. Remova um item pra gravar um áudio."
+      );
       return;
     }
     if (!suportaGravacao()) {
@@ -1040,7 +1116,11 @@ function criarFluxo({ ctx, aoSalvar }) {
         material.aviso =
           "Quase não ouvi som nessa gravação. Confira se o microfone estava aberto antes de mandar.";
       }
-      materiais.push(material);
+      const naoCoube = aceitarNaBandeja(material);
+      if (naoCoube) {
+        erro.textContent = naoCoube;
+        return;
+      }
       etapaEscolher();
       anunciar(`Gravação de ${formatarDuracao(duracao_s)} salva.`);
     } catch (err) {
@@ -1222,7 +1302,7 @@ function criarFluxo({ ctx, aoSalvar }) {
     });
     tentar.addEventListener("click", () => {
       materiais = [];
-      orcamento = novoOrcamento();
+      orcamento = novoOrcamento(CORPO_MAX - RESERVA_ENVELOPE);
       etapaEscolher();
     });
     palco.append(el("div", { class: "cap__acoes", children: [tentar] }));
@@ -1242,7 +1322,7 @@ function criarFluxo({ ctx, aoSalvar }) {
     }));
     const pedidoFeito = pedido.trim();
     materiais = [];
-    orcamento = novoOrcamento();
+    orcamento = novoOrcamento(CORPO_MAX - RESERVA_ENVELOPE);
 
     palco.replaceChildren(
       montarRevisao({

@@ -170,7 +170,14 @@ export async function criarGravador({ aoTempo, aoNivel, aoLimite, maxBytes } = {
     if (!e.data || !e.data.size) return;
     pedacos.push(e.data);
     bytes += e.data.size;
-    if (maxBytes && bytes >= maxBytes && recorder.state === "recording") {
+    /**
+     * `Number.isFinite`, e NÃO `maxBytes &&`: quem chama passa
+     * `Math.min(TETO.audio, orcamento.restante()) * 0.7`, que vira **0** com a bandeja
+     * cheia. Zero é falsy, então a guarda inteira se desligava justamente quando não
+     * havia byte nenhum sobrando, e a gravação seguia até os 600 s pra ser recusada
+     * depois. Sem teto declarado (`undefined`) continua sem teto, que é o contrato.
+     */
+    if (Number.isFinite(maxBytes) && bytes >= maxBytes && recorder.state === "recording") {
       aoLimite?.("tamanho");
       recorder.stop();
     }

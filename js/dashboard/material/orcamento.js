@@ -56,6 +56,18 @@ export const TETO = {
 /** Imagens por geração — 4 páginas fotografadas de uma folha. */
 export const MAX_IMAGENS = 4;
 
+/**
+ * PDF e áudio por geração. Espelham `api/_lib/itens.mjs`, e faltavam DESTE lado: o
+ * servidor recusava o segundo com 413 e a bandeja nunca tinha avisado.
+ *
+ * O do áudio é o mais duro dos dois, e não é de tamanho: cada áudio é uma transcrição
+ * separada de até 90 s (`plano-de-material.mjs` chama `transcrever()` por item), então
+ * dois não cabem no fôlego da função. E ele conta a trilha do vídeo junto, porque pra
+ * quem transcreve ela é um áudio como qualquer outro.
+ */
+export const MAX_PDFS = 1;
+export const MAX_AUDIOS = 1;
+
 /** Teto de texto extraído: por item e somando todos. */
 export const MAX_TEXTO_ITEM = 30_000;
 export const MAX_TEXTO_TOTAL = 60_000;
@@ -166,4 +178,77 @@ export function segundosDeAudioQueCabem(bytesDisponiveis) {
 export function quadrosQueCabem(bytesDisponiveis, custoPorQuadro = 140_000) {
   const cabe = Math.floor(bytesDisponiveis / custoPorQuadro);
   return Math.max(VIDEO.quadrosMin, Math.min(VIDEO.quadrosMax, cabe));
+}
+
+/* ==========================================================================
+   As contagens por TIPO — a conta que o servidor faz e a bandeja não fazia
+   ========================================================================== */
+
+/**
+ * Quantos itens de cada tipo a bandeja tem, somando os itens de TODOS os materiais.
+ *
+ * 🔴 Esta é a unidade do SERVIDOR, e ela não é a mesma da tela: um vídeo é **um card**
+ * e até **cinco itens** (4 quadros + a trilha). Enquanto ninguém somava isso, quatro
+ * tetos do `api/_lib/itens.mjs` só existiam lá — `MAX_IMAGENS`, `MAX_PDFS`,
+ * `MAX_AUDIOS` e `MAX_TEXTO_TOTAL` moravam aqui como constante e **nenhum tinha
+ * consumidor**. O pai montava a bandeja inteira, clicava em montar o plano e só então
+ * levava um 413, que é exatamente o contrário do que o cabeçalho do `itens.mjs`
+ * promete: quem barra tem que ser o cliente, que sabe QUAL material está sobrando.
+ *
+ * @param {Array<{itens?: Array<object>}>} materiais
+ * @returns {{imagem:number, pdf:number, texto:number, audio:number, total:number, caracteres:number}}
+ */
+export function contarItens(materiais) {
+  const conta = { imagem: 0, pdf: 0, texto: 0, audio: 0, total: 0, caracteres: 0 };
+  for (const m of materiais || []) {
+    for (const item of m.itens || []) {
+      if (item.tipo in conta) conta[item.tipo] += 1;
+      conta.total += 1;
+      if (item.tipo === "texto") conta.caracteres += String(item.texto || "").length;
+    }
+  }
+  return conta;
+}
+
+/**
+ * O que impede este material de entrar na bandeja — a frase pro pai, ou `null` se cabe.
+ *
+ * As mensagens dizem o que REMOVER, e não só o que estourou: "mande um PDF por vez" (o
+ * 413 do servidor) deixa o pai sem saber que basta tirar o outro PDF. E cada teto aqui
+ * é o mesmo do servidor, de propósito — a folga que o `itens.mjs` mantém serve pra que
+ * o 413 nunca dispare pra quem passou por aqui, não pra que os dois discordem.
+ *
+ * @param {Array<object>} materiais — o que já está na bandeja
+ * @param {{itens?: Array<object>}} novo — o candidato, já preparado
+ * @returns {string|null}
+ */
+export function porQueNaoCabe(materiais, novo) {
+  const tem = contarItens(materiais);
+  const vem = contarItens([novo]);
+
+  if (tem.imagem + vem.imagem > MAX_IMAGENS) {
+    return vem.imagem > 1
+      ? `Esse material vira ${vem.imagem} imagens, e a Cogni lê ${MAX_IMAGENS} por plano. Remova uma foto ou um vídeo da lista.`
+      : `Dá pra mandar ${MAX_IMAGENS} imagens por plano. Remova uma foto da lista pra juntar outra.`;
+  }
+  if (tem.pdf + vem.pdf > MAX_PDFS) {
+    return "Dá pra mandar um PDF por plano. Remova o que já está na lista pra juntar outro.";
+  }
+  /**
+   * O áudio é o teto mais fácil de furar sem perceber, porque **um vídeo também traz
+   * áudio**: a trilha dele vira `{tipo:"audio"}` igualzinho ao da professora. E o teto
+   * é de tempo, não de bytes — cada áudio é uma transcrição separada de até 90 s
+   * (`plano-de-material.mjs` chama `transcrever()` por item), então dois não cabem no
+   * fôlego da função. Por isso a frase cita o vídeo: senão o pai olha a lista, não vê
+   * áudio nenhum e conclui que a tela está quebrada.
+   */
+  if (tem.audio + vem.audio > MAX_AUDIOS) {
+    return tem.audio && vem.audio
+      ? "A Cogni só consegue ouvir um áudio por plano, e o vídeo da lista já traz o som dele. Remova um dos dois pra juntar este."
+      : "Dá pra mandar um áudio por plano. Remova o que já está na lista pra juntar outro.";
+  }
+  if (tem.caracteres + vem.caracteres > MAX_TEXTO_TOTAL) {
+    return "Junto, esses documentos são longos demais. Remova um texto da lista pra juntar este.";
+  }
+  return null;
 }
