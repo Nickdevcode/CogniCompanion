@@ -1519,7 +1519,10 @@ export async function renderMesa(ctx) {
             max: "365",
             inputmode: "numeric",
             placeholder: "Ex.: 30",
-            value: editando ? String(plano.duracao_dias) : "",
+            // `String(null)` vira a string "null", que é valor inválido pra um
+            // `input[type=number]` — o campo abria vazio mas sujo. Plano sem prazo
+            // abre vazio de verdade, que é o que "sem prazo" significa no formulário.
+            value: editando && plano.duracao_dias ? String(plano.duracao_dias) : "",
           },
         });
         const selStatus = el("select", {

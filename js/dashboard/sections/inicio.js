@@ -224,7 +224,11 @@ function cardProximoPlano(plano, onVerPlano) {
             class: "ini-pill",
             children: [
               el("span", { class: "ini-pill__ico", svg: ICON.calendar }),
-              el("span", { text: `${plano.duracao_dias} dias` }),
+              // `duracao_dias` nulo é "sem prazo", e é valor legítimo. Sem a guarda o
+              // chip imprimia "null dias". A Mesa já tratava; aqui faltava.
+              el("span", {
+                text: plano.duracao_dias ? `${plano.duracao_dias} dias` : "Sem prazo",
+              }),
             ],
           }),
           el("span", {
