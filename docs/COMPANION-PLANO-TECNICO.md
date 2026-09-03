@@ -1440,9 +1440,9 @@ O **card alvo** do turno sai de dentro do plano em foco, nunca de outro: mirar u
 - **Teto de iniciativa (`MAX_PUXOES = 3`) é da SESSÃO, não do plano.** Três planos ativos não dão à Cogni três vezes o direito de insistir — isso transformaria a amiga que puxa coisas legais numa agenda cobrando pauta atrás de pauta.
 - **`MAX_CONCLUSOES_POR_SESSAO = 1` continua 1.** A trava não protege *um quadro*, protege a confiança do pai na tela. Três planos triplicam os cards e triplicam o estrago de uma detecção errada — é exatamente o motivo pra não mexer.
 
-#### 🔴 O que o SITE precisa corrigir (pequeno, mas obrigatório)
+#### ✅ O que o SITE precisou corrigir — **feito** (16/ago/2026)
 
-`js/dashboard/format.js` tem `planoVigente(planos, now)` — uma **segunda cópia** da regra do servidor, e o comentário no arquivo admite isso. Ela escolhia **um** plano; agora ela está errada, e o erro é visível pro pai:
+`js/dashboard/format.js` tinha `planoVigente(planos, now)` — uma **segunda cópia** da regra do servidor — e ela escolhia **um** plano. **Já foi corrigido:** hoje o arquivo exporta `planosVigentes()`, que devolve um **array** (`filaDePlanos()` + teto `MAX_PLANOS_VIGENTES = 5`), mais `posicaoNaFila()`, `ehVigente()`, `motivoNaoVigente()` e `avisoDeOrdem()`. A função no singular **não existe mais no código**. Os dois erros que ela causava, e que estão resolvidos:
 
 - **`motivoNaoVigente()`** faz a tela dizer *"A Cogni não está seguindo este plano agora"* no segundo plano ativo. **Isso virou mentira** — ela está seguindo.
 - **o selo "a Cogni está seguindo"** aparece em um plano só; tem que aparecer em **todos** os vigentes.
@@ -1661,9 +1661,9 @@ Isso vale onde quer que o site liste planos vigentes (`getPlanos`, a faixa de ch
 
 Com isso a tela consegue provar que o arraste chegou ao robô, em vez de a ordem certa poder ser coincidência. Continua **best-effort**: servidor desligado, engula o erro e siga (o Realtime cobre).
 
-#### ⚠️ A pendência da rodada 4 continua de pé
+#### ✅ A pendência da rodada 4 — **resolvida**
 
-`js/dashboard/format.js` → `planoVigente(planos, now)` ainda escolhe **um** plano, e por isso `motivoNaoVigente()` faz a tela dizer *"A Cogni não está seguindo este plano agora"* sobre um plano que **está** sendo seguido. Como a frente 2 mexe exatamente nesse arquivo, é a hora de resolver as duas juntas.
+~~`js/dashboard/format.js` → `planoVigente(planos, now)` ainda escolhe **um** plano~~ — **feito**. `planoVigente` no singular não existe mais; quem responde é `planosVigentes()`, devolvendo array. O selo aparece em todos os vigentes e `motivoNaoVigente()` só fala de quem realmente está fora da fila. A regra abaixo fica como referência do que foi implementado.
 
 Regra correta: *vigente = `status ∈ {ativo, em_andamento}` **e** não vencido (`criado_em + duracao_dias`). **Todos** os que passarem estão sendo seguidos, até o teto de **5**; passando disso ganham os de **menor `ordem`** (e não mais os mais recentes).* O aviso de "não está seguindo" vale — e só — para `rascunho`, `pausado`, `concluido`, vencido, **e o 6º plano em diante da fila**.
 
