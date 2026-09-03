@@ -394,7 +394,10 @@ export async function prepararLink(bruto, orcamento, ctx = {}) {
     itens: [item],
     bytes,
     rotulo: ehVideo
-      ? rotulo(r.titulo || item.nome, formatarDuracao(r.duracao_s), r.canal)
+      // A duração só entra no rótulo quando ela é CONHECIDA. Quando a leitura degrada pro
+      // oembed, `duracao_s` vem `null` — e `formatarDuracao(null)` devolve "0s", que o
+      // `rotulo()` deixa passar por ser texto não vazio. O card anunciava "aula de 0s".
+      ? rotulo(r.titulo || item.nome, r.duracao_s ? formatarDuracao(r.duracao_s) : "", r.canal)
       : rotulo(r.titulo || item.nome, r.dominio),
     miniatura: ehVideo ? r.miniatura || null : null,
     ehVideo,

@@ -325,19 +325,41 @@ export async function lerVideo(videoId) {
   let detalhes = null;
   let legendas = null;
 
+  /**
+   * 🔴 A InnerTube RECUSOU o vídeo — e a recusa é AMBÍGUA, que é exatamente o que a
+   * versão anterior deste arquivo não considerava.
+   *
+   * `LOGIN_REQUIRED` tem DOIS significados que chegam idênticos:
+   *   a) o vídeo é privado / restrito por idade  → é do vídeo, e a culpa é do link;
+   *   b) **quem perguntou foi um IP de datacenter** → é NOSSO, e o vídeo está ótimo.
+   *
+   * (b) é o caso normal em produção: a função roda em `iad1` (AWS us-east-1), e o
+   * YouTube devolve `LOGIN_REQUIRED` no próprio `/player` pra faixa de nuvem. Ou seja:
+   * o pai colava uma videoaula pública e recebia *"pode estar privado, ter sido
+   * removido, ou pedir login"* — uma frase que só descreve o caso (a). Ele conferia o
+   * link, que estava certo, e colava de novo.
+   *
+   * Pior: o `throw` daqui escapava de `lerVideo()` inteira, então **o degrau do oembed
+   * logo abaixo nunca rodava** — justamente o degrau escrito pra este cenário ("responde
+   * de qualquer IP, inclusive quando a InnerTube não fala com datacenter").
+   *
+   * Agora a recusa só ANOTA, e quem decide é o oembed: se ele devolve título e canal, o
+   * vídeo é público e o problema era nosso (card honesto, sem legenda). Se ele também
+   * recusa, aí sim o vídeo é o problema, e a mensagem (a) volta a ser verdade.
+   */
+  let recusado = false;
+
   for (const cliente of CLIENTES) {
     try {
       const j = await player(videoId, cliente);
       const status = j?.playabilityStatus?.status;
-      /**
-       * `ERROR` e `LOGIN_REQUIRED` são definitivos (removido, privado, restrito por
-       * idade) — insistir com outro cliente só gasta tempo. `UNPLAYABLE` NÃO entra
-       * aqui: ele é o que o cliente errado devolve, e ainda assim vem com detalhes.
-       */
       if (status === "ERROR" || status === "LOGIN_REQUIRED") {
-        throw new LinkRuim(
-          "Não consegui abrir esse vídeo. Ele pode estar privado, ter sido removido, ou pedir login."
-        );
+        recusado = true;
+        // `ERROR` é do VÍDEO (não existe): nenhum outro cliente vai discordar, e insistir
+        // só gasta tempo. `LOGIN_REQUIRED` pode ser só deste cliente, então o próximo
+        // ainda vale a tentativa.
+        if (status === "ERROR") break;
+        continue;
       }
       detalhes = detalhes || j?.videoDetails || null;
       const renderer = j?.captions?.playerCaptionsTracklistRenderer;
@@ -366,8 +388,12 @@ export async function lerVideo(videoId) {
   if (!detalhes) {
     const o = await viaOembed(videoId);
     if (!o) {
+      // As duas frases dizem coisas diferentes, e agora cada uma só sai quando é
+      // verdade: houve recusa E o oembed confirmou que não dá pra ver o vídeo de fora.
       throw new LinkRuim(
-        "Não consegui abrir esse vídeo agora. Confira o link, ou copie o assunto da aula e cole no seu pedido."
+        recusado
+          ? "Não consegui abrir esse vídeo. Ele pode estar privado, ter sido removido, ou pedir login."
+          : "Não consegui abrir esse vídeo agora. Confira o link, ou copie o assunto da aula e cole no seu pedido."
       );
     }
     const video = {
