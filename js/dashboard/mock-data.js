@@ -90,7 +90,25 @@ const crianca = {
     "Gosta de histórias antes de dormir.",
   ],
   idioma_nativo: "pt",
-  idiomas_estudando: [{ idioma: "en", nivel: "iniciante" }],
+  // ⚠️ Nenhuma tela LÊ este campo hoje — ele está aqui pra o mock não mentir
+  // sobre o formato do dia em que alguém for usá-lo. E ele mentia: dizia
+  // `nivel: "iniciante"`, e o que o robô grava de verdade é **CEFR** (`A1`…`C2`),
+  // com `palavrasVistas` de OBJETOS, não de strings. Conferido em 07/set/2026
+  // contra a linha real de um perfil no Supabase, do lado do servidor.
+  // Uma tela construída em cima do formato antigo quebraria duas vezes.
+  idiomas_estudando: [
+    {
+      idioma: "en",
+      nivel: "A1",
+      criadoEm: "2026-05-20T14:02:00.000Z",
+      ultimaPratica: "2026-05-26T19:31:00.000Z",
+      vezesPraticado: 4,
+      palavrasVistas: [
+        { termo: "dinosaur", traducao: "dinossauro", visto: "2026-05-26T19:31:00.000Z" },
+        { termo: "bones", traducao: "ossos", visto: "2026-05-26T19:31:00.000Z" },
+      ],
+    },
+  ],
   prompt_personalizado:
     "Incentive a curiosidade do Pedro sobre ciências e use exemplos com " +
     "dinossauros quando possível. Evite respostas longas demais.",

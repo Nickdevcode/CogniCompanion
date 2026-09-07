@@ -1368,3 +1368,47 @@
     text-align: center;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Linha "de quando é este recado" (Dica e Bilhete da semana)
+
+   Componente compartilhado — mora aqui, e não no CSS de uma tela, porque os
+   dois cards que a usam vivem em seções diferentes (Início e Aprendizado) e a
+   linha precisa ser a MESMA nas duas: é ela que responde "isto é de agora ou de
+   três dias atrás?", e uma resposta com duas aparências volta a confundir.
+
+   Discreta de propósito: complementa o recado, não compete com ele. Ver
+   `js/dashboard/recado-frescor.js` pro porquê da linha existir.
+   -------------------------------------------------------------------------- */
+.recado-frescor__host:empty {
+  display: none;
+}
+.recado-frescor {
+  margin: 0.55rem 0 0;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  font-style: normal; /* o bilhete é itálico; a legenda dele não */
+  /* O token puro, sem diluir em alpha. Uma primeira versão usava 88% e caía em
+     4,55:1 sobre o card — passa no papel e não sobra nada pro celular no sol,
+     que é onde o pai lê. `--dash-text-muted` já nasceu escurecido justamente
+     pra esse tipo de legenda (ver o comentário dele lá em cima): 5,99:1. */
+  color: var(--dash-text-muted);
+}
+
+/* Recado fresco do robô: o único estado que merece cor, porque é o único que
+   diz "está ligado agora". Os outros são informação, não conquista.
+
+   `--st-ativo` e não um verde literal: é o token que o painel já usa pra "isto
+   está no ar" (o card "Já domina", o selo de plano ativo), e ele já foi
+   escurecido pra passar em contraste como TEXTO nos dois temas. Verde novo aqui
+   seria uma terceira definição de "positivo" pra discordar das outras duas. */
+.recado-frescor[data-origem="endpoint"] {
+  color: var(--st-ativo);
+}
+
+/* O card do bilhete tem o rodapé logo abaixo do corpo; um respiro a mais evita
+   a legenda encostar no "Ler o bilhete completo". */
+.ini-bilhete__body .recado-frescor {
+  margin-top: 0.7rem;
+}

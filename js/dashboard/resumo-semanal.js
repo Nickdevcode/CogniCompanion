@@ -29,6 +29,7 @@ import { ICON } from "./icons.js";
 import { dicaInfo } from "./tooltip.js";
 import { openModal } from "./modal.js";
 import { materiaLabel } from "./format.js";
+import { linhaDeFrescor, registrarOrigem } from "./recado-frescor.js";
 
 /**
  * Formato interno normalizado do resumo (vindo da tabela OU do endpoint), pra o
@@ -40,6 +41,8 @@ import { materiaLabel } from "./format.js";
  * @property {number|null} totalConversas — conversas no período
  * @property {number} periodoDias — janela em dias (default 7)
  * @property {boolean} vazio — true = a criança ainda não conversou
+ * @property {"endpoint"|"tabela"} origem — de qual das duas fontes ele veio
+ * @property {string|null} em — `criado_em` da linha salva (só na origem `tabela`)
  */
 
 /** Normaliza uma linha de `resumos_semanais` (snake_case) pro formato interno. */
@@ -53,6 +56,8 @@ function normalizarDaTabela(linha) {
       typeof linha.total_conversas === "number" ? linha.total_conversas : null,
     periodoDias: linha.periodo_dias || 7,
     vazio: false, // se há linha salva, houve conversa em algum momento
+    origem: "tabela",
+    em: linha.criado_em || null,
   };
 }
 
@@ -67,6 +72,8 @@ function normalizarDoEndpoint(dados) {
       typeof dados.totalConversas === "number" ? dados.totalConversas : null,
     periodoDias: dados.periodoDias || 7,
     vazio: !!dados.vazio,
+    origem: "endpoint",
+    em: null,
   };
 }
 
@@ -143,6 +150,11 @@ export function cardResumoSemanal({ servidorUrl, crianca, mock }) {
   }
 
   carregarResumo({ servidorUrl, crianca, mock }).then((resumo) => {
+    registrarOrigem(
+      "Bilhete da semana",
+      resumo ? resumo.origem : "padrao",
+      resumo ? resumo.em : null
+    );
     renderConteudo(body, footHost, resumo);
   });
 
@@ -207,11 +219,18 @@ function renderConteudo(body, footHost, resumo) {
 
   // Estado neutro: ainda não há resumo (e nada pra mostrar agora). Discreto, sem
   // alarme de "sem comunicação" — quando a Cogni gerar o primeiro, ele aparece.
+  //
+  // ⚠️ Este vazio é DIFERENTE do `resumo.vazio` lá embaixo, e a diferença
+  // importa: aqui não há bilhete salvo E o robô não respondeu, então ninguém
+  // conferiu nada — o certo é dizer que não há bilhete guardado. No `vazio` do
+  // endpoint quem responde é o servidor, olhando as conversas: ali sim dá pra
+  // afirmar que a criança não conversou. A linha de frescor logo abaixo é o que
+  // deixa os dois distinguíveis na tela (ver `recado-frescor.js`).
   if (!resumo || !resumo.texto) {
     body.appendChild(
       el("p", {
         class: "ini-bilhete__text is-vazio",
-        text: "O bilhete chega no fim da primeira semana de conversas.",
+        text: "Ainda não há nenhum bilhete guardado. Ele aparece aqui sozinho, assim que a Cogni escrever o primeiro.",
       })
     );
     return;
@@ -226,6 +245,11 @@ function renderConteudo(body, footHost, resumo) {
       text: trecho,
     })
   );
+
+  // De quando é este bilhete. Sem isto, um bilhete de três dias atrás e um
+  // escrito agora chegam idênticos à tela.
+  const frescor = linhaDeFrescor({ origem: resumo.origem, em: resumo.em });
+  if (frescor) body.appendChild(frescor);
 
   // "Ler completo": quando há mais texto que o trecho, ou dados extras a mostrar
   // (matérias/tópicos/contagem). Não oferece no estado vazio (nada a expandir).

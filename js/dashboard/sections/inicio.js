@@ -29,6 +29,8 @@ import {
   materiaLabel,
   statusLabel,
   tempoTotal,
+  janelaDeDias,
+  materiasDistintas,
   primeiroNome,
   planosVigentes,
   sujeito,
@@ -275,13 +277,14 @@ function cardResumoSemana(conversas, now, onRelatorio) {
     )
   );
 
-  // Janela dos últimos 7 dias a partir do "agora" de referência.
-  const limite = new Date(now);
-  limite.setDate(limite.getDate() - 7);
-  const semana = conversas.filter((c) => new Date(c.criado_em) >= limite);
+  // Janela dos últimos 7 dias — a MESMA do Aprendizado e a mesma que o gráfico
+  // de lá desenha (ver `janelaDeDias` no format.js). Este card e o de lá não
+  // podem discordar: o rodapé dele leva pra cá.
+  const semana = janelaDeDias(conversas, now, 7);
 
   const nConversas = semana.length;
-  const nMaterias = new Set(semana.map((c) => c.materia)).size;
+  // Pela canônica: um `materia` nulo não é "mais uma matéria explorada".
+  const nMaterias = materiasDistintas(semana);
   const tempo = formatDuracao(tempoTotal(semana));
 
   const body = el("div", { class: "ini-card__body ini-resumo__body" });

@@ -25,6 +25,7 @@
 import { el } from "./sections/_shared.js";
 import { ICON } from "./icons.js";
 import { dicaInfo } from "./tooltip.js";
+import { linhaDeFrescor, registrarOrigem } from "./recado-frescor.js";
 
 /** Texto amigável de quando NÃO há nenhuma dica salva ainda (tabela vazia). */
 const DICA_PADRAO =
@@ -57,6 +58,19 @@ export async function buscarDica(servidorUrl, criancaId) {
 }
 
 /**
+ * A dica resolvida, COM procedência — não só o texto.
+ *
+ * A origem existe porque os três degraus da cascata chegavam à tela com a mesma
+ * aparência, e "dica de três dias atrás" ficava indistinguível de "a Cogni
+ * acabou de escrever" e de "nada salvo ainda". Ver `recado-frescor.js`.
+ *
+ * @typedef {object} DicaResolvida
+ * @property {string} texto — sempre pronto pra exibir
+ * @property {"endpoint"|"tabela"|"padrao"} origem
+ * @property {string|null} em — `criado_em` da linha salva (só na origem `tabela`)
+ */
+
+/**
  * Resolve a "dica de agora" combinando tabela (estável) + endpoint (fresco). Lê os
  * dois em paralelo; prefere o endpoint quando traz texto, senão cai pra última
  * dica salva, e por fim pro texto padrão (tabela realmente vazia).
@@ -64,7 +78,7 @@ export async function buscarDica(servidorUrl, criancaId) {
  * @param {string} cfg.servidorUrl
  * @param {object} cfg.crianca
  * @param {object} cfg.mock — camada de dados (pra ler a última de `dicas`)
- * @returns {Promise<string>} o texto a exibir (sempre uma string pronta).
+ * @returns {Promise<DicaResolvida>}
  */
 export async function resolverDicaAtual({ servidorUrl, crianca, mock }) {
   const criancaId = crianca && crianca.id;
@@ -83,11 +97,13 @@ export async function resolverDicaAtual({ servidorUrl, crianca, mock }) {
   ]);
 
   // Endpoint trouxe texto fresco → vence.
-  if (doEndpoint) return doEndpoint;
+  if (doEndpoint) return { texto: doEndpoint, origem: "endpoint", em: null };
   // Senão, a última dica salva é a fonte estável.
-  if (daTabela && daTabela.texto) return daTabela.texto;
+  if (daTabela && daTabela.texto) {
+    return { texto: daTabela.texto, origem: "tabela", em: daTabela.criado_em || null };
+  }
   // Nada salvo (tabela vazia de verdade) → texto amigável padrão.
-  return DICA_PADRAO;
+  return { texto: DICA_PADRAO, origem: "padrao", em: null };
 }
 
 /**
@@ -121,9 +137,12 @@ export function cardDica({ servidorUrl, crianca, mock, onMais }) {
     class: "ini-dica__text",
     text: "A Cogni está pensando numa dica pra você…",
   });
+  // Host da linha "de quando é" — fica reservado desde já pra a troca do
+  // placeholder não empurrar o rodapé do card quando a dica chegar.
+  const frescor = el("div", { class: "recado-frescor__host" });
   const body = el("div", {
     class: "ini-card__body ini-dica__body",
-    children: [texto],
+    children: [texto, frescor],
   });
   card.appendChild(body);
 
@@ -145,8 +164,11 @@ export function cardDica({ servidorUrl, crianca, mock, onMais }) {
   card.appendChild(foot);
 
   // Resolve a dica (tabela + endpoint) e troca o placeholder.
-  resolverDicaAtual({ servidorUrl, crianca, mock }).then((t) => {
-    texto.textContent = t;
+  resolverDicaAtual({ servidorUrl, crianca, mock }).then((dica) => {
+    texto.textContent = dica.texto;
+    registrarOrigem("Dica da Cogni", dica.origem, dica.em);
+    const linha = linhaDeFrescor({ origem: dica.origem, em: dica.em });
+    if (linha) frescor.replaceChildren(linha);
   });
 
   return card;

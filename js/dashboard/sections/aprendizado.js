@@ -18,6 +18,7 @@ import { dicaInfo } from "../tooltip.js";
 import { ICON, materiaIcon } from "../icons.js";
 import { buildLineChart } from "../linechart.js";
 import { resolverDicaAtual } from "../dica.js";
+import { linhaDeFrescor, registrarOrigem } from "../recado-frescor.js";
 import {
   MATERIAS,
   materiaLabel,
@@ -30,7 +31,9 @@ import {
   tempoPorMateria,
   tempoPorDia,
   tempoTotal,
-  dayKey,
+  chavesDeDias,
+  janelaDeDias,
+  materiasDistintas,
   primeiroNome,
   sujeito,
   capitalizar,
@@ -51,43 +54,48 @@ function topMaterias(conversas, limite = 4) {
 
 /**
  * Série diária (min/dia) dos últimos N dias a partir do "agora".
+ *
+ * Mesma `chavesDeDias` que a `janelaDeDias` dos contadores usa — é o que garante
+ * que a soma da legenda seja a soma das colunas desenhadas.
  * @returns {Array<{label:string, value:number, key:string}>}
  */
 function serieDiaria(conversas, now, dias = 7) {
   const porDia = tempoPorDia(conversas); // key -> ms
   const nomesDia = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  const out = [];
-  for (let i = dias - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const k = dayKey(d);
-    const ms = porDia.get(k) || 0;
-    out.push({
-      key: k,
-      label: nomesDia[d.getDay()],
-      value: Math.round(ms / 60000), // minutos
-    });
-  }
-  return out;
+  return chavesDeDias(now, dias).map((k) => ({
+    key: k,
+    // `new Date("YYYY-MM-DD")` seria UTC (e viraria o dia anterior no Brasil);
+    // a chave já vem no fuso local, então o dia da semana sai dela.
+    label: nomesDia[diaDaSemanaDaChave(k)],
+    value: Math.round((porDia.get(k) || 0) / 60000), // minutos
+  }));
+}
+
+/** Dia da semana (0=Dom) de uma chave `YYYY-MM-DD`, lida no fuso LOCAL. */
+function diaDaSemanaDaChave(chave) {
+  const [a, m, d] = chave.split("-").map(Number);
+  return new Date(a, m - 1, d).getDay();
 }
 
 /**
  * Série semanal (min/semana) das últimas N semanas — usada no modo "Mensal".
+ *
+ * Cada balde são 7 CHAVES DE DIA consecutivas, e os baldes se encostam sem vão
+ * nem sobreposição. A versão anterior montava `[fim - 6 dias, fim]` andando de 7
+ * em 7 — uma janela de 6 dias e 1 instante repetida a cada 7 — e engolia ~1 dia
+ * por semana, o que só aparecia quando a hora das conversas era diferente da
+ * hora em que o pai abria o painel.
+ *
+ * Por construção, o último balde é EXATAMENTE a janela do modo "Semanal".
  * @returns {Array<{label:string, value:number}>}
  */
 function serieSemanal(conversas, now, semanas = 4) {
+  const porDia = tempoPorDia(conversas); // key -> ms
   const out = [];
   for (let i = semanas - 1; i >= 0; i--) {
     const fim = new Date(now);
     fim.setDate(fim.getDate() - i * 7);
-    const ini = new Date(fim);
-    ini.setDate(ini.getDate() - 6);
-    const ms = conversas
-      .filter((c) => {
-        const t = new Date(c.criado_em);
-        return t >= ini && t <= fim;
-      })
-      .reduce((s, c) => s + (Number(c.duracao_ms) || 0), 0);
+    const ms = chavesDeDias(fim, 7).reduce((s, k) => s + (porDia.get(k) || 0), 0);
     out.push({
       label: i === 0 ? "Esta" : `S-${i}`,
       value: Math.round(ms / 60000),
@@ -534,6 +542,7 @@ function cardDicasCogni({ servidorUrl, crianca, now, dicas, mock }) {
     class: "ap-dica-now__text",
     text: "A Cogni está preparando uma dica pra você…",
   });
+  const frescor = el("div", { class: "recado-frescor__host" });
   const destaque = el("div", {
     class: "ap-dica-now",
     children: [
@@ -543,6 +552,7 @@ function cardDicasCogni({ servidorUrl, crianca, now, dicas, mock }) {
         children: [
           el("span", { class: "ap-dica-now__label", text: "Dica de agora" }),
           atualTexto,
+          frescor,
         ],
       }),
     ],
@@ -578,9 +588,12 @@ function cardDicasCogni({ servidorUrl, crianca, now, dicas, mock }) {
   // resolve (caso raro de o endpoint trazer outra), repintamos com o texto real.
   const provavelAtual = dicas.length ? dicas[0].texto : null;
   pintarHistorico(dicas, provavelAtual);
-  resolverDicaAtual({ servidorUrl, crianca, mock }).then((textoAtual) => {
-    atualTexto.textContent = textoAtual;
-    pintarHistorico(dicas, textoAtual);
+  resolverDicaAtual({ servidorUrl, crianca, mock }).then((dica) => {
+    atualTexto.textContent = dica.texto;
+    pintarHistorico(dicas, dica.texto);
+    registrarOrigem("Dica da Cogni (Aprendizado)", dica.origem, dica.em);
+    const linha = linhaDeFrescor({ origem: dica.origem, em: dica.em, now });
+    if (linha) frescor.replaceChildren(linha);
   });
 
   return el("article", {
@@ -661,8 +674,8 @@ export async function renderAprendizado(ctx) {
   ]);
   const crianca = criancaFresca || ctx.crianca;
 
-  // Janela da semana (usada pelos contadores do rodapé).
-  const semana = weekWindow(conversas, ctx.now);
+  // Janela da semana (contadores do rodapé) — a MESMA que o gráfico desenha.
+  const semana = janelaDeDias(conversas, ctx.now, 7);
 
   /* ---- Cards de matéria ---- */
   const mats = topMaterias(conversas, 4);
@@ -749,10 +762,10 @@ export async function renderAprendizado(ctx) {
             : "Minutos de estudo por dia da semana",
       })
     );
-    const total =
-      modo === "mensal"
-        ? serie.reduce((s, p) => s + p.value, 0)
-        : Math.round(tempoTotal(weekWindow(conversas, ctx.now)) / 60000);
+    // A soma do que está DESENHADO, nos dois modos. Antes o modo semanal somava
+    // uma janela própria (`>= agora - 7 dias`, que pega parte de um 8º dia) e a
+    // frase saía maior que o gráfico logo acima dela.
+    const total = serie.reduce((s, p) => s + p.value, 0);
     // Sem minutos no período não cabe elogio ("Muito bem! …dedicou 0 min" soa
     // irônico justamente pro pai que abriu o painel e não achou nada).
     const texto = !total
@@ -853,7 +866,9 @@ export async function renderAprendizado(ctx) {
   const nTopicos = new Set(
     semana.map((c) => (c.topico || "").trim()).filter(Boolean)
   ).size;
-  const nMaterias = new Set(semana.map((c) => c.materia)).size;
+  // Pela canônica (igual aos cards de tempo): antes um `materia` nulo entrava
+  // como se fosse mais uma matéria, e o contador passava dos cards da tela.
+  const nMaterias = materiasDistintas(semana);
   const tempoSemana = formatDuracao(tempoTotal(semana));
 
   root.appendChild(
@@ -871,9 +886,3 @@ export async function renderAprendizado(ctx) {
   return root;
 }
 
-/** Conversas dos últimos 7 dias a partir do "agora". */
-function weekWindow(conversas, now) {
-  const limite = new Date(now);
-  limite.setDate(limite.getDate() - 7);
-  return conversas.filter((c) => new Date(c.criado_em) >= limite);
-}

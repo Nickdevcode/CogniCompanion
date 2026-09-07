@@ -202,6 +202,26 @@ export function capitalizar(texto) {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
+/**
+ * A matéria canônica de um valor qualquer: uma das 14 de `MATERIAS`, ou `outros`.
+ *
+ * Existe porque "não é uma das 14" tinha DUAS respostas diferentes no painel — os
+ * cards de tempo descartavam o valor (e o tempo dele sumia da tela), enquanto os
+ * contadores o somavam como se fosse mais uma matéria. Dois números da mesma tela
+ * discordando sobre o mesmo dado. Agora todo mundo pergunta aqui.
+ *
+ * O servidor já normaliza `conversas.materia` e a coluna é `not null default
+ * 'outros'` — então isto é rede de proteção, não conserto de dado sujo. Mas é a
+ * rede que garante que um rótulo novo do robô APAREÇA (em "Outros") em vez de
+ * evaporar entre dois contadores.
+ *
+ * @param {string|null|undefined} materia
+ * @returns {string} uma chave de `MATERIAS`
+ */
+export function materiaCanonica(materia) {
+  return MATERIAS.includes(materia) ? materia : "outros";
+}
+
 /** @returns {string} rótulo legível da matéria (fallback: a própria chave). */
 export function materiaLabel(materia) {
   return MATERIA_LABELS[materia] || materia || "Outros";
@@ -687,16 +707,77 @@ export function agruparConversasPorDia(conversas, now = new Date()) {
 }
 
 /**
- * Soma a duração (ms) das conversas por matéria.
+ * Soma a duração (ms) das conversas por matéria, agrupando pela CANÔNICA — um
+ * rótulo fora das 14 entra em `outros` em vez de virar um balde que ninguém lê.
  * @returns {Map<string, number>} matéria -> ms acumulado
  */
 export function tempoPorMateria(conversas) {
   const acc = new Map();
   for (const c of conversas || []) {
-    const m = c.materia || "outros";
+    const m = materiaCanonica(c.materia);
     acc.set(m, (acc.get(m) || 0) + (Number(c.duracao_ms) || 0));
   }
   return acc;
+}
+
+/** Quantas matérias DISTINTAS aparecem numa lista de conversas (pela canônica). */
+export function materiasDistintas(conversas) {
+  return new Set((conversas || []).map((c) => materiaCanonica(c.materia))).size;
+}
+
+/* --------------------------------------------------------------------------
+   A janela de dias — UMA definição, usada por todo mundo
+
+   🔴 Por que isto existe. "Os últimos 7 dias" estava escrito três vezes no
+   painel, de três jeitos, e os três discordavam na mesma tela:
+
+     - o gráfico plotava 7 CHAVES DE DIA (hoje + 6 anteriores);
+     - a legenda logo abaixo dele filtrava `criado_em >= agora - 7 dias`, que
+       varre parte de um OITAVO dia — 10 min/dia viravam 70 min no desenho e
+       "1h 20min" na frase colada nele;
+     - o gráfico Mensal montava baldes de `[fim - 6 dias, fim]` andando de 7 em
+       7, deixando um vão de ~1 dia entre cada par. Com as conversas caindo numa
+       hora diferente da hora em que o pai abre o painel, 40 de 280 minutos
+       sumiam — sem erro, sem sintoma.
+
+   O conserto não é acertar as três contas: é ter UMA. Todo mundo aqui deriva de
+   `dayKey`, então o desenho, a frase e os contadores não têm como divergir —
+   nem no horário de verão, nem na virada do dia.
+   -------------------------------------------------------------------------- */
+
+/**
+ * As chaves de dia (`YYYY-MM-DD`) de uma janela que TERMINA no dia de `now`,
+ * da mais antiga pra mais recente.
+ * @param {Date} now — o "agora" de referência (último dia da janela)
+ * @param {number} [dias=7] — largura da janela, em dias
+ * @returns {string[]} exatamente `dias` chaves
+ */
+export function chavesDeDias(now, dias = 7) {
+  const out = [];
+  for (let i = dias - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    out.push(dayKey(d));
+  }
+  return out;
+}
+
+/**
+ * As conversas que caem numa janela de `dias` terminando hoje.
+ *
+ * Filtra por CHAVE DE DIA (não por timestamp) de propósito: é o mesmo critério
+ * que o gráfico usa pra desenhar as colunas, então a soma da frase é sempre a
+ * soma do que está desenhado. Uma conversa com data futura (relógio adiantado)
+ * fica de fora — ela também não teria coluna.
+ *
+ * @param {Array<object>} conversas
+ * @param {Date} now
+ * @param {number} [dias=7]
+ * @returns {Array<object>} subconjunto de `conversas`
+ */
+export function janelaDeDias(conversas, now, dias = 7) {
+  const validas = new Set(chavesDeDias(now, dias));
+  return (conversas || []).filter((c) => validas.has(dayKey(c.criado_em)));
 }
 
 /**
