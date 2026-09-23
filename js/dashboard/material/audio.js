@@ -28,6 +28,39 @@ export class ErroDeAudio extends Error {}
  */
 const EXTENSOES = /\.(mp3|mp4|mpeg|mpga|m4a|wav|webm|ogg|opus|aac|weba)$/i;
 
+/** Extensão → mime de áudio, pra quando o aparelho não diz (ou diz errado). */
+const MIME_DA_EXTENSAO = {
+  mp3: "audio/mpeg",
+  mpeg: "audio/mpeg",
+  mpga: "audio/mpeg",
+  mp4: "audio/mp4",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  wav: "audio/wav",
+  webm: "audio/webm",
+  weba: "audio/webm",
+  ogg: "audio/ogg",
+  opus: "audio/ogg",
+};
+
+/**
+ * O mime que vai no data URL e no `item.mime`.
+ *
+ * O servidor exige `data:audio/…` ancorado. Um `.m4a` que o Android entrega com `type`
+ * vazio passava pela porta (`EXTENSOES` aceita pelo nome) e virava
+ * `data:application/octet-stream`, recusado só no envio. Com `type` de áudio, ele
+ * manda; sem, a extensão decide.
+ *
+ * @param {Blob & {name?: string}} arquivo
+ * @param {string} padrao
+ * @returns {string}
+ */
+function mimeDeAudio(arquivo, padrao) {
+  if (/^audio\//i.test(arquivo.type || "")) return arquivo.type;
+  const ext = /\.([a-z0-9]+)$/i.exec(arquivo.name || "")?.[1]?.toLowerCase();
+  return MIME_DA_EXTENSAO[ext] || padrao;
+}
+
 /**
  * Duração de um arquivo de áudio, sem decodificar.
  *
@@ -83,11 +116,12 @@ export async function deArquivo(file, teto) {
   }
 
   const duracao = await duracaoDe(file);
-  const dados = await blobParaDataURL(file);
+  const mime = mimeDeAudio(file, "audio/mpeg");
+  const dados = await blobParaDataURL(file, mime);
   const item = {
     tipo: "audio",
     nome: file.name || "audio",
-    mime: file.type || "audio/mpeg",
+    mime,
     dados,
     duracao_s: duracao == null ? null : Math.round(duracao),
   };
@@ -110,11 +144,12 @@ export async function deArquivo(file, teto) {
  * @returns {Promise<{item:object, bytes:number, duracao_s:number}>}
  */
 export async function deGravacao(blob, duracaoSegundos, teto) {
-  const dados = await blobParaDataURL(blob);
+  const mime = mimeDeAudio(blob, "audio/webm");
+  const dados = await blobParaDataURL(blob, mime);
   const item = {
     tipo: "audio",
     nome: "gravacao",
-    mime: blob.type || "audio/webm",
+    mime,
     dados,
     duracao_s: Math.round(duracaoSegundos),
   };

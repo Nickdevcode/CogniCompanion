@@ -108,11 +108,60 @@ export function descascarTexto(valor) {
   return t.replace(/\s+/g, " ").trim();
 }
 
-/** Número dentro da faixa, ou `null` se não for número. */
+/**
+ * Número dentro da faixa, ou `null` se não for número.
+ *
+ * 🔴 `Number(null)` é 0, e `Number("")` também. O schema PERMITE `null` em
+ * `estimativa_min` e `duracao_dias` — então o "não sei" do modelo era grampeado no
+ * piso: tarefa de 1 minuto, e plano de 1 dia que vencia amanhã. O `?? 7` e o `?? 0.5`
+ * lá embaixo nunca rodavam, porque `grampear` nunca devolvia `null` pra um `null`.
+ */
 function grampear(valor, min, max) {
+  if (typeof valor !== "number" && typeof valor !== "string") return null;
+  if (typeof valor === "string" && !valor.trim()) return null;
   const n = Number(valor);
   if (!Number.isFinite(n)) return null;
   return Math.min(max, Math.max(min, n));
+}
+
+const DIA_MS = 86_400_000;
+
+/**
+ * "YYYY-MM-DD" → o dia civil em ms (meio-dia UTC, que nenhum fuso empurra de dia), ou
+ * `null` se a data não existe. O `Date` do V8 não recusa "2026-02-31": ele ROLA pra 3 de
+ * março em silêncio, e é a volta pela `toISOString` que denuncia.
+ */
+function diaCivil(iso) {
+  if (typeof iso !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const d = new Date(`${iso}T12:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso) return null;
+  return d.getTime();
+}
+
+/**
+ * A menor `duracao_dias` que ainda cobre o prazo mais distante, contando hoje e o dia
+ * do prazo — ou `null` se não há prazo futuro pra cobrir.
+ *
+ * 🔴 Existe porque o prompt sozinho não segurou: medido ao vivo (23/set/2026), bilhete
+ * com prazos na sexta e na terça seguinte, e o modelo devolveu 3 dias numa rodada e 4
+ * na outra — mesmo com a regra 10 dizendo como contar. Plano vencido é plano que a Cogni
+ * para de seguir, então a lição de terça seria abandonada no sábado sem aviso nenhum.
+ *
+ * @param {{prazo:string|null}[]} tarefas
+ * @param {string|null} hoje — "YYYY-MM-DD", o mesmo que foi pro prompt
+ * @returns {number|null}
+ */
+function duracaoQueCobreOsPrazos(tarefas, hoje) {
+  const inicio = diaCivil(hoje);
+  if (inicio === null) return null;
+  let maisDistante = null;
+  for (const t of tarefas) {
+    const prazo = diaCivil(t.prazo);
+    if (prazo !== null && prazo >= inicio && (maisDistante === null || prazo > maisDistante)) {
+      maisDistante = prazo;
+    }
+  }
+  return maisDistante === null ? null : Math.round((maisDistante - inicio) / DIA_MS) + 1;
 }
 
 /**
@@ -153,10 +202,15 @@ const PADROES = {
 
 /**
  * @param {object} cru — o JSON que a IA devolveu
- * @param {{aviso?:string|null, temMaterial?:boolean, temLink?:boolean}} [ctx]
+ * @param {{aviso?:string|null, temMaterial?:boolean, temLink?:boolean, hoje?:string|null}} [ctx]
+ *   `hoje` é o mesmo "YYYY-MM-DD" que foi pro prompt; sem ele, a duração não é conferida
+ *   contra os prazos.
  * @returns {object} a resposta 200 final
  */
-export function sanear(cru, { aviso = null, temMaterial = true, temLink = false } = {}) {
+export function sanear(
+  cru,
+  { aviso = null, temMaterial = true, temLink = false, hoje = null } = {}
+) {
   // A precedência é a mesma do prompt: a escola manda, depois o link, depois o pedido.
   const padrao = temMaterial ? PADROES.material : temLink ? PADROES.link : PADROES.pedido;
 
@@ -219,7 +273,10 @@ export function sanear(cru, { aviso = null, temMaterial = true, temLink = false 
     // Fallback pra matéria da primeira tarefa (e não "outros"): se a IA classificou
     // as tarefas, ela já disse do que o plano trata.
     foco: MATERIAS.includes(cru.foco) ? cru.foco : tarefas[0].materia,
-    duracao_dias: grampear(cru.duracao_dias, 1, 365) ?? 7,
+    duracao_dias: Math.min(
+      365,
+      Math.max(grampear(cru.duracao_dias, 1, 365) ?? 7, duracaoQueCobreOsPrazos(tarefas, hoje) ?? 0)
+    ),
     extraido_texto: cortar(cru.extraido_texto, LIM.extraido),
     tarefas,
     truncado,

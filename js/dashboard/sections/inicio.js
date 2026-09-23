@@ -399,6 +399,7 @@ export async function renderInicio(ctx) {
         servidorUrl: ctx.servidorUrl,
         crianca: ctx.crianca,
         mock: ctx.mock,
+        now: ctx.now,
       }),
       // Dica do Cogni. Fonte estável: lê a última dica salva (tabela `dicas`, via
       // ctx.mock) na hora e refresca pelo endpoint quando o robô está ligado.
@@ -407,6 +408,7 @@ export async function renderInicio(ctx) {
         servidorUrl: ctx.servidorUrl,
         crianca: ctx.crianca,
         mock: ctx.mock,
+        now: ctx.now,
         onMais: go("aprendizado"),
       }),
     ],

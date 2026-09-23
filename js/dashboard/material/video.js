@@ -36,6 +36,7 @@ import {
   CUSTO_WAV_POR_SEGUNDO,
   segundosDeAudioQueCabem,
   quadrosQueCabem,
+  MAX_IMAGENS,
 } from "./orcamento.js";
 
 /** Erro com mensagem já escrita pro pai. */
@@ -367,6 +368,16 @@ export async function deArquivo(file, orcamento, { onProgresso, signal, maxImage
     // comportamento esperado, não uma falha que mereça explicação.
 
     if (!itens.length) {
+      /**
+       * Sem vaga de imagem e sem fala: "tente outro" mandaria o pai trocar de vídeo, e
+       * QUALQUER vídeo mudo bateria no mesmo lugar. O caso real é dois vídeos no mesmo
+       * lote: o primeiro leva as 4 imagens, e o segundo, mudo, chega com zero vagas.
+       */
+      if (Number.isFinite(maxImagens) && maxImagens <= 0) {
+        throw new ErroDeVideo(
+          `A lista já tem as ${MAX_IMAGENS} imagens que cabem num plano, e esse vídeo não tem fala pra eu aproveitar sem elas. Remova uma foto ou um vídeo da lista e mande de novo.`
+        );
+      }
       throw new ErroDeVideo("Não consegui aproveitar nada desse vídeo. Tente outro.");
     }
 

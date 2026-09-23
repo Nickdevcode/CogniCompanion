@@ -95,8 +95,18 @@ export async function criancaPareada(token, uid, env, paraQue = "criar um plano"
         `&select=id,nome,idade,serie&limit=1`,
       { headers: { Authorization: `Bearer ${token}`, apikey: env.SUPABASE_ANON_KEY } }
     );
+    /**
+     * 🔴 Sem esta checagem, QUALQUER erro do PostgREST virava "pareie o robô": o corpo
+     * de erro é um objeto (`{code, message}`), `objeto[0]` é `undefined`, e o
+     * `!crianca` abaixo respondia 403 pra um pai que está pareado. O token vencer
+     * entre a trava 2 e esta (a sessão expira no meio do upload de um PDF) é o caso
+     * mais provável — e ali a resposta certa é "entre de novo", não "pareie".
+     */
+    if (r.status === 401) throw new ErroHttp(401, "Sua sessão expirou. Entre de novo.");
+    if (!r.ok) throw new Error(`PostgREST ${r.status} ao ler a criança`);
     crianca = (await r.json())?.[0];
   } catch (err) {
+    if (err instanceof ErroHttp) throw err;
     console.error("[api] Falha ao ler a criança:", err);
     throw new ErroHttp(502, "Não consegui carregar o perfil agora.");
   }

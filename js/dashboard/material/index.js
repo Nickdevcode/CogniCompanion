@@ -156,7 +156,13 @@ async function prepararPdf(file, orcamento) {
     );
   }
 
-  const item = { tipo: "pdf", nome: file.name || "documento.pdf", dados: await blobParaDataURL(file) };
+  // O mime é explícito: quem chegou aqui passou pela assinatura `%PDF`, e isso vale
+  // mais que o `file.type` que o aparelho inventou (ver `blobParaDataURL`).
+  const item = {
+    tipo: "pdf",
+    nome: file.name || "documento.pdf",
+    dados: await blobParaDataURL(file, "application/pdf"),
+  };
   return {
     origem: "arquivo",
     itens: [item],

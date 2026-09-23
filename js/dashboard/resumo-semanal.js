@@ -111,9 +111,10 @@ export async function buscarResumoSemanal(servidorUrl, criancaId) {
  * @param {string} cfg.servidorUrl — base do servidor local (endpoint)
  * @param {object} cfg.crianca — a criança pareada (precisa do id)
  * @param {object} cfg.mock — camada de dados (pra ler `resumos_semanais`)
+ * @param {Date} [cfg.now] — o "agora" do painel (`ctx.now`); ver `cardDica`
  * @returns {HTMLElement} o card
  */
-export function cardResumoSemanal({ servidorUrl, crianca, mock }) {
+export function cardResumoSemanal({ servidorUrl, crianca, mock, now }) {
   const card = el("article", {
     class: "dash-card ini-card ini-card--bilhete",
   });
@@ -145,7 +146,7 @@ export function cardResumoSemanal({ servidorUrl, crianca, mock }) {
 
   // Sem criança pareada: estado neutro (não é erro de conexão).
   if (!crianca || !crianca.id) {
-    renderConteudo(body, footHost, null);
+    renderConteudo(body, footHost, null, now);
     return card;
   }
 
@@ -155,7 +156,7 @@ export function cardResumoSemanal({ servidorUrl, crianca, mock }) {
       resumo ? resumo.origem : "padrao",
       resumo ? resumo.em : null
     );
-    renderConteudo(body, footHost, resumo);
+    renderConteudo(body, footHost, resumo, now);
   });
 
   return card;
@@ -212,8 +213,9 @@ function skeletonCarregando() {
  * @param {HTMLElement} body
  * @param {HTMLElement} footHost
  * @param {ResumoNormalizado|null} resumo
+ * @param {Date} [now]
  */
-function renderConteudo(body, footHost, resumo) {
+function renderConteudo(body, footHost, resumo, now) {
   body.replaceChildren();
   footHost.replaceChildren();
 
@@ -248,7 +250,7 @@ function renderConteudo(body, footHost, resumo) {
 
   // De quando é este bilhete. Sem isto, um bilhete de três dias atrás e um
   // escrito agora chegam idênticos à tela.
-  const frescor = linhaDeFrescor({ origem: resumo.origem, em: resumo.em });
+  const frescor = linhaDeFrescor({ origem: resumo.origem, em: resumo.em, now });
   if (frescor) body.appendChild(frescor);
 
   // "Ler completo": quando há mais texto que o trecho, ou dados extras a mostrar

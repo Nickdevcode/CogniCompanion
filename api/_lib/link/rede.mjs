@@ -133,32 +133,102 @@ export function extrairUrl(bruto) {
    ========================================================================== */
 
 /**
- * O IP é de rede interna?
+ * Faixas IPv4 que não são "a internet".
  *
  * A lista não é decorativa: `169.254.*` é onde vive o metadata endpoint da AWS, do GCP
- * e da Azure — o alvo número 1 de qualquer SSRF em nuvem.
+ * e da Azure — o alvo número 1 de qualquer SSRF em nuvem. `100.64/10` é CGNAT (rede
+ * interna de operadora e de boa parte das nuvens); `224/3` junta multicast, a faixa
+ * reservada e o broadcast; o resto é faixa de documentação/benchmark, que nenhum site
+ * de verdade usa.
+ */
+const FAIXAS_IPV4_INTERNAS = [
+  ["0.0.0.0", 8],
+  ["10.0.0.0", 8],
+  ["100.64.0.0", 10],
+  ["127.0.0.0", 8],
+  ["169.254.0.0", 16],
+  ["172.16.0.0", 12],
+  ["192.0.0.0", 24],
+  ["192.0.2.0", 24],
+  ["192.168.0.0", 16],
+  ["198.18.0.0", 15],
+  ["198.51.100.0", 24],
+  ["203.0.113.0", 24],
+  ["224.0.0.0", 3],
+];
+
+/** "10.0.0.1" → inteiro de 32 bits, ou `null` se não for um IPv4 em quatro partes. */
+function ipv4ParaNumero(ip) {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+  if (!m) return null;
+  const partes = m.slice(1).map(Number);
+  if (partes.some((p) => p > 255)) return null;
+  return ((partes[0] << 24) | (partes[1] << 16) | (partes[2] << 8) | partes[3]) >>> 0;
+}
+
+function ipv4Interno(n) {
+  return FAIXAS_IPV4_INTERNAS.some(([base, bits]) => {
+    const mascara = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
+    return ((n & mascara) >>> 0) === ((ipv4ParaNumero(base) & mascara) >>> 0);
+  });
+}
+
+/**
+ * Os 32 bits finais de um IPv6, lidos como IPv4.
+ *
+ * 🔴 Aceita as DUAS grafias, e é a segunda que furava a trava: o `getaddrinfo` escreve o
+ * mapeado como `::ffff:127.0.0.1`, mas o parser de URL do Node normaliza
+ * `http://[::ffff:127.0.0.1]/` pra `[::ffff:7f00:1]` — e `7f00:1` não casava com regex
+ * de IPv4 nenhuma. Medido: `[::ffff:169.254.169.254]` passava inteiro por `validarDestino`.
+ *
+ * @param {string} resto — o que vem depois do prefixo ("127.0.0.1" ou "7f00:1")
+ * @returns {number|null}
+ */
+function ipv4DoFim(resto) {
+  const pontos = ipv4ParaNumero(resto);
+  if (pontos !== null) return pontos;
+  const m = /^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(resto);
+  if (!m) return null;
+  return ((parseInt(m[1], 16) << 16) | parseInt(m[2], 16)) >>> 0;
+}
+
+function ipv6Interno(ip) {
+  if (ip === "::" || ip === "::1") return true;
+
+  /**
+   * IPv4 embutido em IPv6: mapeado (`::ffff:`), NAT64 (`64:ff9b::`) e o
+   * "compatível" obsoleto (`::a.b.c.d`), que o parser de URL ainda aceita. Os três
+   * valem o que valer o IPv4 lá dentro.
+   */
+  for (const prefixo of ["::ffff:", "64:ff9b::", "::"]) {
+    if (!ip.startsWith(prefixo)) continue;
+    const v4 = ipv4DoFim(ip.slice(prefixo.length));
+    if (v4 !== null) return ipv4Interno(v4);
+  }
+
+  if (/^64:ff9b:1:/.test(ip)) return true; // NAT64 de uso local (RFC 8215)
+  if (/^f[cd][0-9a-f]{0,2}:/.test(ip)) return true; // fc00::/7 — endereço único local
+  if (/^fe[89a-f][0-9a-f]?:/.test(ip)) return true; // fe80::/10 link-local + fec0::/10
+  if (/^ff[0-9a-f]{0,2}:/.test(ip)) return true; // multicast
+  return false;
+}
+
+/**
+ * O IP é de rede interna?
+ *
+ * Recebe também NOME de host (é chamada com o `hostname` da URL antes do DNS), e nome
+ * não é IP: devolve `false` e quem decide é a resolução. Antes, as regex de IPv6 rodavam
+ * em qualquer string — e `fcc.gov` ou `fdc.nal.usda.gov` levavam "endereço interno"
+ * por começarem com `fc`/`fd`.
  *
  * @param {string} ip
  * @returns {boolean}
  */
 export function ehIpPrivado(ip) {
-  const baixo = String(ip || "").toLowerCase();
-
-  // IPv6 primeiro: o `::ffff:127.0.0.1` mapeado é IPv4 disfarçado, e passa batido em
-  // qualquer checagem feita só com regex de IPv4.
-  if (baixo.startsWith("::ffff:")) return ehIpPrivado(baixo.slice(7));
-  if (baixo === "::1" || baixo === "::") return true;
-  if (/^f[cd]/.test(baixo)) return true; // fc00::/7 — endereço único local
-  if (baixo.startsWith("fe80")) return true; // link-local
-
-  if (/^(10|127)\./.test(baixo)) return true;
-  if (/^192\.168\./.test(baixo)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(baixo)) return true;
-  if (/^169\.254\./.test(baixo)) return true;
-  if (/^0\./.test(baixo)) return true;
-  // CGNAT: é a faixa da rede interna de operadora e de boa parte das nuvens.
-  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(baixo)) return true;
-  return false;
+  const baixo = String(ip || "").toLowerCase().replace(/^\[|\]$/g, "");
+  if (baixo.includes(":")) return ipv6Interno(baixo);
+  const v4 = ipv4ParaNumero(baixo);
+  return v4 !== null && ipv4Interno(v4);
 }
 
 /**

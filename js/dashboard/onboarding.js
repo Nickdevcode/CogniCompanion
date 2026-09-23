@@ -591,7 +591,7 @@ function telaPareamento({ mock }) {
       // mais: o vínculo acontece no banco, então dá pra conectar do celular, do
       // trabalho, de onde for. Só o CÓDIGO precisa vir do robô.
       text:
-        "Você pode conectar de qualquer lugar — não precisa estar na mesma rede " +
+        "Você pode conectar de qualquer lugar: não precisa estar na mesma rede " +
         "do robô. O que precisa vir dele é só o código.",
     })
   );
@@ -663,7 +663,7 @@ function telaPareamento({ mock }) {
     // aberta pelo robô, então "peça o código pra ela" é literalmente a ação que
     // faz a Cogni aparecer aqui.
     sondaTxt.textContent =
-      "Nenhuma Cogni se anunciou ainda. Peça o código pra ela — é isso que a faz aparecer aqui. Ou digite direto, se já tiver o código.";
+      "Nenhuma Cogni se anunciou ainda. Peça o código pra ela: é isso que a faz aparecer aqui. Ou digite direto, se já tiver o código.";
     sondaBtn.hidden = false;
   }
 

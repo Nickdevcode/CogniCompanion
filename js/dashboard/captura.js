@@ -799,6 +799,17 @@ function criarFluxo({ ctx, aoSalvar }) {
       orcamento.devolver(material.bytes);
       return problema;
     }
+    /**
+     * Estourou o orçamento? Foto, PDF, áudio e link conferem isso no próprio preparo;
+     * o vídeo não consegue, porque debita durante a extração e garante sempre UM
+     * quadro — que numa bandeja quase cheia pode sair maior que o espaço. Sem esta
+     * trava a barra passava de 100% calada e o erro só vinha no "Montar o plano",
+     * sem dizer qual material sobrava.
+     */
+    if (orcamento.usado() > orcamento.total) {
+      orcamento.devolver(material.bytes);
+      return `"${material.nome}" ficou em ${formatarBytes(material.bytes)} e não cabe junto com o resto. Tire um material da lista, ou mande um trecho menor.`;
+    }
     materiais.push(material);
     return null;
   }

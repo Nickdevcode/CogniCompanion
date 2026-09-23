@@ -93,7 +93,7 @@
       price: "R$ 80,00",
       image: "assets/images/produto-jumpers.png",
       alt: "Cabos jumper coloridos nas versões macho-macho, macho-fêmea e fêmea-fêmea",
-      desc: "Os fios que ligam tudo. Vários packs de cabo macho-macho, macho-fêmea e fêmea-fêmea — são eles que levam energia e sinal de uma peça pra outra na protoboard.",
+      desc: "Os fios que ligam tudo. Vários packs de cabo macho-macho, macho-fêmea e fêmea-fêmea. São eles que levam energia e sinal de uma peça pra outra na protoboard.",
     },
   ];
 })();

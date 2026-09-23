@@ -173,6 +173,7 @@ export default async function handler(req, res) {
             : null),
         temMaterial: prontos.length - links > 0,
         temLink: links > 0,
+        hoje,
       })
     );
   } catch (err) {

@@ -16,15 +16,24 @@
  * exceeded") em todos os navegadores. O `FileReader` faz o base64 nativo, sem cópia
  * intermediária em JS.
  *
+ * 🔴 O prefixo `data:<mime>` sai do `type` do Blob — e o `type` de um arquivo escolhido
+ * no aparelho é o MESMO campo em que `index.js` se recusa a confiar (Windows e Android
+ * mandam vazio ou `application/octet-stream`). O servidor valida o prefixo ancorado
+ * (`data:application/pdf;base64,`, `data:audio/…`), então um PDF reconhecido aqui pela
+ * assinatura `%PDF` entrava na bandeja e só era recusado no envio, como "não parece um
+ * PDF válido". Quem já sabe o que o arquivo É passa o `mime`, e ele manda.
+ *
  * @param {Blob} blob
+ * @param {string} [mime] — o tipo canônico; reembrulhar um Blob não copia os bytes
  * @returns {Promise<string>}
  */
-export function blobParaDataURL(blob) {
+export function blobParaDataURL(blob, mime) {
+  const alvo = mime && blob.type !== mime ? new Blob([blob], { type: mime }) : blob;
   return new Promise((resolve, reject) => {
     const fr = new FileReader();
     fr.onload = () => resolve(String(fr.result));
     fr.onerror = () => reject(fr.error || new Error("Falha ao ler o arquivo."));
-    fr.readAsDataURL(blob);
+    fr.readAsDataURL(alvo);
   });
 }
 

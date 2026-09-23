@@ -22,8 +22,15 @@
 
 import { normalizarRosto, ROSTO_PADRAO } from "./rosto-preview.js";
 
-/** Intervalo do PUT ao vivo. O valor vem do plano técnico (~150 ms). */
-const DEBOUNCE_ROBO_MS = 150;
+/**
+ * Ritmo do PUT ao vivo: no máximo um a cada ~150 ms (o valor vem do plano técnico).
+ *
+ * 🔴 É um RITMO, não um debounce — e já foi debounce. O slider dispara `input` a cada
+ * ~16 ms, e um debounce de 150 ms reiniciava o relógio em cada um deles: medido, 0 PUT
+ * num arraste contínuo de 1 s. O robô ficava parado o arraste inteiro e só pulava pra
+ * cara final quando a criança soltava — o contrário do que esta tela existe pra fazer.
+ */
+const INTERVALO_ROBO_MS = 150;
 /** Intervalo da gravação no banco — persistência não precisa de tempo real. */
 const DEBOUNCE_BANCO_MS = 1200;
 /** Teto por request: servidor fora do ar não pode deixar a UI pendurada. */
@@ -112,6 +119,7 @@ export function criarGravadorRosto({ servidorUrl, crianca, mock, aoMudarStatus }
   let timerBanco = null;
   let pendente = null; // último rosto que o usuário escolheu
   let ultimoEnviado = null; // último que chegou a sair pro servidor
+  let ultimoEnvioEm = 0; // quando saiu o último PUT ao vivo (Date.now)
 
   // Cada PUT leva um número de sequência. Uma resposta só conta se for do último
   // request disparado — senão, arrastar rápido faria uma resposta atrasada
@@ -177,12 +185,18 @@ export function criarGravadorRosto({ servidorUrl, crianca, mock, aoMudarStatus }
   function agendar(rosto) {
     pendente = rosto;
 
-    clearTimeout(timerRobo);
-    timerRobo = setTimeout(() => {
-      timerRobo = null;
-      ultimoEnviado = rosto;
-      enviarProRobo(rosto);
-    }, DEBOUNCE_ROBO_MS);
+    // Já tem PUT marcado: ele vai levar o `pendente` mais novo quando sair, então
+    // não há o que reagendar. Sem PUT marcado, sai assim que a janela de 150 ms
+    // desde o último fechar — na hora, se a criança estava parada.
+    if (!timerRobo) {
+      const espera = Math.max(0, INTERVALO_ROBO_MS - (Date.now() - ultimoEnvioEm));
+      timerRobo = setTimeout(() => {
+        timerRobo = null;
+        ultimoEnvioEm = Date.now();
+        ultimoEnviado = pendente;
+        enviarProRobo(pendente);
+      }, espera);
+    }
 
     clearTimeout(timerBanco);
     timerBanco = setTimeout(() => {

@@ -115,9 +115,13 @@ export async function resolverDicaAtual({ servidorUrl, crianca, mock }) {
  * @param {object} cfg.crianca
  * @param {object} cfg.mock — camada de dados (pra ler a última de `dicas`)
  * @param {Function} cfg.onMais
+ * @param {Date} [cfg.now] — o "agora" do painel (`ctx.now`). No modo demo ele é o
+ *   relógio deslizado do mock, e a linha "Escrito há…" tem que contar a partir dele,
+ *   como o mesmo card faz no Aprendizado — senão as duas telas discordam da idade da
+ *   mesma dica.
  * @returns {HTMLElement}
  */
-export function cardDica({ servidorUrl, crianca, mock, onMais }) {
+export function cardDica({ servidorUrl, crianca, mock, onMais, now }) {
   const card = el("article", { class: "dash-card ini-card ini-card--dica" });
   card.appendChild(
     el("div", {
@@ -167,7 +171,7 @@ export function cardDica({ servidorUrl, crianca, mock, onMais }) {
   resolverDicaAtual({ servidorUrl, crianca, mock }).then((dica) => {
     texto.textContent = dica.texto;
     registrarOrigem("Dica da Cogni", dica.origem, dica.em);
-    const linha = linhaDeFrescor({ origem: dica.origem, em: dica.em });
+    const linha = linhaDeFrescor({ origem: dica.origem, em: dica.em, now });
     if (linha) frescor.replaceChildren(linha);
   });
 

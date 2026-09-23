@@ -43,7 +43,31 @@ const MODELO_FALLBACK_PDF = "gpt-4o-mini";
  * (US$ 0,0045 contra 0,003 por minuto) é 1,5 centavo num áudio de 10 minutos.
  */
 const MODELO_TRANSCRICAO = "gpt-transcribe";
-const MODELO_TRANSCRICAO_FALLBACK = "whisper-1";
+
+/**
+ * O fallback, e a data em que ele deixa de existir.
+ *
+ * Em 26/08/2026 a OpenAI anunciou a aposentadoria de `whisper-1`, `gpt-4o-transcribe` e
+ * `gpt-4o-mini-transcribe`, com saída da API em **26/02/2027** (developers.openai.com/
+ * api/docs/deprecations). O fallback daqui era o `whisper-1`; agora é o mesmo do robô
+ * (`STT_FALLBACK_MODEL` em `Cogni/server/config.js`), que transcreve melhor e morre no
+ * mesmo dia — nenhum dos dois é "mais vivo" que o outro.
+ *
+ * O titular (`gpt-transcribe`) NÃO está na lista: aqui o fallback morrer não deixa o site
+ * surdo, só sem rede de proteção. Por isso, passada a data, `transcrever` simplesmente
+ * não chama o fallback — uma segunda chamada a um modelo morto devolveria outro 404 e
+ * esconderia no log o erro que importa, o do titular.
+ *
+ * >>> ATÉ 26/02/2027: se existir um segundo modelo de transcrição fora dessa família,
+ *     aponte pra ele e atualize a data (ou apague as duas linhas).
+ */
+const MODELO_TRANSCRICAO_FALLBACK = "gpt-4o-mini-transcribe";
+const FALLBACK_SAI_DO_AR = "2027-02-26";
+
+/** O fallback de transcrição ainda responde nesta data? */
+export function fallbackDeTranscricaoNoAr(agora = new Date()) {
+  return agora.toISOString().slice(0, 10) < FALLBACK_SAI_DO_AR;
+}
 
 /**
  * Teto de saída.
@@ -214,9 +238,15 @@ export async function transcrever(chave, item, crianca) {
     form.append("model", modelo);
     form.append("prompt", dicas.prompt);
     if (modelo === MODELO_TRANSCRICAO) {
-      // O modelo novo usa `languages` (plural) e aceita palavras-chave do domínio.
-      form.append("languages", "pt");
-      form.append("keywords", dicas.keywords);
+      /**
+       * `languages` e `keywords` são LISTAS, e em multipart lista se escreve com `[]`
+       * e um campo por item — é o exemplo de `curl` da doc (`-F 'keywords[]=…'`).
+       * Mandava-se `languages=pt` e `keywords="lição, tarefa, …"`: no melhor caso, UMA
+       * palavra-chave de 90 caracteres que nunca aparece no áudio. E a doc é explícita:
+       * `languages` SUBSTITUI o `language` singular — não mande os dois.
+       */
+      form.append("languages[]", "pt");
+      for (const palavra of dicas.keywords) form.append("keywords[]", palavra);
     } else {
       form.append("language", "pt");
     }
@@ -234,7 +264,16 @@ export async function transcrever(chave, item, crianca) {
      * que existe uma rede que não existe.
      */
     if (recusouModelo(err)) {
-      console.warn("[plano-de-material] gpt-transcribe indisponível; usando whisper-1.");
+      if (!fallbackDeTranscricaoNoAr()) {
+        console.error(
+          `[plano-de-material] ${MODELO_TRANSCRICAO} indisponível, e o fallback ` +
+            `${MODELO_TRANSCRICAO_FALLBACK} saiu do ar em ${FALLBACK_SAI_DO_AR}.`
+        );
+        throw err;
+      }
+      console.warn(
+        `[plano-de-material] ${MODELO_TRANSCRICAO} indisponível; usando ${MODELO_TRANSCRICAO_FALLBACK}.`
+      );
       return chamarTranscricao(chave, montar(MODELO_TRANSCRICAO_FALLBACK));
     }
     if (recusouFormato(err)) {

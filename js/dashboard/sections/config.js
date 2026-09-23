@@ -998,7 +998,7 @@ function blocoVinculo({ crianca, mock, onDesvinculado }) {
             children: [
               el("span", { text: "Código de pareamento" }),
               dicaInfo(
-                "O mesmo código que liga outro aparelho a este perfil. Ele não muda e não expira — nem precisa do robô ligado pra aparecer aqui.",
+                "O mesmo código que liga outro aparelho a este perfil. Ele não muda, não expira e nem precisa do robô ligado pra aparecer aqui.",
                 { rotulo: "Código de pareamento" }
               ),
             ],
