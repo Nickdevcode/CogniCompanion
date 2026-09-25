@@ -13,6 +13,41 @@
 
 const DEFAULT_ROUTE = "inicio";
 
+/**
+ * O bloco de "algo deu errado", com uma saída.
+ *
+ * Ele era um título e um parágrafo, e mais nada: a falha que o provoca quase sempre
+ * é uma piscada de rede, e a única porta pra tentar de novo era o pai adivinhar que
+ * um F5 resolve. Exportado porque o `main.js` precisa do MESMO bloco quando a falha
+ * acontece antes de existir router (ao carregar a criança).
+ *
+ * @param {object} cfg
+ * @param {string} [cfg.mensagem]
+ * @param {() => void} [cfg.aoTentarDeNovo] — sem ele, o botão não aparece
+ * @returns {HTMLElement}
+ */
+export function blocoDeErro({ mensagem, aoTentarDeNovo } = {}) {
+  const wrap = document.createElement("div");
+  wrap.className = "dash-error";
+  // `role="alert"` porque o bloco substitui o spinner sem o foco sair do lugar: sem
+  // isto, quem usa leitor de tela fica ouvindo "Carregando…" pra sempre.
+  wrap.setAttribute("role", "alert");
+  const h = document.createElement("h2");
+  h.textContent = "Algo deu errado";
+  const p = document.createElement("p");
+  p.textContent = mensagem || "Não foi possível carregar esta seção.";
+  wrap.append(h, p);
+  if (typeof aoTentarDeNovo === "function") {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "dash-btn dash-btn--primary dash-error__acao";
+    btn.textContent = "Tentar de novo";
+    btn.addEventListener("click", aoTentarDeNovo);
+    wrap.appendChild(btn);
+  }
+  return wrap;
+}
+
 export function createRouter({ outlet, context }) {
   const routes = new Map();
   let current = null;
@@ -46,15 +81,18 @@ export function createRouter({ outlet, context }) {
       'aria-hidden="true"></span><p>Carregando…</p></div>';
   }
 
-  function showError(message) {
-    const wrap = document.createElement("div");
-    wrap.className = "dash-error";
-    const h = document.createElement("h2");
-    h.textContent = "Algo deu errado";
-    const p = document.createElement("p");
-    p.textContent = message || "Não foi possível carregar esta seção.";
-    wrap.append(h, p);
-    outlet.replaceChildren(wrap);
+  /**
+   * @param {string} [message]
+   * @param {boolean} [podeTentar=true] — "Seção não encontrada" não melhora
+   *   tentando de novo; falha de carga, sim.
+   */
+  function showError(message, podeTentar = true) {
+    outlet.replaceChildren(
+      blocoDeErro({
+        mensagem: message,
+        aoTentarDeNovo: podeTentar ? () => handleRoute() : undefined,
+      })
+    );
   }
 
   /** Renderiza a rota atual (lê o hash). */
@@ -64,7 +102,7 @@ export function createRouter({ outlet, context }) {
 
     const render = routes.get(key);
     if (!render) {
-      showError("Seção não encontrada.");
+      showError("Seção não encontrada.", false);
       return;
     }
 

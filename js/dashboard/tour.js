@@ -346,7 +346,7 @@ export function iniciarTour({ passos, aoTerminar }) {
   btnVoltar.addEventListener("click", () => ir(indice - 1));
   btnPular.addEventListener("click", () => terminar(false));
   btnFechar.addEventListener("click", () => terminar(false));
-  // Clicar no véu não fecha de propósito: o tutorial tem 10 passos e um toque
+  // Clicar no véu não fecha de propósito: o tutorial tem 9 passos e um toque
   // torto no celular jogaria fora tudo que já foi lido. Sair é decisão, não
   // acidente — e há dois botões explícitos pra isso.
 

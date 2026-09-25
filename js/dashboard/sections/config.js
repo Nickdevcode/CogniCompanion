@@ -34,6 +34,13 @@ import {
 } from "../format.js";
 
 /**
+ * A faixa de idade que o sistema inteiro entende: é a mesma que o robô aceita
+ * quando aprende a idade por voz (`memoria-ai.js`, `idade >= 4 && idade <= 18`).
+ */
+const IDADE_MIN = 4;
+const IDADE_MAX = 18;
+
+/**
  * Desvincula a criança do responsável (o pai escolheu desfazer o vínculo).
  *
  * ⛔ 26/ago/2026: era `POST {servidorUrl}/api/pareamento/desvincular`, e nunca
@@ -214,8 +221,8 @@ function formularioPerfil(crianca, { onSubmit, close }) {
       type: "number",
       // 4–18 é a faixa que o robô valida e que a camada didática sabe calibrar.
       // Oferecer menos que isso seria propor um valor que o resto do sistema não usa.
-      min: "4",
-      max: "18",
+      min: String(IDADE_MIN),
+      max: String(IDADE_MAX),
       inputmode: "numeric",
       value: crianca.idade != null ? String(crianca.idade) : "",
     },
@@ -346,12 +353,23 @@ function formularioPerfil(crianca, { onSubmit, close }) {
   // monta — daí o ajuste inicial esperar um frame.
   requestAnimationFrame(ajustarAlturaPrompt);
 
+  // O motivo da recusa mora COLADO no campo: o aviso geral do formulário fica
+  // abaixo da barra de ações, que no celular é fixa, e o pai via a borda vermelha
+  // sem ver o porquê.
+  const erroIdade = el("p", {
+    class: "cfg-field__erro",
+    attrs: { id: "cf-idade-erro", "aria-live": "polite" },
+  });
+  inIdade.setAttribute("aria-describedby", "cf-idade-erro");
+  const campoIdade = campo("Idade", inIdade);
+  campoIdade.appendChild(erroIdade);
+
   // Seção 1: dados básicos (grid)
   const grid = el("div", {
     class: "cfg-form__grid",
     children: [
       campo("Nome", inNome, { full: true }),
-      campo("Idade", inIdade),
+      campoIdade,
       campo("Série", selSerie),
       campo("Matéria favorita", selFav),
       campo("Matéria difícil", selDif),
@@ -439,6 +457,24 @@ function formularioPerfil(crianca, { onSubmit, close }) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const idadeVal = parseInt(inIdade.value, 10);
+
+    /**
+     * O `min`/`max` do campo não valem nada com `novalidate` no form: "45" (a idade
+     * do pai, digitada no campo errado) ou "-3" iam direto pro banco, e a Cogni
+     * passava a calibrar a conversa pra um adulto. Vazio continua valendo (a coluna
+     * é nullable); fora da faixa, o formulário para e diz por quê.
+     */
+    const idadeForaDaFaixa =
+      inIdade.value.trim() !== "" &&
+      (Number.isNaN(idadeVal) || idadeVal < IDADE_MIN || idadeVal > IDADE_MAX);
+    inIdade.setAttribute("aria-invalid", idadeForaDaFaixa ? "true" : "false");
+    erroIdade.textContent = idadeForaDaFaixa
+      ? `Use uma idade entre ${IDADE_MIN} e ${IDADE_MAX} anos, ou deixe em branco.`
+      : "";
+    if (idadeForaDaFaixa) {
+      inIdade.focus();
+      return;
+    }
 
     // Trava o botão durante o update e mostra a falha se ela vier: o perfil
     // alimenta o prompt da Cogni, então "achei que tinha salvado" é caro aqui.

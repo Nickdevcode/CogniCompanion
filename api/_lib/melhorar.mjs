@@ -67,7 +67,8 @@ export const CAMPOS = {
       "O que a criança precisa FAZER, com o enunciado resumido, não só onde está " +
       '("Somar frações de denominadores diferentes; ex.: 2/3 + 1/4. Páginas 42 e 43"). ' +
       "A Cogni usa este texto pra ajudar a fazer a lição: sem o enunciado ela só sabe " +
-      "que a lição existe; com ele, sabe ensinar a resolver.",
+      "que a lição existe; com ele, sabe ensinar a resolver. Nunca ACRESCENTE a " +
+      "resposta ou o resultado: ela ensina a chegar lá, e o gabarito no card vira cola.",
     acoes: ["gerar", "melhorar", "encurtar", "detalhar"],
   },
 };

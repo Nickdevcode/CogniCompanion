@@ -77,11 +77,24 @@ const RE_PDF = /^data:application\/pdf;base64,[A-Za-z0-9+/=]+$/;
 const RE_AUDIO =
   /^data:audio\/[a-z0-9.+-]+(?:\s*;\s*[a-z0-9-]+=(?:"[^"]*"|[^;,"]+))*;base64,[A-Za-z0-9+/=]+$/;
 
-/** Data ISO "YYYY-MM-DD" vinda do cliente, ou a de hoje no servidor. */
+/**
+ * O dia civil de agora no Brasil. A função roda em UTC na Vercel, e `toISOString()`
+ * já é amanhã das 21h à meia-noite de Brasília, justo o horário da mochila.
+ * `en-CA` porque é o locale que formata como "YYYY-MM-DD".
+ */
+const DIA_EM_BRASILIA = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * Data ISO "YYYY-MM-DD" vinda do cliente (o calendário do aparelho do pai), ou a de
+ * hoje em Brasília quando ele não mandou.
+ */
 export function normalizarHoje(valor) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(valor)
-    ? valor
-    : new Date().toISOString().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(valor) ? valor : DIA_EM_BRASILIA.format(new Date());
 }
 
 /**

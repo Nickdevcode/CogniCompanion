@@ -23,6 +23,7 @@ import {
   primeiroNome,
   sujeito,
   capitalizar,
+  chaveDeTexto,
 } from "../format.js";
 
 /* --------------------------------------------------------------------------
@@ -39,19 +40,21 @@ function createState() {
 /* --------------------------------------------------------------------------
    Filtragem (pura) sobre a lista de conversas
    -------------------------------------------------------------------------- */
+
 function aplicarFiltros(conversas, state) {
-  const termo = state.busca.trim().toLowerCase();
+  const termo = chaveDeTexto(state.busca.trim());
   return conversas.filter((c) => {
     if (state.materia && c.materia !== state.materia) return false;
     if (state.apenasSensiveis && !c.sensivel) return false;
     if (termo) {
-      const alvo = (
-        (c.texto_usuario || "") +
-        " " +
-        (c.texto_resposta || "") +
-        " " +
-        materiaLabel(c.materia)
-      ).toLowerCase();
+      // O `topico` entra porque é o nome que o pai VÊ: ele lê o chip "sistema
+      // solar" em Aprendizado, vem aqui procurar, e a busca antiga só olhava as
+      // falas, que podem nem conter a expressão ("e os planetas?").
+      const alvo = chaveDeTexto(
+        [c.texto_usuario, c.texto_resposta, c.topico, materiaLabel(c.materia)]
+          .filter(Boolean)
+          .join(" ")
+      );
       if (!alvo.includes(termo)) return false;
     }
     return true;
@@ -259,15 +262,25 @@ function filtroMateria(state, onChange) {
     wrap.classList.add("is-open");
     btn.setAttribute("aria-expanded", "true");
     document.addEventListener("click", onDocClick, true);
+    document.addEventListener("keydown", onEsc);
   }
   function close() {
     menu.hidden = true;
     wrap.classList.remove("is-open");
     btn.setAttribute("aria-expanded", "false");
     document.removeEventListener("click", onDocClick, true);
+    document.removeEventListener("keydown", onEsc);
   }
   function onDocClick(e) {
     if (!wrap.contains(e.target)) close();
+  }
+  // Esc fecha e devolve o foco ao botão: quem abriu pelo teclado não tinha como
+  // sair do menu sem escolher uma matéria ou clicar fora.
+  function onEsc(e) {
+    if (e.key !== "Escape") return;
+    const focoDentro = wrap.contains(document.activeElement);
+    close();
+    if (focoDentro) btn.focus();
   }
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -319,7 +332,7 @@ export async function renderConversas(ctx) {
       placeholder: "Buscar conversa ou palavra-chave",
       "aria-label": "Buscar conversa ou palavra-chave",
       "data-dica":
-        "Procura no que a criança perguntou, no que a Cogni respondeu e no nome da matéria.",
+        "Procura no que a criança perguntou, no que a Cogni respondeu, no assunto e no nome da matéria. Acento é opcional.",
       "data-dica-pos": "bottom",
     },
   });

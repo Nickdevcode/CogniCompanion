@@ -37,6 +37,8 @@ import {
   primeiroNome,
   sujeito,
   capitalizar,
+  chaveDeTexto,
+  topicosUnicos,
 } from "../format.js";
 
 /* --------------------------------------------------------------------------
@@ -110,16 +112,22 @@ function serieSemanal(conversas, now, semanas = 4) {
  * @returns {Array<{nome:string, materia:string}>}
  */
 function topicosExplorados(conversas, limite = 8) {
-  const vistos = new Map(); // topico -> materia
+  // Deduplica pela chave SEM acento: até 25/set/2026 o robô gravava "fracoes", e
+  // dali em diante "frações". Pela string crua, o mesmo assunto virava dois chips.
+  const vistos = new Map(); // chave -> { nome, materia }
   for (const c of conversas) {
     const t = (c.topico || "").trim();
     if (!t) continue; // null/vazio = papo sem assunto → ignora
-    if (!vistos.has(t)) vistos.set(t, c.materia || "outros");
+    const chave = chaveDeTexto(t);
+    const atual = vistos.get(chave);
+    if (!atual) {
+      vistos.set(chave, { nome: t, materia: c.materia || "outros" });
+    } else {
+      // A matéria continua a da 1ª ocorrência; o nome fica com a grafia acentuada.
+      atual.nome = topicosUnicos([atual.nome, t])[0];
+    }
   }
-  return Array.from(vistos, ([nome, materia]) => ({ nome, materia })).slice(
-    0,
-    limite
-  );
+  return Array.from(vistos.values()).slice(0, limite);
 }
 
 /* --------------------------------------------------------------------------
@@ -862,10 +870,9 @@ export async function renderAprendizado(ctx) {
 
   /* ---- Contadores do rodapé (janela da semana) ---- */
   const nConversas = semana.length;
-  // Tópicos distintos (não-nulos) explorados na semana.
-  const nTopicos = new Set(
-    semana.map((c) => (c.topico || "").trim()).filter(Boolean)
-  ).size;
+  // Tópicos distintos (não-nulos) explorados na semana, com a mesma chave sem
+  // acento dos chips: senão o contador contaria "fracoes" e "frações" como dois.
+  const nTopicos = topicosUnicos(semana.map((c) => c.topico)).length;
   // Pela canônica (igual aos cards de tempo): antes um `materia` nulo entrava
   // como se fosse mais uma matéria, e o contador passava dos cards da tela.
   const nMaterias = materiasDistintas(semana);

@@ -202,6 +202,58 @@ export function capitalizar(texto) {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
+/** Marcas de acento que o `normalize("NFD")` separa da letra. */
+const DIACRITICOS = /[\u0300-\u036f]/g;
+
+/**
+ * Texto pronto pra COMPARAR (nunca pra exibir): sem acento, minúsculo, espaços
+ * colapsados. "Frações " e "fracoes" viram a mesma chave.
+ *
+ * Existe por dois motivos que chegaram juntos: o pai busca no celular sem acento
+ * ("fracao"), e o robô gravou o `topico` sem acento até 25/set/2026 e com acento
+ * dali em diante. Sem uma chave comum, o mesmo assunto vira dois chips e a busca
+ * perde metade das conversas.
+ *
+ * @param {string|null|undefined} texto
+ * @returns {string}
+ */
+export function chaveDeTexto(texto) {
+  return String(texto || "")
+    .normalize("NFD")
+    .replace(DIACRITICOS, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** A grafia tem acento? (entre duas do mesmo assunto, é a que se mostra) */
+function temAcento(texto) {
+  // Regex própria, sem `g`: `.test()` numa regex global guarda `lastIndex` entre
+  // chamadas e passa a errar de forma intermitente.
+  return /[\u0300-\u036f]/.test(String(texto || "").normalize("NFD"));
+}
+
+/**
+ * Tópicos sem repetição, na ordem em que chegaram, preferindo a grafia acentuada.
+ *
+ * "fracoes" (gravado antes de 25/set) e "frações" (depois) são o mesmo assunto: um
+ * chip só, escrito certo. Vazio e `null` saem da lista.
+ *
+ * @param {Array<string|null|undefined>} lista
+ * @returns {string[]}
+ */
+export function topicosUnicos(lista) {
+  const porChave = new Map();
+  for (const bruto of lista || []) {
+    const t = String(bruto || "").trim();
+    const chave = chaveDeTexto(t);
+    if (!chave) continue;
+    const atual = porChave.get(chave);
+    if (atual === undefined || (!temAcento(atual) && temAcento(t))) porChave.set(chave, t);
+  }
+  return [...porChave.values()];
+}
+
 /**
  * A matéria canônica de um valor qualquer: uma das 14 de `MATERIAS`, ou `outros`.
  *

@@ -144,7 +144,7 @@ function mensagemDeStatus(status) {
   if (status === 401) return "Sua sessão expirou. Entre de novo.";
   if (status === 403) return "Pareie o robô com o perfil da criança antes de criar um plano.";
   if (status === 429) {
-    return "Você já criou muitos planos com a Cogni hoje. Tente de novo amanhã.";
+    return "Você já criou muitos planos com a Cogni nas últimas 24 horas. Tente de novo mais tarde.";
   }
   if (status === 404) {
     // Site servido localmente: a função só existe no deploy. Dizer isso é muito melhor

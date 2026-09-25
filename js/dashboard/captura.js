@@ -54,9 +54,23 @@ import {
 } from "./material/orcamento.js";
 import { criarGravador, suportaGravacao, ErroDeGravacao } from "./material/gravador.js";
 import { formatarBytes, formatarDuracao, tamanhoSerializado } from "./material/bytes.js";
+import { dayKey } from "./format.js";
 
 /** Endpoint da Vercel Function. Mesma origem do site — não precisa de CORS. */
 const ENDPOINT = "/api/plano-de-material";
+
+/**
+ * O "hoje" que vai pro prompt, no calendário do PAI (fuso do aparelho).
+ *
+ * Era `new Date().toISOString().slice(0, 10)`, que é o dia em UTC: das 21h à
+ * meia-noite no Brasil ele já é amanhã. E é justamente a hora em que o pai
+ * olha a mochila. A IA recebia "hoje é terça" numa segunda à noite, então
+ * "entregar amanhã" virava quarta, e "entregar terça" podia ir parar na terça
+ * da SEMANA SEGUINTE. `dayKey` é o mesmo dia local que o resto do painel usa.
+ */
+function hojeLocal() {
+  return dayKey(new Date());
+}
 
 /**
  * Teto de espera do cliente.
@@ -207,7 +221,7 @@ function mensagemDeStatus(status) {
     return "O material ficou grande demais pra enviar. Tire um item e tente de novo.";
   }
   if (status === 429) {
-    return "Você já criou muitos planos com a Cogni hoje. Tente de novo amanhã.";
+    return "Você já criou muitos planos com a Cogni nas últimas 24 horas. Tente de novo mais tarde.";
   }
   if (status === 401) return "Sua sessão expirou. Entre de novo.";
   if (status === 404) {
@@ -244,7 +258,7 @@ async function lerMaterial(itens, pedido, signal) {
     resp = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ itens, pedido, hoje: new Date().toISOString().slice(0, 10) }),
+      body: JSON.stringify({ itens, pedido, hoje: hojeLocal() }),
       signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
     });
   } catch (err) {
@@ -1183,7 +1197,7 @@ function criarFluxo({ ctx, aoSalvar }) {
       etapaEscolher("Escreva o que você quer que ela estude, ou mande o material da escola.");
       return;
     }
-    const corpo = { itens, pedido: texto, hoje: new Date().toISOString().slice(0, 10) };
+    const corpo = { itens, pedido: texto, hoje: hojeLocal() };
 
     /**
      * A última checagem, e a única que mede o que a plataforma mede. Estourar aqui é

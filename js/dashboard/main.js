@@ -12,7 +12,7 @@
  * window.cognifyToast. Os dados vêm de mock-data.js (trocável pelo Supabase).
  */
 
-import { createRouter } from "./router.js";
+import { createRouter, blocoDeErro } from "./router.js";
 import * as mock from "./mock-data.js";
 import { idadeLabel, primeiroNome } from "./format.js";
 import { iniciarOnboarding } from "./onboarding.js";
@@ -87,7 +87,8 @@ export { SERVIDOR_URL };
  * (request de rede que valida o JWT no servidor), e não o cache local — assim
  * uma conta já excluída no Supabase não consegue mais abrir o painel (o cache
  * sozinho continuaria "logado"). Falha transitória de rede preserva a sessão do
- * cache (o `validateUser` cuida disso), então o painel ainda abre offline.
+ * cache (o `validateUser` cuida disso), então o pai não é expulso por estar
+ * offline: o painel abre e diz que não conseguiu carregar, com "Tentar de novo".
  * Sem Supabase configurado ou sem sessão válida, redireciona pro login.
  * @returns {Promise<object|null>} o usuário validado, ou null (já redirecionou)
  */
@@ -207,7 +208,32 @@ async function init() {
   try {
     crianca = await mock.getCrianca();
   } catch (e) {
+    /**
+     * "Não consegui PERGUNTAR" não é "não há criança". As duas coisas caíam no
+     * mesmo `null`, e um pai pareado com o Wi-Fi piscando abria o painel e dava de
+     * cara com "Passo 1 de 3 · Boas-vindas", como se nunca tivesse usado o produto.
+     * Pior: a sessão sobrevive offline de propósito (ver `validateUser`), então era
+     * exatamente o caminho de quem abre o painel sem rede. Aqui a tela diz a verdade
+     * e oferece a única ação que resolve.
+     */
     console.error("[Companion] Erro ao carregar a criança:", e);
+    setupShell();
+    // Sem criança carregada, o card dela na sidebar seria só um avatar num quadro
+    // vazio, com cara de tela quebrada. Some até a próxima tentativa. (`style`, e
+    // não `hidden`: o `display: flex` do `.dash-child` vence o atributo.)
+    const cardCrianca = document.querySelector("[data-dash-child]");
+    if (cardCrianca) cardCrianca.style.display = "none";
+    const outlet = document.querySelector("[data-dash-outlet]");
+    if (outlet) {
+      outlet.replaceChildren(
+        blocoDeErro({
+          mensagem:
+            "Não consegui carregar o perfil agora. Confira a sua conexão e tente de novo.",
+          aoTentarDeNovo: () => window.location.reload(),
+        })
+      );
+    }
+    return;
   }
 
   if (!crianca) {

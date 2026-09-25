@@ -146,7 +146,10 @@ export async function dentroDaCota(token, criancaId, env) {
     if (Array.isArray(linhas) && linhas.length >= MAX_POR_DIA) {
       throw new ErroHttp(
         429,
-        `Você já criou ${MAX_POR_DIA} planos com a Cogni hoje; tente de novo amanhã.`
+        // "Nas últimas 24 horas", e não "hoje": a janela é móvel (`desde` acima), então
+        // quem bateu o teto às 23h não é liberado à meia-noite, como "amanhã" prometia.
+        `Você já criou ${MAX_POR_DIA} planos com a Cogni nas últimas 24 horas. ` +
+          "Tente de novo mais tarde."
       );
     }
   } catch (err) {

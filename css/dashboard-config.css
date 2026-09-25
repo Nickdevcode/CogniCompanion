@@ -743,6 +743,24 @@
   border-color: var(--dash-accent);
   box-shadow: 0 0 0 3px var(--dash-accent-soft);
 }
+/* Valor recusado no salvar (ex.: idade fora de 4–18). Mesma cor do aviso
+   `.pl-form__erro` que explica o motivo, pra os dois se lerem como um par. */
+.cfg-input[aria-invalid="true"] {
+  border-color: var(--toast-error, #c0392b);
+}
+/* O porquê da recusa, embaixo do próprio campo. */
+.cfg-field__erro {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--toast-error, #c0392b);
+}
+[data-theme="dark"] .cfg-field__erro {
+  color: var(--toast-error, #ff6b6b);
+}
+.cfg-field__erro:empty {
+  display: none;
+}
 .cfg-textarea {
   resize: vertical;
   line-height: 1.5;

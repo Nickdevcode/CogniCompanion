@@ -509,7 +509,8 @@ export async function removerPlano(id) {
 /**
  * Atualiza o perfil da criança pareada (infos editáveis + prompt_personalizado).
  * NUNCA escreve `responsavel_id` nem `codigo_pareamento` (protegidos: o vínculo
- * é só via servidor). A RLS garante que o pai só edita os próprios filhos.
+ * só muda pelas RPCs `vincular_por_codigo`/`desvincular_crianca`, e o código é do
+ * robô). A RLS garante que o pai só edita os próprios filhos.
  * @param {object} patch — campos editáveis de `criancas`
  * @returns {Promise<object>} a criança atualizada
  */
@@ -991,8 +992,16 @@ export async function criarPlanoComTarefas(plano, tarefas) {
   if (erroTarefas) {
     // Rollback à mão (não há transação pelo PostgREST). Se o próprio rollback
     // falhar, ainda assim é o erro do insert que interessa ao pai.
+    //
+    // ⚠️ O supabase-js NÃO lança em erro de query: ele devolve `{ error }`. Só o
+    // `try/catch` deixava o log de plano órfão como código morto: o DELETE recusado
+    // passava calado, e o plano vazio ficava na Mesa sem ninguém saber de onde veio.
     try {
-      await client().from("planos_estudo").delete().eq("id", criado.id);
+      const { error: erroRollback } = await client()
+        .from("planos_estudo")
+        .delete()
+        .eq("id", criado.id);
+      if (erroRollback) console.error("[Companion] Plano órfão em", criado.id, erroRollback);
     } catch (e) {
       console.error("[Companion] Plano órfão em", criado.id, e);
     }

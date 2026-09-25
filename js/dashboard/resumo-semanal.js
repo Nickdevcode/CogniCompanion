@@ -28,7 +28,9 @@ import { el } from "./sections/_shared.js";
 import { ICON } from "./icons.js";
 import { dicaInfo } from "./tooltip.js";
 import { openModal } from "./modal.js";
-import { materiaLabel } from "./format.js";
+// `topicosUnicos`: na semana da virada (25/set/2026) o robô gravou o mesmo assunto
+// com e sem acento, e o bilhete mostraria "fracoes" e "frações" lado a lado.
+import { materiaLabel, topicosUnicos } from "./format.js";
 import { linhaDeFrescor, registrarOrigem } from "./recado-frescor.js";
 
 /**
@@ -51,7 +53,7 @@ function normalizarDaTabela(linha) {
   return {
     texto: linha.texto || "",
     materias: Array.isArray(linha.materias) ? linha.materias : [],
-    topicos: Array.isArray(linha.topicos) ? linha.topicos : [],
+    topicos: Array.isArray(linha.topicos) ? topicosUnicos(linha.topicos) : [],
     totalConversas:
       typeof linha.total_conversas === "number" ? linha.total_conversas : null,
     periodoDias: linha.periodo_dias || 7,
@@ -67,7 +69,7 @@ function normalizarDoEndpoint(dados) {
   return {
     texto: dados.resumo || "",
     materias: Array.isArray(dados.materias) ? dados.materias : [],
-    topicos: Array.isArray(dados.topicos) ? dados.topicos : [],
+    topicos: Array.isArray(dados.topicos) ? topicosUnicos(dados.topicos) : [],
     totalConversas:
       typeof dados.totalConversas === "number" ? dados.totalConversas : null,
     periodoDias: dados.periodoDias || 7,

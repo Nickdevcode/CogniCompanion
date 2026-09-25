@@ -280,6 +280,10 @@ ${regrasDaFonte(pedido, temMaterial, temLink)}
    denominadores diferentes; ex.: 2/3 + 1/4. Páginas 42 e 43, questões 1 a 8".
    O robô tutor usa esse texto pra AJUDAR a fazer a lição; sem o enunciado, ele só
    sabe que a lição existe. Com ele, sabe ensinar a resolver.
+   Copie as contas e as perguntas como estão ("1) 2/5 + 1/5; 2) 3/8 + 4/8"), mas
+   NUNCA escreva a RESPOSTA nem o resultado, nem no \`detalhe\` nem no \`conteudo\`:
+   "2/3 + 1/4" sim, "2/3 + 1/4 = 11/12" não. A Cogni ensina a criança a CHEGAR na
+   resposta, um passo por vez; com o gabarito escrito no card, ele vira cola.
 9. O \`titulo\` do plano tem no máximo ${LIM.titulo} caracteres e o \`conteudo\` ${LIM.conteudo}. O
    \`conteudo\` é um resumo em 1-2 frases do que a criança precisa fazer, escrito
    pro robô tutor seguir, e não repita a lista de tarefas ali.
