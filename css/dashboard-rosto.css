@@ -54,7 +54,8 @@
 }
 
 /* --------------------------------------------------------------------------
-   Status do robô — três estados, nenhum deles de erro
+   Status do robô — cinco estados; só "falhou" é erro, e mesmo ele é âmbar
+   (a criança mexe de novo e pronto, não há nada pra ela consertar)
    -------------------------------------------------------------------------- */
 
 .dash-rosto__status {
@@ -82,14 +83,17 @@
   height: 100%;
 }
 
-/* Aplicado no robô agora: o único estado "verde".
+/* Aplicado no robô agora — ou "enviado" pela nuvem, de onde o robô ligado pega na
+   hora (o texto é que diz que não dá pra confirmar). Os dois são o estado "verde".
    O verde é escuro porque sobre o próprio fundo esverdeado um tom médio fica em
    4.1:1 — abaixo do mínimo AA (4.5:1) pra este tamanho de texto. */
-.dash-rosto__status[data-estado="aplicado"] {
+.dash-rosto__status[data-estado="aplicado"],
+.dash-rosto__status[data-estado="enviado"] {
   background: rgba(34, 160, 96, 0.15);
   color: #0f5c37;
 }
-[data-theme="dark"] .dash-rosto__status[data-estado="aplicado"] {
+[data-theme="dark"] .dash-rosto__status[data-estado="aplicado"],
+[data-theme="dark"] .dash-rosto__status[data-estado="enviado"] {
   color: #57d497;
 }
 
@@ -99,11 +103,13 @@
    O texto é mais escuro que --brand-gold-deep de propósito: o dourado da marca
    sobre este fundo âmbar dá só 2.7:1, e este chip carrega a informação mais
    importante da tela ("a Cogni ainda não viu"). Precisa ser legível de verdade. */
-.dash-rosto__status[data-estado="salvo"] {
+.dash-rosto__status[data-estado="salvo"],
+.dash-rosto__status[data-estado="falhou"] {
   background: var(--dash-accent-soft);
   color: #9a4a02;
 }
-[data-theme="dark"] .dash-rosto__status[data-estado="salvo"] {
+[data-theme="dark"] .dash-rosto__status[data-estado="salvo"],
+[data-theme="dark"] .dash-rosto__status[data-estado="falhou"] {
   color: var(--brand-gold);
 }
 

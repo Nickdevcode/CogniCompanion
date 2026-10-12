@@ -135,7 +135,7 @@ O painel lê de **duas fontes**, e ambas já estão integradas:
 | Fonte | O quê | Como |
 | --- | --- | --- |
 | 🗄️ **Supabase** | Criança, conversas (Diário), planos de estudo, perfil, **trilha de aprendizado** | `@supabase/supabase-js` (anon key + RLS). Conversas e trilha são **só leitura** pelo site; planos têm CRUD |
-| 🖥️ **Servidor local da Cogni** | Só o que é **ao vivo**: refresh do Resumo e da Dica (IA) e o rosto chegando no robô em tempo real | `fetch` nos endpoints `/api/...`, e **só quando o painel está aberto em casa** — ver *Servidor local*. Pareamento, despareamento e código do perfil **saíram daqui** em 26/ago/2026 |
+| 🖥️ **Servidor local da Cogni** | Só o refresh do Resumo e da Dica (IA) — e o rosto ao vivo pelo caminho curto, quando o painel está aberto **em casa** | `fetch` nos endpoints `/api/...`, e **só quando o painel está aberto em casa** — ver *Servidor local*. Pareamento, despareamento e código do perfil **saíram daqui** em 26/ago/2026; o rosto ao vivo de fora de casa vai pelo banco desde 12/out/2026 |
 
 ### 🎛️ A chave que liga tudo: `USAR_SUPABASE`
 
@@ -219,9 +219,9 @@ export const SERVIDOR_AO_ALCANCE = SERVIDOR_URL !== "";
 > `PORTA_SERVIDOR`.
 
 **O que sobrou passando pelo servidor local** (e só funciona com o painel aberto em casa): o *refresh* do
-Resumo Semanal e da Dica com IA, e o rosto chegando no robô **enquanto a criança arrasta o slider**. Tudo
-o mais foi pro banco — inclusive o pareamento, que nunca precisou do robô: o endpoint dele só rodava duas
-queries no Supabase.
+Resumo Semanal e da Dica com IA. Tudo o mais foi pro banco — inclusive o pareamento, que nunca precisou do
+robô (o endpoint dele só rodava duas queries no Supabase), e o **rosto ao vivo**, que de fora de casa vai
+pelo Supabase e chega no robô pelo Realtime (ver *Como o "ao vivo" funciona*).
 
 **Plano criado no site chega na Cogni na hora.** Quem faz isso é o **Realtime do Supabase** (o servidor
 escuta `planos_estudo`); o site ainda dá um `POST /api/planos/refrescar` depois de criar, editar ou excluir
@@ -978,9 +978,9 @@ o próprio `-soft`, que são um degrau mais escuros que o branco puro. Na remedi
 > 🧪 **Testar o pareamento não precisa mais do robô ligado** — ele fala com o banco. Basta ter um perfil
 > em `criancas` com `codigo_pareamento` e digitar o código. Para testar **sem banco nenhum**, vire
 > `USAR_SUPABASE = false`: o mock aceita o código `K7H2QM` e a lista de candidatos mostra um robô de
-> exemplo. O servidor da Cogni (`http://127.0.0.1:3000`) só é necessário pra ver o **rosto mudando ao
-> vivo** e pra forçar um refresh do Resumo/Dica — e, nesse caso, abra o painel em `localhost`, não na
-> Vercel.
+> exemplo. O servidor da Cogni (`http://127.0.0.1:3000`) só é necessário pra ver o **rosto mudando no
+> robô** (ligado e no perfil da criança — vale da Vercel também, pelo Realtime) e pra forçar um refresh do
+> Resumo/Dica, que esse sim exige abrir o painel em `localhost`.
 
 ---
 
@@ -1010,21 +1010,37 @@ destas o firmware ignora — não adianta inventar cor, pupila ou brilho.
 
 ### ⚡ Como o "ao vivo" funciona
 
-Cada mexida dispara um `PUT {SERVIDOR}/api/esp/rosto` com **debounce de 150 ms** — é isso que faz o robô
-acompanhar o dedo. A gravação no Supabase é separada, com debounce mais folgado (1,2 s), porque é só
-persistência e não precisa de tempo real.
+São dois caminhos, e o painel escolhe sozinho pelo lugar de onde foi aberto:
+
+| Painel aberto… | Caminho até o robô | Persistência |
+| --- | --- | --- |
+| 🏠 **Em casa** (`localhost` ou IP da rede) | `PUT {SERVIDOR}/api/esp/rosto`, no máximo um a cada 150 ms | `UPDATE` no Supabase 1,2 s depois de a criança parar |
+| ☁️ **Na Vercel** (o normal) | `UPDATE` enxuto de `rosto_robo` no mesmo ritmo → Realtime → servidor do robô | É o próprio `UPDATE` ao vivo |
+
+> 🐛 **12/out/2026 — "antes mudava na hora, agora demora".** Desde o Local Network Access (ver
+> *Servidor local*), o PUT nem sai da Vercel, e o robô só via o desenho pela gravação de persistência —
+> que é um debounce: **1,2 s depois de a criança soltar o slider**, e nada durante o arraste. Agora o banco
+> é o caminho ao vivo (`criarGravadorPelaNuvem` em `rosto-api.js`). Duas regras: **uma escrita por vez**
+> (duas em voo podem chegar fora de ordem e deixar no banco um desenho do meio do arraste) e **a mais nova
+> vence** (o que se acumula enquanto uma voa não vira fila). O `count` do UPDATE pega a falha silenciosa da
+> RLS, que atualiza zero linhas sem dar erro; falha de rede tenta de novo o último desenho até 2 vezes.
+
+> 🎚️ É **ritmo, não debounce** — e já foi debounce: o slider dispara `input` a cada ~16 ms, e um debounce
+> de 150 ms reiniciava o relógio em cada um. Medido: zero PUT num arraste contínuo de 1 s.
 
 O preview em SVG **replica a matemática do firmware** (a lib RoboEyes que posiciona os olhos),
 então o que aparece na tela é pixel a pixel o que vai aparecer no robô. Ele é síncrono e local: funciona
 com o robô **e** o servidor desligados.
 
-### 🔌 Três estados, nenhum deles de erro
+### 🔌 Cinco estados, só um de erro
 
 | Situação | O que a criança vê |
 | --- | --- |
-| Robô ligado nesse perfil | 🟢 "A Cogni tá com essa carinha agora!" |
+| Robô ligado nesse perfil (painel em casa) | 🟢 "A Cogni tá com essa carinha agora!" |
+| Gravado pela nuvem (painel na Vercel) | 🟢 "Pronto! Se a Cogni estiver ligada, ela já tá com essa carinha." — pelo banco não dá pra saber se o robô está ligado, então a frase promete o que é verdade nos dois casos |
 | `aplicadoNoRobo: false` | 🟡 "Guardei! Ela vai fazer essa cara quando ligar." |
-| Servidor fora do ar | 🟡 A mesma coisa — e o desenho **salva do mesmo jeito** |
+| Servidor fora do ar (painel em casa) | 🟡 A mesma coisa — e o desenho **salva do mesmo jeito** |
+| A nuvem recusou, mesmo depois de tentar de novo | 🟡 "Não consegui mandar agora. Mexe de novo daqui a pouquinho!" — o único caso em que a escolha **não** ficou guardada |
 
 > ⚠️ `aplicadoNoRobo: false` **não é falha**: significa que o robô estava desligado ou usando outro perfil.
 > O rosto foi salvo e vale na próxima conexão.

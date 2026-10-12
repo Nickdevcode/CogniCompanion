@@ -562,6 +562,40 @@ export async function atualizarCrianca(patch) {
   return data;
 }
 
+/**
+ * Grava SÓ o rosto do robô, no caminho mais curto que existe até o banco.
+ *
+ * É o caminho AO VIVO do editor de rosto quando o servidor local está fora de
+ * alcance (o painel na Vercel — ver `servidor.js`): cada mexida no slider vira um
+ * UPDATE, o Realtime entrega a linha ao servidor do robô, e ele muda a cara na
+ * hora. Por isso não passa pelo `atualizarCrianca`, que custa o dobro:
+ *
+ *   • lá, cada escrita relê a criança antes (o cache é descartado a cada escrita,
+ *     então durante um arraste TODA gravação faria um SELECT antes do UPDATE);
+ *   • lá, o `.select()` devolve a linha inteira — com os vetores de rosto e de voz
+ *     que o robô guarda — só pra tela jogar fora.
+ *
+ * Aqui é um round-trip só, sem corpo de volta. O `count` é o que impede a falha
+ * silenciosa da RLS: um UPDATE barrado por ela não dá erro, só atualiza zero
+ * linhas — e o editor diria "pronto" pra um rosto que nunca foi gravado.
+ *
+ * @param {string} criancaId — id da criança (a RLS confere se ela é deste pai)
+ * @param {object} rosto — já normalizado pelo editor
+ * @returns {Promise<void>}
+ */
+export async function gravarRostoRobo(criancaId, rosto) {
+  if (!criancaId) throw new Error("Sem criança pareada para editar.");
+  const { error, count } = await client()
+    .from("criancas")
+    .update({ rosto_robo: rosto }, { count: "exact" })
+    .eq("id", criancaId);
+  if (error) throw error;
+  if (count === 0) {
+    throw new Error("O rosto não foi gravado: a criança não está vinculada a esta conta.");
+  }
+  invalidarCacheCrianca();
+}
+
 /* ==========================================================================
    Vínculo pai ↔ criança (pareamento) ⭐ 26/ago/2026
 

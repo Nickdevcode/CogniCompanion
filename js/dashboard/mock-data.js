@@ -1371,6 +1371,20 @@ export async function atualizarCrianca(patch) {
     : _mockAtualizarCrianca(patch);
 }
 
+/**
+ * Grava só o rosto do robô — o caminho ao vivo do editor de rosto quando o
+ * servidor local está fora de alcance. No modo real é um UPDATE enxuto em
+ * `criancas` (ver `gravarRostoRobo` em supabase-data.js); na demonstração, o
+ * mesmo update do mock.
+ * @param {string} criancaId
+ * @param {object} rosto
+ * @returns {Promise<void>}
+ */
+export async function gravarRostoRobo(criancaId, rosto) {
+  if (USAR_SUPABASE) return supa.gravarRostoRobo(criancaId, rosto);
+  await _mockAtualizarCrianca({ rosto_robo: rosto });
+}
+
 /* ==========================================================================
    Vínculo pai ↔ criança (pareamento) ⭐ 26/ago/2026
 

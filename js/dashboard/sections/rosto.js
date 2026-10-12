@@ -80,11 +80,28 @@ const CONTROLES = [
   },
 ];
 
-/** Mensagem de cada estado. Nenhuma delas é de erro — nem quando a rede falha. */
+/**
+ * Mensagem de cada estado. Só "falhou" admite que algo deu errado — e é o único
+ * em que a escolha da criança de fato não ficou guardada.
+ *
+ * "enviado" é o caminho pela nuvem (painel fora de casa): pelo banco não dá pra
+ * saber se o robô está ligado, então a frase promete o que é verdade nos dois casos.
+ */
 const MENSAGENS = {
   salvando: "Mandando pra Cogni…",
   aplicado: "A Cogni tá com essa carinha agora!",
   salvo: "Guardei! Ela vai fazer essa cara quando ligar.",
+  enviado: "Pronto! Se a Cogni estiver ligada, ela já tá com essa carinha.",
+  falhou: "Não consegui mandar agora. Mexe de novo daqui a pouquinho!",
+};
+
+/** Ícone de cada estado (markup constante do ICON, nunca dado de usuário). */
+const ICONES = {
+  aplicado: "check",
+  enviado: "check",
+  salvando: "refresh",
+  falhou: "alert",
+  salvo: "robot",
 };
 
 /**
@@ -143,8 +160,7 @@ export async function renderRosto(ctx) {
     // markup SVG constante escrito no código-fonte, nunca dado de usuário. É a
     // mesma regra documentada no helper `el()` (_shared.js).
     statusTexto.textContent = MENSAGENS[estado] || "";
-    statusIcone.innerHTML =
-      estado === "aplicado" ? ICON.check : estado === "salvando" ? ICON.refresh : ICON.robot;
+    statusIcone.innerHTML = ICON[ICONES[estado] || "robot"];
   }
   mostrarStatus("salvo");
 
