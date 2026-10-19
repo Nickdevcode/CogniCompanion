@@ -317,7 +317,9 @@ html.is-trailer-open {
   border: 0;
   background: transparent;
   color: #fff;
-  overflow: hidden;
+  /* visible, e não o auto do navegador: o botão de fechar mora acima do quadro e
+     não pode ser cortado nem ganhar barra de rolagem em tela baixa */
+  overflow: visible;
 }
 .video-modal[open] {
   display: grid;
