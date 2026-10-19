@@ -93,10 +93,16 @@ a CDN oficial do `@supabase/supabase-js` — sem back-end próprio e sem build.
 | 🔑 **Login** | Entra com e-mail/senha, com mensagens de erro claras em português |
 | 🟦 **Login com Google** | Autenticação social via OAuth (`signInWithOAuth`) |
 | 👤 **Sessão persistente** | Continua logado entre reloads e abas; badge do usuário no header com menu (Dashboard / Sair) |
-| 🎮 **Gate de download** | Os botões de baixar o **jogo** só funcionam logado; deslogado, mostram um aviso pedindo login |
+| 🎮 **Gate de download** | Os botões de baixar o **jogo** (o `.rar` em `assets/downloads/`) só funcionam logado; deslogado, mostram um aviso pedindo login |
 | 🔔 **Notificações (toasts)** | Sistema de avisos acessível e reutilizável para sucesso/erro/informação |
 
 > 📄 O download do **artigo científico (PDF)** continua **livre**, sem exigir login.
+
+> 🕹️ **O jogo é a build de Windows do Psybot** (`assets/downloads/Psybot-TCC-Windows-2026-10-11.rar`, ~76 MiB),
+> com `Psybot.exe`, `Psybot.pck` e o `LEIA-ME.txt` na pasta `Psybot/`. Pra trocar por uma build nova, gere o `.rar`
+> com outro nome e atualize o `href` dos dois botões (`index.html` e `jogo.html`).
+> ⚠️ O **GitHub recusa arquivo acima de 100 MiB**, e é do GitHub que a Vercel puxa o site: build maior que isso não sobe.
+> O gate é só de interface: quem tiver o link direto baixa sem login.
 
 ### 🔑 Sobre a chave do Supabase (importante)
 
@@ -1127,6 +1133,7 @@ Cogni Software/
 └── assets/                 # Mídia
     ├── icons/              # Ícones e favicon
     ├── images/             # Imagens (robô, equipe, produtos, jogo...)
+    ├── downloads/          # A build do jogo (.rar)
     └── pdfs/               # Artigo científico em PDF
 ```
 

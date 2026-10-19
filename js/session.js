@@ -314,7 +314,7 @@
         if (!trigger) return;
 
         const user = lastKnownUser;
-        if (user) return; // logado → deixa o clique seguir (download real, quando existir)
+        if (user) return; // logado → deixa o clique seguir (baixa o .rar do jogo)
 
         // Deslogado → bloqueia e orienta.
         e.preventDefault();
