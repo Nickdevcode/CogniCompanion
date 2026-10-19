@@ -16,6 +16,7 @@ Mais do que um robô, o Cogni é a união de **hardware + IA** numa experiência
 | 🔐 | [Autenticação](#-autenticação-login-cadastro-e-sessão) | Supabase Auth, sessão persistente e o gate de download do jogo |
 | 📊 | [**Painel Companion**](#-painel-companion-dashboard-dos-pais) | o app dos pais, e a maior parte deste README |
 | 🎨 | [Rosto da Cogni](#-rosto-da-cogni--a-tela-da-criança) | a única tela feita pra criança, e a contribuição científica do TCC |
+| 🎬 | [Trailer do Psybot](#-o-trailer-do-psybot) | o vídeo do jogo: como foi feito e como toca na página |
 | 🗂️ | [Estrutura de pastas](#️-estrutura-de-pastas) | onde cada coisa mora |
 | 🚀 | [Como rodar](#-como-rodar-localmente) | subir na sua máquina, e como o site vai ao ar |
 | 👥 | [Equipe](#-equipe) · [Tecnologias](#️-tecnologias) | quem fez, e com o quê |
@@ -60,7 +61,7 @@ Os dois foram construídos **do zero em HTML, CSS e JavaScript puro** (sem frame
 | --- | --- | --- |
 | 🏠 **Home** | `index.html` | Apresentação geral: projeto, materiais, jogo, artigo científico e equipe |
 | 🛠️ **Produto** | `produto.html` | Detalhes dos materiais/componentes usados na construção do Cogni |
-| 🎮 **Jogo** | `jogo.html` | Página do jogo do Cogni (história, fases e download) |
+| 🎮 **Jogo** | `jogo.html` | Página do jogo do Cogni ([trailer](#-o-trailer-do-psybot), história, fases e download) |
 | 📘 **Instruções** | `instrucoes.html` | Como usar / saber mais sobre o Cogni |
 | 🔐 **Login** | `login.html` | Tela de acesso |
 | 📝 **Cadastro** | `cadastro.html` | Tela de cadastro |
@@ -1064,6 +1065,44 @@ O robô lê do perfil local, que já é hidratado do Supabase pelo caminho norma
 
 ---
 
+## 🎬 O trailer do Psybot
+
+O card **Trailer** da seção *Vídeos* do `jogo.html` abre um trailer de **1 min 40 s** (1080p, 30 qps, H.264 + AAC,
+~38 MB) feito inteiro a partir do próprio jogo: nada de banco de imagem, nada de música licenciada. 🎮
+
+| | O que é | De onde veio |
+| --- | --- | --- |
+| 🎞️ **Imagem** | Gameplay de verdade das quatro noites + as ilustrações da história | Filmado no Godot (*Movie Maker*, 60 qps) com uma bancada que monta cada cena e **joga sozinha**: mira, anda, troca de arma e bate |
+| 🎼 **Trilha** | Composta para o trailer, cortada no tempo da imagem | O mesmo sintetizador da trilha do jogo: a canção de ninar na caixinha de música, o coração do Alcino e o motivo d'O NÓ |
+| 🔤 **Texto** | Chakra Petch, a fonte do próprio jogo, e o ciano do visor do Cogni | Falas tiradas do roteiro da história do jogo |
+| 🔊 **Volume** | −14 LUFS | O padrão de vídeo na web: nem estoura, nem obriga a aumentar o som |
+
+> 👀 **Feito pra dar tempo de ler.** Quem assiste é pai, professor e banca, não jogador de reflexo: toda legenda fica
+> na tela pelo menos o que leva para ler a ~12 caracteres por segundo (e nunca menos de 1,6 s). A regra foi conferida
+> por script, legenda por legenda, antes de renderizar.
+
+### ▶️ Como ele toca na página
+
+| Situação | O que acontece |
+| --- | --- |
+| 🖱️ Clique no card | Abre um `<dialog>` com o player e o vídeo já começa (`js/game-trailer.js`) |
+| ⌨️ `Esc`, botão ✕ ou clique fora do vídeo | Fecha, **pausa** e devolve o foco ao card |
+| 📱 Celular | Abre direto em **tela cheia** (deitado, onde o navegador deixa): em pé, as legendas ficariam pequenas demais |
+| 🚫 Sem JavaScript | O card é um link para o próprio `.mp4`: o navegador abre o vídeo direto |
+| 📶 Quem não clica | Não baixa nada — `preload="none"`, os 38 MB só vêm quando alguém pede |
+
+| Arquivo | Papel |
+| --- | --- |
+| `assets/videos/psybot-trailer.mp4` | O trailer |
+| `assets/images/jogo-trailer-capa.jpg` | Capa do card **e** pôster do player (o Cogni encarando O NÓ) |
+
+> 🔁 **Pra trocar por uma versão nova:** exporte em H.264 + AAC **com `-movflags +faststart`** (sem isso o navegador
+> só começa a tocar depois de baixar o arquivo inteiro) e mantenha abaixo de **100 MiB** — o mesmo teto do GitHub que
+> vale para o `.rar` do jogo. As fontes da edição (a bancada de filmagem, a trilha e o compositor) ficam em
+> `tmp/trailer/`, fora do Git.
+
+---
+
 ## 🗂️ Estrutura de pastas
 
 ```
@@ -1128,12 +1167,13 @@ Cogni Software/
 │   │   └── sections/       # Início, Conversas, Aprendizado, Mesa, Rosto, Config
 │   │                       #   (+ _shared.js, as peças que todas usam)
 │   └── ...                 # e o que é de página: ui.js, particles.js,
-│                           #   product.js, game-page.js
+│                           #   product.js, game-page.js, game-trailer.js
 │
 └── assets/                 # Mídia
     ├── icons/              # Ícones e favicon
     ├── images/             # Imagens (robô, equipe, produtos, jogo...)
     ├── downloads/          # A build do jogo (.rar)
+    ├── videos/             # O trailer do jogo (.mp4)
     └── pdfs/               # Artigo científico em PDF
 ```
 

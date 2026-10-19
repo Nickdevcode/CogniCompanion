@@ -295,6 +295,100 @@
   font-size: clamp(0.95rem, 1.2vw, 1.25rem);
 }
 
+/* --------------------------------------------------------------------------
+   Player do trailer — <dialog> modal (js/game-trailer.js)
+
+   O diálogo ocupa a tela inteira e é transparente: o clique fora do quadro cai
+   nele mesmo, e é assim que o JS sabe que foi "no fundo". O quadro tem a largura
+   limitada também pela altura da janela, para o vídeo 16:9 nunca passar da tela
+   num notebook baixo ou num celular deitado.
+   -------------------------------------------------------------------------- */
+html.is-trailer-open {
+  overflow: hidden; /* a página atrás não rola enquanto o trailer está aberto */
+}
+
+.video-modal {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: clamp(1rem, 4vw, 3rem);
+  border: 0;
+  background: transparent;
+  color: #fff;
+  overflow: hidden;
+}
+.video-modal[open] {
+  display: grid;
+  place-items: center;
+}
+.video-modal::backdrop {
+  background-color: rgba(4, 6, 24, 0.88);
+  backdrop-filter: blur(6px);
+}
+
+.video-modal__frame {
+  position: relative;
+  /* vh antes, dvh depois: navegador sem dvh descarta só a segunda linha */
+  width: min(1200px, 100%, calc((100vh - 7rem) * 16 / 9));
+  width: min(1200px, 100%, calc((100dvh - 7rem) * 16 / 9));
+  animation: video-modal-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes video-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.video-modal__video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  background-color: #000;
+  /* a mesma moldura dourada do card: quem clicou reconhece o que abriu */
+  border: 3px solid var(--gp-gold);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+}
+
+/* O botão de fechar fica acima do quadro, fora do vídeo: dentro dele, brigaria
+   com os controles nativos do player no canto. */
+.video-modal__close {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.6rem);
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+.video-modal__close svg {
+  width: 20px;
+  height: 20px;
+}
+.video-modal__close:hover {
+  background-color: var(--gp-gold);
+  border-color: var(--gp-gold);
+  transform: rotate(90deg);
+}
+.video-modal__close:focus-visible {
+  outline: 2px solid var(--gp-gold);
+  outline-offset: 3px;
+}
+
 /* ==========================================================================
    HISTÓRIA — 2 parágrafos + 3 cards de imagem com legendas
    ========================================================================== */

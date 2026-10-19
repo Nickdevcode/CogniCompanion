@@ -177,11 +177,24 @@
           <h2 class="game-band game-band--gold" id="videos-titulo" data-reveal>Vídeos</h2>
 
           <div class="game-video" data-reveal data-reveal-delay="120">
-            <a href="#" class="game-video__card" aria-label="Assistir ao trailer de Psybot">
+            <!-- O link aponta para o próprio .mp4: sem JavaScript, o clique abre o
+                 vídeo direto no navegador. Com JavaScript, game-trailer.js abre o
+                 player no diálogo logo abaixo. -->
+            <a
+              href="assets/videos/psybot-trailer.mp4"
+              type="video/mp4"
+              class="game-video__card"
+              aria-label="Assistir ao trailer de Psybot (1 minuto e 40 segundos)"
+              aria-haspopup="dialog"
+              aria-controls="trailer-dialog"
+              data-trailer-open
+            >
               <img
                 class="game-video__thumb"
-                src="assets/images/jogo-video-trailer.png"
-                alt="Cena de gameplay de Psybot: personagem montado atravessa uma floresta"
+                src="assets/images/jogo-trailer-capa.jpg"
+                width="1280"
+                height="720"
+                alt="O Cogni, um pequeno robô branco, encara O NÓ, um monstro rosa de músculos trançados, dentro do cérebro do Alcino"
                 loading="lazy"
               />
               <span class="game-video__play" aria-hidden="true">
@@ -190,13 +203,41 @@
                 </svg>
               </span>
               <span class="game-video__meta">
-                <span class="game-video__date">26/05</span>
+                <span class="game-video__date">19/10 · 1:40</span>
                 <span class="game-video__name">Trailer</span>
               </span>
             </a>
           </div>
         </div>
       </section>
+
+      <!-- Player do trailer. O <dialog> nativo dá de graça o foco preso, o Esc e o
+           fundo escurecido (::backdrop). preload="none": os 38 MB só começam a
+           baixar quando alguém pede para assistir. -->
+      <dialog class="video-modal" id="trailer-dialog" aria-label="Trailer de Psybot">
+        <div class="video-modal__frame">
+          <button type="button" class="video-modal__close" aria-label="Fechar o trailer" data-trailer-close>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+          <video
+            class="video-modal__video"
+            controls
+            playsinline
+            preload="none"
+            poster="assets/images/jogo-trailer-capa.jpg"
+            width="1920"
+            height="1080"
+          >
+            <source src="assets/videos/psybot-trailer.mp4" type="video/mp4" />
+            <p>
+              Seu navegador não reproduz vídeo aqui.
+              <a href="assets/videos/psybot-trailer.mp4">Baixe o trailer em MP4</a>.
+            </p>
+          </video>
+        </div>
+      </dialog>
 
       <!-- ---------- SOBRE ---------- -->
       <section class="game-section" id="sobre" aria-labelledby="sobre-titulo">
@@ -345,7 +386,8 @@
 
     <!-- Scripts (defer: não bloqueiam o parsing).
          theme = tema · scroll = animações [data-reveal] · ui = menu hambúrguer ·
-         game-page = scrollspy do menu lateral do hero. -->
+         game-page = scrollspy do menu lateral do hero · game-trailer = player
+         do trailer na seção Vídeos. -->
     <!-- Supabase (CDN com SRI) → config → toast → session: estado de login no
          site inteiro (header dinâmico + gate de download do jogo). -->
     <script
@@ -366,5 +408,6 @@
     <script src="js/scroll.js" defer></script>
     <script src="js/ui.js" defer></script>
     <script src="js/game-page.js" defer></script>
+    <script src="js/game-trailer.js" defer></script>
   </body>
 </html>
